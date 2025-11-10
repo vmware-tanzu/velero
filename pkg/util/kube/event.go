@@ -16,6 +16,7 @@ limitations under the License.
 package kube
 
 import (
+	"context"
 	"math"
 	"sync"
 	"time"
@@ -182,13 +183,13 @@ func (es *eventSink) Create(event *corev1api.Event) (*corev1api.Event, error) {
 		return event, nil
 	}
 
-	return es.sink.CreateWithEventNamespace(event)
+	return es.sink.CreateWithEventNamespaceWithContext(context.Background(), event)
 }
 
 func (es *eventSink) Update(event *corev1api.Event) (*corev1api.Event, error) {
-	return es.sink.UpdateWithEventNamespace(event)
+	return es.sink.UpdateWithEventNamespaceWithContext(context.Background(), event)
 }
 
 func (es *eventSink) Patch(event *corev1api.Event, data []byte) (*corev1api.Event, error) {
-	return es.sink.PatchWithEventNamespace(event, data)
+	return es.sink.PatchWithEventNamespaceWithContext(context.Background(), event, data)
 }

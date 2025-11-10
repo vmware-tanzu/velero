@@ -125,21 +125,21 @@ func (rp *resticProvider) RunBackup(
 	parentSnapshot string,
 	volMode uploader.PersistentVolumeMode,
 	uploaderCfg map[string]string,
-	updater uploader.ProgressUpdater) (string, bool, int64, error) {
+	updater uploader.ProgressUpdater) (string, bool, int64, int64, error) {
 	if updater == nil {
-		return "", false, 0, errors.New("Need to initial backup progress updater first")
+		return "", false, 0, 0, errors.New("Need to initial backup progress updater first")
 	}
 
 	if path == "" {
-		return "", false, 0, errors.New("path is empty")
+		return "", false, 0, 0, errors.New("path is empty")
 	}
 
 	if realSource != "" {
-		return "", false, 0, errors.New("real source is not empty, this is not supported by restic uploader")
+		return "", false, 0, 0, errors.New("real source is not empty, this is not supported by restic uploader")
 	}
 
 	if volMode == uploader.PersistentVolumeBlock {
-		return "", false, 0, errors.New("unable to support block mode")
+		return "", false, 0, 0, errors.New("unable to support block mode")
 	}
 
 	log := rp.log.WithFields(logrus.Fields{
@@ -150,7 +150,7 @@ func (rp *resticProvider) RunBackup(
 	if len(uploaderCfg) > 0 {
 		parallelFilesUpload, err := uploaderutil.GetParallelFilesUpload(uploaderCfg)
 		if err != nil {
-			return "", false, 0, errors.Wrap(err, "failed to get uploader config")
+			return "", false, 0, 0, errors.Wrap(err, "failed to get uploader config")
 		}
 		if parallelFilesUpload > 0 {
 			log.Warnf("ParallelFilesUpload is set to %d, but restic does not support parallel file uploads. Ignoring.", parallelFilesUpload)
@@ -172,9 +172,9 @@ func (rp *resticProvider) RunBackup(
 	if err != nil {
 		if strings.Contains(stderrBuf, "snapshot is empty") {
 			log.Debugf("Restic backup got empty dir with %s path", path)
-			return "", true, 0, nil
+			return "", true, 0, 0, nil
 		}
-		return "", false, 0, errors.WithStack(fmt.Errorf("error running restic backup command %s with error: %v stderr: %v", backupCmd.String(), err, stderrBuf))
+		return "", false, 0, 0, errors.WithStack(fmt.Errorf("error running restic backup command %s with error: %v stderr: %v", backupCmd.String(), err, stderrBuf))
 	}
 	// GetSnapshotID
 	snapshotIDCmd := resticGetSnapshotFunc(rp.repoIdentifier, rp.credentialsFile, tags)
@@ -185,10 +185,10 @@ func (rp *resticProvider) RunBackup(
 	}
 	snapshotID, err := resticGetSnapshotIDFunc(snapshotIDCmd)
 	if err != nil {
-		return "", false, 0, errors.WithStack(fmt.Errorf("error getting snapshot id with error: %v", err))
+		return "", false, 0, 0, errors.WithStack(fmt.Errorf("error getting snapshot id with error: %v", err))
 	}
 	log.Infof("Run command=%s, stdout=%s, stderr=%s", backupCmd.String(), summary, stderrBuf)
-	return snapshotID, false, 0, nil
+	return snapshotID, false, 0, 0, nil
 }
 
 // RunRestore runs a `restore` command and monitors the volume size to

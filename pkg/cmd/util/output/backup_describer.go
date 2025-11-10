@@ -713,6 +713,9 @@ func describeDataMovement(d *Describer, details bool, info *volume.BackupVolumeI
 		d.Printf("\t\t\t\tData Mover: %s\n", dataMover)
 		d.Printf("\t\t\t\tUploader Type: %s\n", info.SnapshotDataMovementInfo.UploaderType)
 		d.Printf("\t\t\t\tMoved data Size (bytes): %d\n", info.SnapshotDataMovementInfo.Size)
+		if info.SnapshotDataMovementInfo.IncrementalSize > 0 {
+			d.Printf("\t\t\t\tIncremental data Size (bytes): %d\n", info.SnapshotDataMovementInfo.IncrementalSize)
+		}
 		d.Printf("\t\t\t\tResult: %s\n", info.Result)
 	} else {
 		d.Printf("\t\t\tData Movement: %s\n", "included, specify --details for more information")
@@ -835,7 +838,7 @@ func describePodVolumeBackups(d *Describer, details bool, podVolumeBackups []vel
 		backupsByPod := new(volumesByPod)
 
 		for _, backup := range backupsByPhase[phase] {
-			backupsByPod.Add(backup.Spec.Pod.Namespace, backup.Spec.Pod.Name, backup.Spec.Volume, phase, backup.Status.Progress)
+			backupsByPod.Add(backup.Spec.Pod.Namespace, backup.Spec.Pod.Name, backup.Spec.Volume, phase, backup.Status.Progress, backup.Status.IncrementalBytes)
 		}
 
 		d.Printf("\t\t%s:\n", phase)
@@ -885,7 +888,8 @@ type volumesByPod struct {
 
 // Add adds a pod volume with the specified pod namespace, name
 // and volume to the appropriate group.
-func (v *volumesByPod) Add(namespace, name, volume, phase string, progress veleroapishared.DataMoveOperationProgress) {
+// Used for both backup and restore
+func (v *volumesByPod) Add(namespace, name, volume, phase string, progress veleroapishared.DataMoveOperationProgress, incrementalBytes int64) {
 	if v.volumesByPodMap == nil {
 		v.volumesByPodMap = make(map[string]*podVolumeGroup)
 	}
@@ -895,6 +899,12 @@ func (v *volumesByPod) Add(namespace, name, volume, phase string, progress veler
 	// append backup progress percentage if backup is in progress
 	if phase == "In Progress" && progress.TotalBytes != 0 {
 		volume = fmt.Sprintf("%s (%.2f%%)", volume, float64(progress.BytesDone)/float64(progress.TotalBytes)*100)
+	} else if phase == string(velerov1api.PodVolumeBackupPhaseCompleted) && incrementalBytes > 0 {
+		volume = fmt.Sprintf("%s (size: %v, incremental size: %v)", volume, progress.TotalBytes, incrementalBytes)
+	} else if (phase == string(velerov1api.PodVolumeBackupPhaseCompleted) ||
+		phase == string(velerov1api.PodVolumeRestorePhaseCompleted)) &&
+		progress.TotalBytes > 0 {
+		volume = fmt.Sprintf("%s (size: %v)", volume, progress.TotalBytes)
 	}
 
 	if group, ok := v.volumesByPodMap[key]; !ok {

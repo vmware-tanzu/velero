@@ -35,6 +35,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
+	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/csi"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -47,6 +48,12 @@ type CSISnapshotExposeParam struct {
 
 	// SourceNamespace is the original namespace of the volume that the snapshot is taken for
 	SourceNamespace string
+
+	// SourcePVCName is the original name of the PVC that the snapshot is taken for
+	SourcePVCName string
+
+	// SourcePVName is the name of PV for SourcePVC
+	SourcePVName string
 
 	// AccessMode defines the mode to access the snapshot
 	AccessMode string
@@ -189,6 +196,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 	backupPVCReadOnly := false
 	spcNoRelabeling := false
 	backupPVCAnnotations := map[string]string{}
+	intoleratableNodes := []string{}
 	if value, exists := csiExposeParam.BackupPVCConfig[csiExposeParam.StorageClass]; exists {
 		if value.StorageClass != "" {
 			backupPVCStorageClass = value.StorageClass
@@ -205,6 +213,15 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 
 		if len(value.Annotations) > 0 {
 			backupPVCAnnotations = value.Annotations
+		}
+
+		if _, found := backupPVCAnnotations[util.VSphereCNSFastCloneAnno]; found {
+			if n, err := kube.GetPVAttachedNodes(ctx, csiExposeParam.SourcePVName, e.kubeClient.StorageV1()); err != nil {
+				curLog.WithField("source PV", csiExposeParam.SourcePVName).WithError(err).Warnf("Failed to get attached node for source PV, ignore %s annotation", util.VSphereCNSFastCloneAnno)
+				delete(backupPVCAnnotations, util.VSphereCNSFastCloneAnno)
+			} else {
+				intoleratableNodes = n
+			}
 		}
 	}
 
@@ -236,6 +253,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 		spcNoRelabeling,
 		csiExposeParam.NodeOS,
 		csiExposeParam.PriorityClassName,
+		intoleratableNodes,
 	)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
@@ -363,8 +381,13 @@ func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject cor
 		diag += fmt.Sprintf("error getting backup vs %s, err: %v\n", backupVSName, err)
 	}
 
+	events, err := e.kubeClient.CoreV1().Events(ownerObject.Namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		diag += fmt.Sprintf("error listing events, err: %v\n", err)
+	}
+
 	if pod != nil {
-		diag += kube.DiagnosePod(pod)
+		diag += kube.DiagnosePod(pod, events)
 
 		if pod.Spec.NodeName != "" {
 			if err := nodeagent.KbClientIsRunningInNode(ctx, ownerObject.Namespace, pod.Spec.NodeName, e.kubeClient); err != nil {
@@ -374,7 +397,7 @@ func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject cor
 	}
 
 	if pvc != nil {
-		diag += kube.DiagnosePVC(pvc)
+		diag += kube.DiagnosePVC(pvc, events)
 
 		if pvc.Spec.VolumeName != "" {
 			if pv, err := e.kubeClient.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{}); err != nil {
@@ -386,7 +409,7 @@ func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject cor
 	}
 
 	if vs != nil {
-		diag += csi.DiagnoseVS(vs)
+		diag += csi.DiagnoseVS(vs, events)
 
 		if vs.Status != nil && vs.Status.BoundVolumeSnapshotContentName != nil && *vs.Status.BoundVolumeSnapshotContentName != "" {
 			if vsc, err := e.csiSnapshotClient.VolumeSnapshotContents().Get(ctx, *vs.Status.BoundVolumeSnapshotContentName, metav1.GetOptions{}); err != nil {
@@ -564,6 +587,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	spcNoRelabeling bool,
 	nodeOS string,
 	priorityClassName string,
+	intoleratableNodes []string,
 ) (*corev1api.Pod, error) {
 	podName := ownerObject.Name
 
@@ -664,6 +688,18 @@ func (e *csiSnapshotExposer) createBackupPod(
 	}
 
 	var podAffinity *corev1api.Affinity
+	if len(intoleratableNodes) > 0 {
+		if affinity == nil {
+			affinity = &kube.LoadAffinity{}
+		}
+
+		affinity.NodeSelector.MatchExpressions = append(affinity.NodeSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+			Key:      "kubernetes.io/hostname",
+			Values:   intoleratableNodes,
+			Operator: metav1.LabelSelectorOpNotIn,
+		})
+	}
+
 	if affinity != nil {
 		podAffinity = kube.ToSystemAffinity([]*kube.LoadAffinity{affinity})
 	}

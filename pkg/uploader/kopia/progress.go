@@ -121,6 +121,7 @@ func (p *Progress) UploadStarted() {}
 // CachedFile statistic the total bytes been cached currently
 func (p *Progress) CachedFile(fname string, numBytes int64) {
 	atomic.AddInt64(&p.cachedBytes, numBytes)
+	atomic.AddInt64(&p.processedBytes, numBytes)
 	p.UpdateProgress()
 }
 
@@ -175,4 +176,8 @@ func (p *Progress) EstimationParameters() upload.EstimationParameters {
 
 func (p *Progress) Enabled() bool {
 	return true
+}
+
+func (p *Progress) GetIncrementalSize() int64 {
+	return p.estimatedTotalBytes - p.cachedBytes
 }

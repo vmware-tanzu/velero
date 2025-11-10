@@ -3269,7 +3269,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			err := h.backupper.Backup(h.log, tc.req, backupFile, nil, nil, tc.snapshotterGetter)
 			require.NoError(t, err)
 
-			assert.Equal(t, tc.want, tc.req.VolumeSnapshots)
+			assert.Equal(t, tc.want, tc.req.VolumeSnapshots.Get())
 		})
 	}
 }
@@ -4213,7 +4213,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 			assert.Equal(t, tc.want, req.PodVolumeBackups)
 
 			// this assumes that we don't have any test cases where some PVs should be snapshotted using a VolumeSnapshotter
-			assert.Nil(t, req.VolumeSnapshots)
+			assert.Nil(t, req.VolumeSnapshots.Get())
 		})
 	}
 }
@@ -5578,6 +5578,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{VolumeSnapshot: "vs-1"}).
 				SnapshotID("snapshot-id").
 				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000}).
+				IncrementalBytes(500).
 				Phase(velerov2alpha1.DataUploadPhaseFailed).
 				SourceNamespace("ns-1").
 				SourcePVC("pvc-1").
@@ -5603,6 +5604,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 						RetainedSnapshot: "vs-1",
 						SnapshotHandle:   "snapshot-id",
 						Size:             1000,
+						IncrementalSize:  500,
 						Phase:            velerov2alpha1.DataUploadPhaseFailed,
 					},
 				},
@@ -5616,6 +5618,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{VolumeSnapshot: "vs-1"}).
 				SnapshotID("snapshot-id").
 				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000}).
+				IncrementalBytes(500).
 				Phase(velerov2alpha1.DataUploadPhaseCompleted).
 				SourceNamespace("ns-1").
 				SourcePVC("pvc-1").
@@ -5641,6 +5644,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 						RetainedSnapshot: "vs-1",
 						SnapshotHandle:   "snapshot-id",
 						Size:             1000,
+						IncrementalSize:  500,
 						Phase:            velerov2alpha1.DataUploadPhaseCompleted,
 					},
 				},
@@ -5655,6 +5659,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{VolumeSnapshot: "vs-1"}).
 				SnapshotID("snapshot-id").
 				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000}).
+				IncrementalBytes(500).
 				Phase(velerov2alpha1.DataUploadPhaseCompleted).
 				SourceNamespace("ns-1").
 				SourcePVC("pvc-1").

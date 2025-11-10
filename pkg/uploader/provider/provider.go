@@ -50,7 +50,7 @@ type Provider interface {
 		parentSnapshot string,
 		volMode uploader.PersistentVolumeMode,
 		uploaderCfg map[string]string,
-		updater uploader.ProgressUpdater) (string, bool, int64, error)
+		updater uploader.ProgressUpdater) (string, bool, int64, int64, error)
 	// RunRestore which will do restore for one specific volume with given snapshot id and return error
 	// updater is used for updating backup progress which implement by third-party
 	RunRestore(
