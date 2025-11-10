@@ -145,7 +145,7 @@ type CSISnapshotInfo struct {
 	OperationID string `json:"operationID,omitempty"`
 
 	// The VolumeSnapshot's Status.ReadyToUse value
-	ReadyToUse *bool
+	ReadyToUse *bool `json:"readyToUse,omitempty"`
 }
 
 // SnapshotDataMovementInfo is used for displaying the snapshot data mover status.
