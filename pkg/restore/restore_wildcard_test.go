@@ -165,12 +165,12 @@ func TestExpandNamespaceWildcards(t *testing.T) {
 			err := ctx.expandNamespaceWildcards(tc.backupResources)
 
 			if tc.expectedError != "" {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.expectedError)
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if tc.expectedIncludeMatches == nil && tc.expectedExcludeMatches == nil {
 				// No wildcards case - status should not be set
@@ -201,8 +201,8 @@ func TestExtractNamespacesFromBackup(t *testing.T) {
 		{
 			name: "Namespaces with resources",
 			backupResources: map[string]*archive.ResourceItems{
-				"namespaces": {ItemsByNamespace: map[string][]string{"app1": {}, "app2": {}}},
-				"pods.v1":    {ItemsByNamespace: map[string][]string{"app1": {"pod1"}}},
+				"namespaces":  {ItemsByNamespace: map[string][]string{"app1": {}, "app2": {}}},
+				"pods.v1":     {ItemsByNamespace: map[string][]string{"app1": {"pod1"}}},
 				"services.v1": {ItemsByNamespace: map[string][]string{"app2": {"svc1"}}},
 			},
 			expected: []string{"app1", "app2"},
@@ -234,8 +234,8 @@ func TestExtractNamespacesFromBackup(t *testing.T) {
 		{
 			name: "Duplicate namespace entries",
 			backupResources: map[string]*archive.ResourceItems{
-				"namespaces":   {ItemsByNamespace: map[string][]string{"app": {}}},
-				"pods.v1":      {ItemsByNamespace: map[string][]string{"app": {"pod1"}}},
+				"namespaces":    {ItemsByNamespace: map[string][]string{"app": {}}},
+				"pods.v1":       {ItemsByNamespace: map[string][]string{"app": {"pod1"}}},
 				"configmaps.v1": {ItemsByNamespace: map[string][]string{"app": {"cm1"}}},
 			},
 			expected: []string{"app"},
