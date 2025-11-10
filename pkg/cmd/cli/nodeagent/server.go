@@ -363,7 +363,7 @@ func (s *nodeAgentServer) run() {
 		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
 	}
 
-	pvrReconciler := controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.logger, dataMovePriorityClass, privilegedFsBackup)
+	pvrReconciler := controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, s.backupRepoConfigs, cachePVCConfig, podResources, s.logger, dataMovePriorityClass, privilegedFsBackup, s.repoConfigMgr)
 	if err := pvrReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
