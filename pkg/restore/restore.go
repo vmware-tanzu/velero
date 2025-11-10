@@ -25,6 +25,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -77,6 +78,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
+	"github.com/vmware-tanzu/velero/pkg/util/wildcard"
 )
 
 const ObjectStatusRestoreAnnotationKey = "velero.io/restore-status"
@@ -471,6 +473,12 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 	}
 	if err != nil {
 		errs.AddVeleroError(errors.Wrap(err, "error parsing backup contents"))
+		return warnings, errs
+	}
+
+	// Expand wildcard patterns in namespace includes/excludes if needed
+	if err := ctx.expandNamespaceWildcards(backupResources); err != nil {
+		errs.AddVeleroError(err)
 		return warnings, errs
 	}
 
@@ -2376,6 +2384,66 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource string, original
 		restorable.totalItems++
 	}
 	return restorable, warnings, errs
+}
+
+// extractNamespacesFromBackup extracts all available namespaces from backup resources
+func extractNamespacesFromBackup(backupResources map[string]*archive.ResourceItems) []string {
+	namespaceSet := make(map[string]struct{})
+	for _, resource := range backupResources {
+		for namespace := range resource.ItemsByNamespace {
+			if namespace != "" { // Skip cluster-scoped resources (empty namespace)
+				namespaceSet[namespace] = struct{}{}
+			}
+		}
+	}
+
+	namespaces := make([]string, 0, len(namespaceSet))
+	for ns := range namespaceSet {
+		namespaces = append(namespaces, ns)
+	}
+	return namespaces
+}
+
+// expandNamespaceWildcards expands wildcard patterns in namespace includes/excludes
+// and updates the restore context with the expanded patterns and status
+func (ctx *restoreContext) expandNamespaceWildcards(backupResources map[string]*archive.ResourceItems) error {
+	if !wildcard.ShouldExpandWildcards(ctx.restore.Spec.IncludedNamespaces, ctx.restore.Spec.ExcludedNamespaces) {
+		return nil
+	}
+
+	// If `*` is mentioned in restore excludes, something is wrong
+	if slices.Contains(ctx.restore.Spec.ExcludedNamespaces, "*") {
+		return errors.New("wildcard '*' is not allowed in restore excludes")
+	}
+
+	availableNamespaces := extractNamespacesFromBackup(backupResources)
+	expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(
+		availableNamespaces,
+		ctx.restore.Spec.IncludedNamespaces,
+		ctx.restore.Spec.ExcludedNamespaces,
+	)
+	if err != nil {
+		return errors.Wrap(err, "error expanding wildcard patterns in namespace includes/excludes")
+	}
+
+	// Update namespace includes/excludes with expanded patterns
+	ctx.namespaceIncludesExcludes = collections.NewIncludesExcludes().
+		Includes(expandedIncludes...).
+		Excludes(expandedExcludes...)
+
+	selectedNamespaces := wildcard.GetWildcardResult(expandedIncludes, expandedExcludes)
+
+	// Record the expanded wildcard includes/excludes and final processed namespaces in the restore status
+	ctx.restore.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
+		IncludeWildcardMatches: expandedIncludes,
+		ExcludeWildcardMatches: expandedExcludes,
+		WildcardResult:         selectedNamespaces,
+	}
+
+	ctx.log.Infof("Expanded namespace wildcards - includes: %v, excludes: %v, final: %v",
+		expandedIncludes, expandedExcludes, selectedNamespaces)
+
+	return nil
 }
 
 // removeRestoreLabels removes the restore name and the
