@@ -189,7 +189,7 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 		"repo UID":  param.BackupRepo.UID,
 	})
 
-	log.Debug("Start to prepare repo")
+	log.Info("Start to prepare repo")
 
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
@@ -211,7 +211,7 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 	if created, err := urp.repoService.IsCreated(ctx, *repoOption); err != nil {
 		return errors.Wrap(err, "error to check backup repo")
 	} else if created {
-		log.Debug("Repo has already been initialized remotely")
+		log.Info("Repo has already been initialized")
 		return nil
 	}
 
@@ -224,7 +224,7 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 		return errors.Wrap(err, "error to create backup repo")
 	}
 
-	log.Debug("Prepare repo complete")
+	log.Info("Prepare repo complete")
 
 	return nil
 }
