@@ -60,6 +60,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	repository "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -144,6 +145,7 @@ type nodeAgentServer struct {
 	dataPathConfigs   *velerotypes.NodeAgentConfigs
 	backupRepoConfigs map[string]string
 	vgdpCounter       *exposer.VgdpCounter
+	repoConfigMgr     repository.ConfigManager
 }
 
 func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, config nodeAgentServerConfig) (*nodeAgentServer, error) {
@@ -237,6 +239,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		namespace:      factory.Namespace(),
 		nodeName:       nodeName,
 		metricsAddress: config.metricsAddress,
+		repoConfigMgr:  repository.NewConfigManager(logger),
 	}
 
 	// the cache isn't initialized yet when "validatePodVolumesHostPath" is called, the client returned by the manager cannot
@@ -345,6 +348,16 @@ func (s *nodeAgentServer) run() {
 		}
 	}
 
+	var cachePVCConfig *velerotypes.CachePVC
+	if s.dataPathConfigs != nil && s.dataPathConfigs.CachePVCConfig != nil {
+		cachePVCConfig = s.dataPathConfigs.CachePVCConfig
+		s.logger.Infof("Using customized cachePVC config %v", cachePVCConfig)
+	}
+
+	if s.backupRepoConfigs != nil {
+		s.logger.Infof("Using backup repo config %v", s.backupRepoConfigs)
+	}
+
 	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger, dataMovePriorityClass, privilegedFsBackup)
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
@@ -394,12 +407,15 @@ func (s *nodeAgentServer) run() {
 		s.vgdpCounter,
 		loadAffinity,
 		restorePVCConfig,
+		s.backupRepoConfigs,
+		cachePVCConfig,
 		podResources,
 		s.nodeName,
 		s.config.dataMoverPrepareTimeout,
 		s.logger,
 		s.metrics,
 		dataMovePriorityClass,
+		s.repoConfigMgr,
 	)
 
 	if err := dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
