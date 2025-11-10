@@ -69,8 +69,9 @@ type Request struct {
 }
 
 type restoredItemStatus struct {
-	action     string
-	itemExists bool
+	action      string
+	itemExists  bool
+	createdName string // Actual name assigned by K8s for GenerateName resources
 }
 
 // GetItemOperationsList returns ItemOperationsList, initializing it if necessary
@@ -87,9 +88,15 @@ func (r *Request) GetItemOperationsList() *[]*itemoperation.RestoreOperation {
 func (r *Request) RestoredResourceList() map[string][]string {
 	resources := map[string][]string{}
 	for i, item := range r.RestoredItems {
-		entry := i.name
+		// Use createdName if available (GenerateName case), otherwise itemKey.name
+		name := i.name
+		if item.createdName != "" {
+			name = item.createdName
+		}
+
+		entry := name
 		if i.namespace != "" {
-			entry = fmt.Sprintf("%s/%s", i.namespace, i.name)
+			entry = fmt.Sprintf("%s/%s", i.namespace, name)
 		}
 		entry = fmt.Sprintf("%s(%s)", entry, item.action)
 		resources[i.resource] = append(resources[i.resource], entry)
