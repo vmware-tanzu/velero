@@ -133,6 +133,30 @@ func DescribeRestore(
 		}
 		d.Printf("\tExcluded:\t%s\n", s)
 
+		// Display wildcard namespace information if present
+		if restore.Status.WildcardNamespaces != nil {
+			d.Println()
+			d.Printf("\tWildcard Namespace Processing:\n")
+
+			if len(restore.Status.WildcardNamespaces.IncludeWildcardMatches) > 0 {
+				d.Printf("\t\tNamespaces matched by include patterns:\t%s\n", strings.Join(restore.Status.WildcardNamespaces.IncludeWildcardMatches, ", "))
+			} else {
+				d.Printf("\t\tNamespaces matched by include patterns:\t<none>\n")
+			}
+
+			if len(restore.Status.WildcardNamespaces.ExcludeWildcardMatches) > 0 {
+				d.Printf("\t\tNamespaces matched by exclude patterns:\t%s\n", strings.Join(restore.Status.WildcardNamespaces.ExcludeWildcardMatches, ", "))
+			} else {
+				d.Printf("\t\tNamespaces matched by exclude patterns:\t<none>\n")
+			}
+
+			if len(restore.Status.WildcardNamespaces.WildcardResult) > 0 {
+				d.Printf("\t\tFinal namespaces selected:\t%s\n", strings.Join(restore.Status.WildcardNamespaces.WildcardResult, ", "))
+			} else {
+				d.Printf("\t\tFinal namespaces selected:\t<none>\n")
+			}
+		}
+
 		d.Println()
 		d.Printf("Resources:\n")
 		if len(restore.Spec.IncludedResources) == 0 {
