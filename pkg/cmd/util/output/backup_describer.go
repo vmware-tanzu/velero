@@ -342,6 +342,31 @@ func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Desc
 	d.Printf("Expiration:\t%s\n", status.Expiration)
 	d.Println()
 
+	// Display wildcard namespace information if present
+	if status.WildcardNamespaces != nil {
+		d.Printf("Wildcard Namespace Processing:\n")
+
+		if len(status.WildcardNamespaces.IncludeWildcardMatches) > 0 {
+			d.Printf("\tNamespaces matched by include patterns:\t%s\n", strings.Join(status.WildcardNamespaces.IncludeWildcardMatches, ", "))
+		} else {
+			d.Printf("\tNamespaces matched by include patterns:\t<none>\n")
+		}
+
+		if len(status.WildcardNamespaces.ExcludeWildcardMatches) > 0 {
+			d.Printf("\tNamespaces matched by exclude patterns:\t%s\n", strings.Join(status.WildcardNamespaces.ExcludeWildcardMatches, ", "))
+		} else {
+			d.Printf("\tNamespaces matched by exclude patterns:\t<none>\n")
+		}
+
+		if len(status.WildcardNamespaces.WildcardResult) > 0 {
+			d.Printf("\tFinal namespaces selected:\t%s\n", strings.Join(status.WildcardNamespaces.WildcardResult, ", "))
+		} else {
+			d.Printf("\tFinal namespaces selected:\t<none>\n")
+		}
+
+		d.Println()
+	}
+
 	if backup.Status.Progress != nil {
 		if backup.Status.Phase == velerov1api.BackupPhaseInProgress {
 			d.Printf("Estimated total items to be backed up:\t%d\n", backup.Status.Progress.TotalItems)

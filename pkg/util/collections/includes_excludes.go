@@ -65,6 +65,7 @@ type NamespaceIncludesExcludes struct {
 	activeNamespaces []string
 	includesExcludes *IncludesExcludes
 	wildcardExpanded bool
+	wildcardResult   []string
 }
 
 func NewNamespaceIncludesExcludes() *NamespaceIncludesExcludes {
@@ -188,7 +189,8 @@ func (nie *NamespaceIncludesExcludes) ResolveNamespaceList() ([]string, error) {
 			outNamespaces = append(outNamespaces, ns)
 		}
 	}
-	return outNamespaces, nil
+	nie.wildcardResult = outNamespaces
+	return nie.wildcardResult, nil
 }
 
 // IncludesExcludes is a type that manages lists of included

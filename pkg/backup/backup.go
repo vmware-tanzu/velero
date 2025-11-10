@@ -171,12 +171,6 @@ func NewKubernetesBackupper(
 // getNamespaceIncludesExcludes returns an IncludesExcludes list containing which namespaces to
 // include and exclude from the backup.
 func getNamespaceIncludesExcludes(backup *velerov1api.Backup, kbClient kbclient.Client) (*collections.NamespaceIncludesExcludes, []string, error) {
-	includesExcludes := collections.NewNamespaceIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...)
-	err := includesExcludes.ExpandIncludesExcludes()
-	if err != nil {
-		return nil, []string{}, err
-	}
-
 	nsList := corev1api.NamespaceList{}
 	activeNamespaces := []string{}
 	nsManagedByArgoCD := []string{}
@@ -185,12 +179,28 @@ func getNamespaceIncludesExcludes(backup *velerov1api.Backup, kbClient kbclient.
 	}
 	for _, ns := range nsList.Items {
 		activeNamespaces = append(activeNamespaces, ns.Name)
+	}
+
+	// Set ActiveNamespaces first, then set includes/excludes
+	includesExcludes := collections.NewNamespaceIncludesExcludes().
+		ActiveNamespaces(activeNamespaces).
+		Includes(backup.Spec.IncludedNamespaces...).
+		Excludes(backup.Spec.ExcludedNamespaces...)
+
+	// Expand wildcards if needed
+	if err := includesExcludes.ExpandIncludesExcludes(); err != nil {
+		return nil, []string{}, err
+	}
+
+	// Check for ArgoCD managed namespaces in the namespaces that will be included
+	for _, ns := range nsList.Items {
 		nsLabels := ns.GetLabels()
 		if len(nsLabels[ArgoCDManagedByNamespaceLabel]) > 0 && includesExcludes.ShouldInclude(ns.Name) {
 			nsManagedByArgoCD = append(nsManagedByArgoCD, ns.Name)
 		}
 	}
-	return includesExcludes.ActiveNamespaces(activeNamespaces), nsManagedByArgoCD, nil
+
+	return includesExcludes, nsManagedByArgoCD, nil
 }
 
 func getResourceHooks(hookSpecs []velerov1api.BackupResourceHookSpec, discoveryHelper discovery.Helper) ([]hook.ResourceHook, error) {
@@ -267,29 +277,39 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	var err error
 	var nsManagedByArgoCD []string
 	backupRequest.NamespaceIncludesExcludes, nsManagedByArgoCD, err = getNamespaceIncludesExcludes(backupRequest.Backup, kb.kbClient)
+	if err != nil {
+		log.WithError(err).Errorf("error getting namespace includes/excludes")
+		return err
+	}
 
 	if backupRequest.NamespaceIncludesExcludes.IsWildcardExpanded() {
 		expandedIncludes := backupRequest.NamespaceIncludesExcludes.GetIncludes()
 		expandedExcludes := backupRequest.NamespaceIncludesExcludes.GetExcludes()
 
+		// Get the final namespace list after wildcard expansion
+		wildcardResult, err := backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList()
+		if err != nil {
+			log.WithError(err).Errorf("error resolving namespace list")
+			return err
+		}
+
 		// Record the expanded wildcard includes/excludes in the request status
 		backupRequest.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
 			IncludeWildcardMatches: expandedIncludes,
 			ExcludeWildcardMatches: expandedExcludes,
+			WildcardResult:         wildcardResult,
 		}
 
 		log.WithFields(logrus.Fields{
 			"expandedIncludes": expandedIncludes,
 			"expandedExcludes": expandedExcludes,
+			"wildcardResult":   wildcardResult,
 			"includedCount":    len(expandedIncludes),
 			"excludedCount":    len(expandedExcludes),
+			"resultCount":      len(wildcardResult),
 		}).Info("Successfully expanded wildcard patterns")
 	}
 
-	if err != nil {
-		log.WithError(err).Errorf("error listing namespaces")
-		return err
-	}
 	log.Infof("Including namespaces: %s", backupRequest.NamespaceIncludesExcludes.IncludesString())
 	log.Infof("Excluding namespaces: %s", backupRequest.NamespaceIncludesExcludes.ExcludesString())
 
