@@ -993,124 +993,124 @@ func TestShouldExcluded(t *testing.T) {
 
 func TestExpandIncludesExcludes(t *testing.T) {
 	tests := []struct {
-		name                    string
-		includes                []string
-		excludes                []string
-		activeNamespaces        []string
-		expectedIncludes        []string
-		expectedExcludes        []string
+		name                     string
+		includes                 []string
+		excludes                 []string
+		activeNamespaces         []string
+		expectedIncludes         []string
+		expectedExcludes         []string
 		expectedWildcardExpanded bool
-		expectError             bool
+		expectError              bool
 	}{
 		{
-			name:                    "no wildcards - should not expand",
-			includes:                []string{"default", "kube-system"},
-			excludes:                []string{"kube-public"},
-			activeNamespaces:        []string{"default", "kube-system", "kube-public", "test"},
-			expectedIncludes:        []string{"default", "kube-system"},
-			expectedExcludes:        []string{"kube-public"},
+			name:                     "no wildcards - should not expand",
+			includes:                 []string{"default", "kube-system"},
+			excludes:                 []string{"kube-public"},
+			activeNamespaces:         []string{"default", "kube-system", "kube-public", "test"},
+			expectedIncludes:         []string{"default", "kube-system"},
+			expectedExcludes:         []string{"kube-public"},
 			expectedWildcardExpanded: false,
-			expectError:             false,
+			expectError:              false,
 		},
 		{
-			name:                    "asterisk alone - should not expand",
-			includes:                []string{"*"},
-			excludes:                []string{},
-			activeNamespaces:        []string{"default", "kube-system", "test"},
-			expectedIncludes:        []string{"*"},
-			expectedExcludes:        []string{},
+			name:                     "asterisk alone - should not expand",
+			includes:                 []string{"*"},
+			excludes:                 []string{},
+			activeNamespaces:         []string{"default", "kube-system", "test"},
+			expectedIncludes:         []string{"*"},
+			expectedExcludes:         []string{},
 			expectedWildcardExpanded: false,
-			expectError:             false,
+			expectError:              false,
 		},
 		{
-			name:                    "wildcard in includes - should expand",
-			includes:                []string{"kube-*"},
-			excludes:                []string{},
-			activeNamespaces:        []string{"default", "kube-system", "kube-public", "test"},
-			expectedIncludes:        []string{"kube-system", "kube-public"},
-			expectedExcludes:        []string{},
+			name:                     "wildcard in includes - should expand",
+			includes:                 []string{"kube-*"},
+			excludes:                 []string{},
+			activeNamespaces:         []string{"default", "kube-system", "kube-public", "test"},
+			expectedIncludes:         []string{"kube-system", "kube-public"},
+			expectedExcludes:         []string{},
 			expectedWildcardExpanded: true,
-			expectError:             false,
+			expectError:              false,
 		},
 		{
-			name:                    "wildcard in excludes - should expand",
-			includes:                []string{"default"},
-			excludes:                []string{"*-test"},
-			activeNamespaces:        []string{"default", "kube-test", "app-test", "prod"},
-			expectedIncludes:        []string{"default"},
-			expectedExcludes:        []string{"kube-test", "app-test"},
+			name:                     "wildcard in excludes - should expand",
+			includes:                 []string{"default"},
+			excludes:                 []string{"*-test"},
+			activeNamespaces:         []string{"default", "kube-test", "app-test", "prod"},
+			expectedIncludes:         []string{"default"},
+			expectedExcludes:         []string{"kube-test", "app-test"},
 			expectedWildcardExpanded: true,
-			expectError:             false,
+			expectError:              false,
 		},
 		{
-			name:                    "wildcards in both includes and excludes",
-			includes:                []string{"kube-*", "app-*"},
-			excludes:                []string{"*-test"},
-			activeNamespaces:        []string{"kube-system", "kube-test", "app-prod", "app-test", "default"},
-			expectedIncludes:        []string{"kube-system", "kube-test", "app-prod", "app-test"},
-			expectedExcludes:        []string{"kube-test", "app-test"},
+			name:                     "wildcards in both includes and excludes",
+			includes:                 []string{"kube-*", "app-*"},
+			excludes:                 []string{"*-test"},
+			activeNamespaces:         []string{"kube-system", "kube-test", "app-prod", "app-test", "default"},
+			expectedIncludes:         []string{"kube-system", "kube-test", "app-prod", "app-test"},
+			expectedExcludes:         []string{"kube-test", "app-test"},
 			expectedWildcardExpanded: true,
-			expectError:             false,
+			expectError:              false,
 		},
 		{
-			name:                    "wildcard pattern matches nothing",
-			includes:                []string{"nonexistent-*"},
-			excludes:                []string{},
-			activeNamespaces:        []string{"default", "kube-system"},
-			expectedIncludes:        []string{},
-			expectedExcludes:        []string{},
+			name:                     "wildcard pattern matches nothing",
+			includes:                 []string{"nonexistent-*"},
+			excludes:                 []string{},
+			activeNamespaces:         []string{"default", "kube-system"},
+			expectedIncludes:         []string{},
+			expectedExcludes:         []string{},
 			expectedWildcardExpanded: true,
-			expectError:             false,
+			expectError:              false,
 		},
 		{
-			name:                    "mix of wildcards and non-wildcards in includes",
-			includes:                []string{"default", "kube-*"},
-			excludes:                []string{},
-			activeNamespaces:        []string{"default", "kube-system", "kube-public", "test"},
-			expectedIncludes:        []string{"default", "kube-system", "kube-public"},
-			expectedExcludes:        []string{},
+			name:                     "mix of wildcards and non-wildcards in includes",
+			includes:                 []string{"default", "kube-*"},
+			excludes:                 []string{},
+			activeNamespaces:         []string{"default", "kube-system", "kube-public", "test"},
+			expectedIncludes:         []string{"default", "kube-system", "kube-public"},
+			expectedExcludes:         []string{},
 			expectedWildcardExpanded: true,
-			expectError:             false,
+			expectError:              false,
 		},
 		{
-			name:                    "question mark wildcard",
-			includes:                []string{"test-?"},
-			excludes:                []string{},
-			activeNamespaces:        []string{"test-1", "test-2", "test-10", "default"},
-			expectedIncludes:        []string{"test-1", "test-2"},
-			expectedExcludes:        []string{},
+			name:                     "question mark wildcard",
+			includes:                 []string{"test-?"},
+			excludes:                 []string{},
+			activeNamespaces:         []string{"test-1", "test-2", "test-10", "default"},
+			expectedIncludes:         []string{"test-1", "test-2"},
+			expectedExcludes:         []string{},
 			expectedWildcardExpanded: true,
-			expectError:             false,
+			expectError:              false,
 		},
 		{
-			name:                    "brace wildcard pattern",
-			includes:                []string{"app-{prod,dev}"},
-			excludes:                []string{},
-			activeNamespaces:        []string{"app-prod", "app-dev", "app-test", "default"},
-			expectedIncludes:        []string{"app-prod", "app-dev"},
-			expectedExcludes:        []string{},
+			name:                     "brace wildcard pattern",
+			includes:                 []string{"app-{prod,dev}"},
+			excludes:                 []string{},
+			activeNamespaces:         []string{"app-prod", "app-dev", "app-test", "default"},
+			expectedIncludes:         []string{"app-prod", "app-dev"},
+			expectedExcludes:         []string{},
 			expectedWildcardExpanded: true,
-			expectError:             false,
+			expectError:              false,
 		},
 		{
-			name:                    "empty activeNamespaces with wildcards",
-			includes:                []string{"kube-*"},
-			excludes:                []string{},
-			activeNamespaces:        []string{},
-			expectedIncludes:        []string{},
-			expectedExcludes:        []string{},
+			name:                     "empty activeNamespaces with wildcards",
+			includes:                 []string{"kube-*"},
+			excludes:                 []string{},
+			activeNamespaces:         []string{},
+			expectedIncludes:         []string{},
+			expectedExcludes:         []string{},
 			expectedWildcardExpanded: true,
-			expectError:             false,
+			expectError:              false,
 		},
 		{
-			name:                    "invalid wildcard pattern - consecutive asterisks",
-			includes:                []string{"kube-**"},
-			excludes:                []string{},
-			activeNamespaces:        []string{"default"},
-			expectedIncludes:        []string{"kube-**"},
-			expectedExcludes:        []string{},
+			name:                     "invalid wildcard pattern - consecutive asterisks",
+			includes:                 []string{"kube-**"},
+			excludes:                 []string{},
+			activeNamespaces:         []string{"default"},
+			expectedIncludes:         []string{"kube-**"},
+			expectedExcludes:         []string{},
 			expectedWildcardExpanded: false,
-			expectError:             true,
+			expectError:              true,
 		},
 	}
 
@@ -1148,12 +1148,12 @@ func TestExpandIncludesExcludes(t *testing.T) {
 
 func TestResolveNamespaceList(t *testing.T) {
 	tests := []struct {
-		name                 string
-		includes             []string
-		excludes             []string
-		activeNamespaces     []string
-		expectedNamespaces   []string
-		preExpandWildcards   bool
+		name               string
+		includes           []string
+		excludes           []string
+		activeNamespaces   []string
+		expectedNamespaces []string
+		preExpandWildcards bool
 	}{
 		{
 			name:               "no includes/excludes - all active namespaces",
