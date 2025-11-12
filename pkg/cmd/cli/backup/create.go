@@ -32,6 +32,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
@@ -50,24 +51,27 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
-		Example: `  # Create a backup containing all resources.
-  velero backup create backup1
+	}
+
+	// Set examples using the dynamic program name
+	progName := util.GetProgramName(c)
+	c.Example = fmt.Sprintf(`  # Create a backup containing all resources.
+  %s backup create backup1
 
   # Create a backup including only the nginx namespace.
-  velero backup create nginx-backup --include-namespaces nginx
+  %s backup create nginx-backup --include-namespaces nginx
 
   # Create a backup excluding the velero and default namespaces.
-  velero backup create backup2 --exclude-namespaces velero,default
+  %s backup create backup2 --exclude-namespaces velero,default
 
   # Create a backup based on a schedule named daily-backup.
-  velero backup create --from-schedule daily-backup
+  %s backup create --from-schedule daily-backup
 
   # View the YAML for a backup that doesn't snapshot volumes, without sending it to the server.
-  velero backup create backup3 --snapshot-volumes=false -o yaml
+  %s backup create backup3 --snapshot-volumes=false -o yaml
 
   # Wait for a backup to complete before returning from the command.
-  velero backup create backup4 --wait`,
-	}
+  %s backup create backup4 --wait`, progName, progName, progName, progName, progName, progName)
 
 	o.BindFlags(c.Flags())
 	o.BindWait(c.Flags())
@@ -326,7 +330,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 				if backup.Status.Phase == velerov1api.BackupPhaseFailedValidation || backup.Status.Phase == velerov1api.BackupPhaseCompleted ||
 					backup.Status.Phase == velerov1api.BackupPhasePartiallyFailed || backup.Status.Phase == velerov1api.BackupPhaseFailed {
-					fmt.Printf("\nBackup completed with status: %s. You may check for more information using the commands `velero backup describe %s` and `velero backup logs %s`.\n", backup.Status.Phase, backup.Name, backup.Name)
+					progName := util.GetProgramName(c)
+					fmt.Printf("\nBackup completed with status: %s. You may check for more information using the commands `%s backup describe %s` and `%s backup logs %s`.\n", backup.Status.Phase, progName, backup.Name, progName, backup.Name)
 					return nil
 				}
 			}
@@ -334,8 +339,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 
 	// Not waiting
-
-	fmt.Printf("Run `velero backup describe %s` or `velero backup logs %s` for more details.\n", backup.Name, backup.Name)
+	progName := util.GetProgramName(c)
+	fmt.Printf("Run `%s backup describe %s` or `%s backup logs %s` for more details.\n", progName, backup.Name, progName, backup.Name)
 
 	return nil
 }

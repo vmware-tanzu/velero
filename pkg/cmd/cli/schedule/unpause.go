@@ -17,11 +17,14 @@ limitations under the License.
 package schedule
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util"
 )
 
 // NewUnpauseCommand creates the command for unpause
@@ -31,23 +34,26 @@ func NewUnpauseCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   use,
 		Short: "Unpause schedules",
-		Example: `  # Unpause a schedule named "schedule-1".
-  velero schedule unpause schedule-1
-
-  # Unpause schedules named "schedule-1" and "schedule-2".
-  velero schedule unpause schedule-1 schedule-2
-
-  # Unpause all schedules labeled with "foo=bar".
-  velero schedule unpause --selector foo=bar
-
-  # Unpause all schedules.
-  velero schedule unpause --all`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args))
 			cmd.CheckError(o.Validate())
 			cmd.CheckError(runPause(f, o, false, pauseOpts.SkipOptions.SkipImmediately.Value))
 		},
 	}
+
+	// Set examples using the dynamic program name
+	progName := util.GetProgramName(c)
+	c.Example = fmt.Sprintf(`  # Unpause a schedule named "schedule-1".
+  %s schedule unpause schedule-1
+
+  # Unpause schedules named "schedule-1" and "schedule-2".
+  %s schedule unpause schedule-1 schedule-2
+
+  # Unpause all schedules labeled with "foo=bar".
+  %s schedule unpause --selector foo=bar
+
+  # Unpause all schedules.
+  %s schedule unpause --all`, progName, progName, progName, progName)
 
 	o.BindFlags(c.Flags())
 	pauseOpts.BindFlags(c.Flags())

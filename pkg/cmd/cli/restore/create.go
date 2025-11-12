@@ -35,6 +35,7 @@ import (
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -48,27 +49,30 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   use + " [RESTORE_NAME] [--from-backup BACKUP_NAME | --from-schedule SCHEDULE_NAME]",
 		Short: "Create a restore",
-		Example: `  # Create a restore named "restore-1" from backup "backup-1".
-  velero restore create restore-1 --from-backup backup-1
-
-  # Create a restore with a default name ("backup-1-<timestamp>") from backup "backup-1".
-  velero restore create --from-backup backup-1
- 
-  # Create a restore from the latest successful backup triggered by schedule "schedule-1".
-  velero restore create --from-schedule schedule-1
-
-  # Create a restore from the latest successful OR partially-failed backup triggered by schedule "schedule-1".
-  velero restore create --from-schedule schedule-1 --allow-partially-failed
-
-  # Create a restore for only persistentvolumeclaims and persistentvolumes within a backup.
-  velero restore create --from-backup backup-2 --include-resources persistentvolumeclaims,persistentvolumes`,
-		Args: cobra.MaximumNArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args, f))
 			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
 	}
+
+	// Set examples using the dynamic program name
+	progName := util.GetProgramName(c)
+	c.Example = fmt.Sprintf(`  # Create a restore named "restore-1" from backup "backup-1".
+  %s restore create restore-1 --from-backup backup-1
+
+  # Create a restore with a default name ("backup-1-<timestamp>") from backup "backup-1".
+  %s restore create --from-backup backup-1
+
+  # Create a restore from the latest successful backup triggered by schedule "schedule-1".
+  %s restore create --from-schedule schedule-1
+
+  # Create a restore from the latest successful OR partially-failed backup triggered by schedule "schedule-1".
+  %s restore create --from-schedule schedule-1 --allow-partially-failed
+
+  # Create a restore for only persistentvolumeclaims and persistentvolumes within a backup.
+  %s restore create --from-backup backup-2 --include-resources persistentvolumeclaims,persistentvolumes`, progName, progName, progName, progName, progName)
 
 	o.BindFlags(c.Flags())
 	output.BindFlags(c.Flags())
@@ -420,7 +424,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 				if restore.Status.Phase == api.RestorePhaseFailedValidation || restore.Status.Phase == api.RestorePhaseCompleted ||
 					restore.Status.Phase == api.RestorePhasePartiallyFailed || restore.Status.Phase == api.RestorePhaseFailed {
-					fmt.Printf("\nRestore completed with status: %s. You may check for more information using the commands `velero restore describe %s` and `velero restore logs %s`.\n", restore.Status.Phase, restore.Name, restore.Name)
+					progName := util.GetProgramName(c)
+					fmt.Printf("\nRestore completed with status: %s. You may check for more information using the commands `%s restore describe %s` and `%s restore logs %s`.\n", restore.Status.Phase, progName, restore.Name, progName, restore.Name)
 					return nil
 				}
 			}
@@ -428,8 +433,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 
 	// Not waiting
-
-	fmt.Printf("Run `velero restore describe %s` or `velero restore logs %s` for more details.\n", restore.Name, restore.Name)
+	progName := util.GetProgramName(c)
+	fmt.Printf("Run `%s restore describe %s` or `%s restore logs %s` for more details.\n", progName, restore.Name, progName, restore.Name)
 
 	return nil
 }

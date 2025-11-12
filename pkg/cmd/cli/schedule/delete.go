@@ -31,6 +31,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/confirm"
 )
 
@@ -41,26 +42,29 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s [NAMES]", use),
 		Short: "Delete schedules",
-		Example: `  # Delete a schedule named "schedule-1".
-  velero schedule delete schedule-1
-
-  # Delete a schedule named "schedule-1" without prompting for confirmation.
-  velero schedule delete schedule-1 --confirm
-
-  # Delete schedules named "schedule-1" and "schedule-2".
-  velero schedule delete schedule-1 schedule-2
-
-  # Delete all schedules labeled with "foo=bar".
-  velero schedule delete --selector foo=bar
-
-  # Delete all schedules.
-  velero schedule delete --all`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(f, args))
 			cmd.CheckError(o.Validate(c, f, args))
 			cmd.CheckError(Run(o))
 		},
 	}
+
+	// Set examples using the dynamic program name
+	progName := util.GetProgramName(c)
+	c.Example = fmt.Sprintf(`  # Delete a schedule named "schedule-1".
+  %s schedule delete schedule-1
+
+  # Delete a schedule named "schedule-1" without prompting for confirmation.
+  %s schedule delete schedule-1 --confirm
+
+  # Delete schedules named "schedule-1" and "schedule-2".
+  %s schedule delete schedule-1 schedule-2
+
+  # Delete all schedules labeled with "foo=bar".
+  %s schedule delete --selector foo=bar
+
+  # Delete all schedules.
+  %s schedule delete --all`, progName, progName, progName, progName, progName)
 
 	o.BindFlags(c.Flags())
 	return c

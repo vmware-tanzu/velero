@@ -31,6 +31,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/confirm"
 )
 
@@ -41,26 +42,29 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s [NAMES]", use),
 		Short: "Delete backup storage locations",
-		Example: `  # Delete a backup storage location named "backup-location-1".
-  velero backup-location delete backup-location-1
-
-  # Delete a backup storage location named "backup-location-1" without prompting for confirmation.
-  velero backup-location delete backup-location-1 --confirm
-
-  # Delete backup storage locations named "backup-location-1" and "backup-location-2".
-  velero backup-location delete backup-location-1 backup-location-2
-		
-  # Delete all backup storage locations labeled with "foo=bar".
-  velero backup-location delete --selector foo=bar
-
-  # Delete all backup storage locations.
-  velero backup-location delete --all`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(f, args))
 			cmd.CheckError(o.Validate(c, f, args))
 			cmd.CheckError(Run(f, o))
 		},
 	}
+
+	// Set examples using the dynamic program name
+	progName := util.GetProgramName(c)
+	c.Example = fmt.Sprintf(`  # Delete a backup storage location named "backup-location-1".
+  %s backup-location delete backup-location-1
+
+  # Delete a backup storage location named "backup-location-1" without prompting for confirmation.
+  %s backup-location delete backup-location-1 --confirm
+
+  # Delete backup storage locations named "backup-location-1" and "backup-location-2".
+  %s backup-location delete backup-location-1 backup-location-2
+
+  # Delete all backup storage locations labeled with "foo=bar".
+  %s backup-location delete --selector foo=bar
+
+  # Delete all backup storage locations.
+  %s backup-location delete --all`, progName, progName, progName, progName, progName)
 
 	o.BindFlags(c.Flags())
 	return c

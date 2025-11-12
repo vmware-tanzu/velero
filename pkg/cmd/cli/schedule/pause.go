@@ -32,6 +32,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util"
 )
 
 // NewPauseCommand creates the command for pause
@@ -42,23 +43,26 @@ func NewPauseCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   use,
 		Short: "Pause schedules",
-		Example: `  # Pause a schedule named "schedule-1".
-  velero schedule pause schedule-1
-
-  # Pause schedules named "schedule-1" and "schedule-2".
-  velero schedule pause schedule-1 schedule-2
-
-  # Pause all schedules labeled with "foo=bar".
-  velero schedule pause --selector foo=bar
-
-  # Pause all schedules.
-  velero schedule pause --all`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args))
 			cmd.CheckError(o.Validate())
 			cmd.CheckError(runPause(f, o, true, pauseOpts.SkipOptions.SkipImmediately.Value))
 		},
 	}
+
+	// Set examples using the dynamic program name
+	progName := util.GetProgramName(c)
+	c.Example = fmt.Sprintf(`  # Pause a schedule named "schedule-1".
+  %s schedule pause schedule-1
+
+  # Pause schedules named "schedule-1" and "schedule-2".
+  %s schedule pause schedule-1 schedule-2
+
+  # Pause all schedules labeled with "foo=bar".
+  %s schedule pause --selector foo=bar
+
+  # Pause all schedules.
+  %s schedule pause --all`, progName, progName, progName, progName)
 
 	o.BindFlags(c.Flags())
 	pauseOpts.BindFlags(c.Flags())
