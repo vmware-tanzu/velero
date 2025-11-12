@@ -372,6 +372,40 @@ ERROR CODE: AuthorizationFailure
 `),
 			expected: "rpc error: code = Unknown desc = AuthorizationFailure: Forbidden",
 		},
+		{
+			name: "Error with Azure SAS token in URL",
+			input: errors.New(`rpc error: code = Unknown desc = GET https://storage.blob.core.windows.net/backup?sv=2020-08-04&sig=abc123secrettoken&se=2024-12-31T23:59:59Z&sp=rwdl
+--------------------------------------------------------------------------------
+RESPONSE 404: 404 The specified container does not exist.
+ERROR CODE: ContainerNotFound
+--------------------------------------------------------------------------------
+`),
+			expected: "rpc error: code = Unknown desc = ContainerNotFound: The specified container does not exist.",
+		},
+		{
+			name:     "Error with multiple SAS parameters",
+			input:    errors.New(`GET https://mystorageaccount.blob.core.windows.net/container?sv=2020-08-04&ss=b&srt=sco&sp=rwdlac&se=2024-12-31&st=2024-01-01&sip=168.1.5.60&spr=https&sig=SIGNATURE_HASH`),
+			expected: "GET https://mystorageaccount.blob.core.windows.net/container?sv=***REDACTED***&ss=***REDACTED***&srt=***REDACTED***&sp=***REDACTED***&se=***REDACTED***&st=***REDACTED***&sip=***REDACTED***&spr=***REDACTED***&sig=***REDACTED***",
+		},
+		{
+			name:     "Simple URL without SAS tokens unchanged",
+			input:    errors.New("GET https://storage.blob.core.windows.net/container/blob"),
+			expected: "GET https://storage.blob.core.windows.net/container/blob",
+		},
+		{
+			name: "Azure error with SAS token in full HTTP response",
+			input: errors.New(`rpc error: code = Unknown desc = GET https://oadp100711zl59k.blob.core.windows.net/backup?sig=secretsignature123&se=2024-12-31
+--------------------------------------------------------------------------------
+RESPONSE 404: 404 The specified container does not exist.
+ERROR CODE: ContainerNotFound
+--------------------------------------------------------------------------------
+<?xml version="1.0" encoding="utf-8"?><Error><Code>ContainerNotFound</Code><Message>The specified container does not exist.
+RequestId:63cf34d8-801e-0078-09b4-2e4682000000
+Time:2024-11-04T12:23:04.5623627Z</Message></Error>
+--------------------------------------------------------------------------------
+`),
+			expected: "rpc error: code = Unknown desc = ContainerNotFound: The specified container does not exist.",
+		},
 	}
 
 	for _, test := range tests {
