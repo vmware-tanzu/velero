@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/utils/ptr"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -253,6 +254,15 @@ func TestEnsureContainerExists(t *testing.T) {
 					Name: "foo",
 				},
 			},
+			InitContainers: []corev1api.Container{
+				{
+					Name: "baz",
+				},
+				{
+					Name:          "qux",
+					RestartPolicy: ptr.To(corev1api.ContainerRestartPolicyAlways),
+				},
+			},
 		},
 	}
 
@@ -260,6 +270,12 @@ func TestEnsureContainerExists(t *testing.T) {
 	require.EqualError(t, err, `no such container: "bar"`)
 
 	err = ensureContainerExists(pod, "foo")
+	assert.NoError(t, err)
+
+	err = ensureContainerExists(pod, "baz")
+	require.EqualError(t, err, `no such container: "baz"`)
+
+	err = ensureContainerExists(pod, "qux")
 	assert.NoError(t, err)
 }
 
