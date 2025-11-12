@@ -3,6 +3,8 @@ title: "Node Selection for Data Movement"
 layout: docs
 ---
 
+> **📖 For a comprehensive guide** covering all node-agent configuration options, see [Node-agent Configuration](node-agent-config.md).
+
 Velero node-agent is a DaemonSet hosting the data movement modules to complete the concrete work of backups/restores.
 Varying from the data size, data complexity, resource availability, the data movement may take a long time and remarkable resources (CPU, memory, network bandwidth, etc.) during the backup and restore.
 
@@ -258,3 +260,11 @@ volumeBindingMode: Immediate
 Because the StorageClass volumeBindingMode is `Immediate`, although `ignoreDelayBinding` is set to `false`, restorePVC will not be created according to the target Pod.
 
 The restorePod will be assigned to nodes, which instance type is `Standard_B4ms`.
+
+## Related Documentation
+
+- [Node-agent Configuration](node-agent-config.md) - Complete reference for all configuration options
+- [Node-agent Concurrency](node-agent-concurrency.md) - Configure concurrent operations per node
+- [Data Movement Pod Resource Configuration](data-movement-pod-resource-configuration.md) - Configure pod resources  
+- [BackupPVC Configuration](data-movement-backup-pvc-configuration.md) - Configure backup storage
+- [RestorePVC Configuration](data-movement-restore-pvc-configuration.md) - Configure restore storage
