@@ -50,12 +50,19 @@ const (
 // sanitizeStorageError cleans up verbose HTTP responses from cloud provider errors,
 // particularly Azure which includes full HTTP response details and XML in error messages.
 // It extracts the error code and message while removing HTTP headers and response bodies.
+// It also scrubs sensitive information like SAS tokens from URLs.
 func sanitizeStorageError(err error) string {
 	if err == nil {
 		return ""
 	}
 
 	errMsg := err.Error()
+
+	// Scrub sensitive information from URLs (SAS tokens, credentials, etc.)
+	// Azure SAS token parameters: sig, se, st, sp, spr, sv, sr, sip, srt, ss
+	// These appear as query parameters in URLs like: ?sig=value&se=value
+	sasParamsRegex := regexp.MustCompile(`([?&])(sig|se|st|sp|spr|sv|sr|sip|srt|ss)=([^&\s<>\n]+)`)
+	errMsg = sasParamsRegex.ReplaceAllString(errMsg, `${1}${2}=***REDACTED***`)
 
 	// Check if this looks like an Azure HTTP response error
 	// Azure errors contain patterns like "RESPONSE 404:" and "ERROR CODE:"
@@ -217,7 +224,7 @@ func (r *backupStorageLocationReconciler) Reconcile(ctx context.Context, req ctr
 			if err != nil {
 				log.Info("BackupStorageLocation is invalid, marking as unavailable")
 				err = errors.Wrapf(err, "BackupStorageLocation %q is unavailable", location.Name)
-				unavailableErrors = append(unavailableErrors, err.Error())
+				unavailableErrors = append(unavailableErrors, sanitizeStorageError(err))
 				location.Status.Phase = velerov1api.BackupStorageLocationPhaseUnavailable
 				location.Status.Message = sanitizeStorageError(err)
 			} else {
