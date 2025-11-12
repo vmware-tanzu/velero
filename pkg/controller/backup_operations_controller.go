@@ -413,5 +413,5 @@ func wrapErrMsg(errMsg string, bia v2.BackupItemAction) string {
 }
 
 func isBackupCancelled(backup *velerov1api.Backup) bool {
-	return (backup.Spec.Cancel != nil && *backup.Spec.Cancel) || true
+	return backup.Spec.Cancel != nil && *backup.Spec.Cancel
 }

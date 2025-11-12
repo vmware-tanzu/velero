@@ -360,11 +360,19 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logger logrus.FieldLogger) *pkgbackup.Request {
+	// Create backup-specific context for Tier 2 cancellation
+	backupCtx, backupCancelFunc := context.WithCancel(b.ctx)
+
 	request := &pkgbackup.Request{
 		Backup:           backup.DeepCopy(), // don't modify items in the cache
 		SkippedPVTracker: pkgbackup.NewSkipPVTracker(),
 		BackedUpItems:    pkgbackup.NewBackedUpItemsMap(),
 		ItemBlockChannel: b.workerPool.GetInputChannel(),
+
+		// Cancellation support (two-tier cancellation system)
+		WorkerPool:       b.workerPool,      // For Tier 1: closing channel to stop workers
+		BackupContext:    backupCtx,         // For Tier 2: cancelling in-flight processing
+		BackupCancelFunc: backupCancelFunc,  // Trigger function for Tier 2 cancellation
 	}
 	request.VolumesInformation.Init()
 
@@ -688,6 +696,9 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 // field is checked to see if the backup was a partial failure.
 
 func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
+	// Ensure backup context is cancelled when we exit to prevent context leaks
+	defer backup.BackupCancelFunc()
+
 	b.logger.WithField(constant.ControllerBackup, kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
 
 	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the

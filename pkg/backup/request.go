@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -73,6 +74,11 @@ type Request struct {
 	ItemBlockChannel          chan ItemBlockInput
 	Cancel                    bool
 	LastCancelCheck           time.Time
+
+	// Cancellation support (two-tier cancellation system)
+	WorkerPool       *ItemBlockWorkerPool // For Tier 1: closing channel to stop workers
+	BackupContext    context.Context      // For Tier 2: cancelling in-flight processing
+	BackupCancelFunc context.CancelFunc   // Trigger function for Tier 2 cancellation
 }
 
 // BackupVolumesInformation contains the information needs by generating

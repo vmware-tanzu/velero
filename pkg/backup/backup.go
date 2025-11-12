@@ -299,6 +299,8 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	itemBlockActionResolver framework.ItemBlockActionResolver,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) error {
+
+	log.Info("Creating output streams")
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 
@@ -310,6 +312,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		return errors.WithStack(err)
 	}
 
+	log.Info("Resolving namespace includes/excludes")
 	backupRequest.NamespaceIncludesExcludes = getNamespaceIncludesExcludes(backupRequest.Backup)
 	log.Infof("Including namespaces: %s", backupRequest.NamespaceIncludesExcludes.IncludesString())
 	log.Infof("Excluding namespaces: %s", backupRequest.NamespaceIncludesExcludes.ExcludesString())
@@ -326,6 +329,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		}
 	}
 
+	log.Info("Resolving resource includes/excludes")
 	if collections.UseOldResourceFilters(backupRequest.Spec) {
 		backupRequest.ResourceIncludesExcludes = collections.GetGlobalResourceIncludesExcludes(kb.discoveryHelper, log,
 			backupRequest.Spec.IncludedResources,
@@ -348,6 +352,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 
 	log.Infof("Backing up all volumes using pod volume backup: %t", boolptr.IsSetToTrue(backupRequest.Backup.Spec.DefaultVolumesToFsBackup))
 
+	log.Info("Resolving resource hooks")
 	var err error
 	backupRequest.ResourceHooks, err = getResourceHooks(backupRequest.Spec.Hooks.Resources, kb.discoveryHelper)
 	if err != nil {
@@ -355,12 +360,14 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		return err
 	}
 
+	log.Info("Resolving backup item actions")
 	backupRequest.ResolvedActions, err = backupItemActionResolver.ResolveActions(kb.discoveryHelper, log)
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Debugf("Error from backupItemActionResolver.ResolveActions")
 		return err
 	}
 
+	log.Info("Resolving item block actions")
 	backupRequest.ResolvedItemBlockActions, err = itemBlockActionResolver.ResolveActions(kb.discoveryHelper, log)
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Errorf("Error from itemBlockActionResolver.ResolveActions")
@@ -381,6 +388,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	kb.podVolumeContext, podVolumeCancelFunc = context.WithTimeout(context.Background(), podVolumeTimeout)
 	defer podVolumeCancelFunc()
 
+	log.Info("Initializing PodVolumeBackupper")
 	var podVolumeBackupper podvolume.Backupper
 	if kb.podVolumeBackupperFactory != nil {
 		podVolumeBackupper, err = kb.podVolumeBackupperFactory.NewBackupper(kb.podVolumeContext, log, backupRequest.Backup, kb.uploaderType)
@@ -412,6 +420,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	items := collector.getAllItems()
 	log.WithField("progress", "").Infof("Collected %d items matching the backup spec from the Kubernetes API (actual number of items backed up may be more or less depending on velero.io/exclude-from-backup annotation, plugins returning additional related items to back up, etc.)", len(items))
 
+	log.Info("Updating backup status.progress.totalItems")
 	updated := backupRequest.Backup.DeepCopy()
 	if updated.Status.Progress == nil {
 		updated.Status.Progress = &velerov1api.BackupProgress{}
@@ -421,6 +430,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	if err := kube.PatchResource(backupRequest.Backup, updated, kb.kbClient); err != nil {
 		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress.totalItems")
 	}
+
 	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(items)}
 
 	itemBackupper := &itemBackupper{
@@ -529,23 +539,28 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 			select {
 			case response := <-itemBlockReturn: // process each BackupItemBlock response
 				func() {
-					// Concurrency down, the goroutine processing the ItemBlock is done
-					defer wg.Done()
+					defer wg.Done() // Always decrement
+
+					// Handle different error types
 					if response.err != nil {
-						log.WithError(errors.WithStack((response.err))).Error("Got error in BackupItemBlock.")
+						if errors.Is(response.err, context.Canceled) {
+							// Expected during cancellation
+							log.Info("ItemBlock processing cancelled")
+							// Don't track resources for cancelled ItemBlocks
+							return
+						}
+						// Unexpected error
+						log.WithError(errors.WithStack(response.err)).Error("Got error in BackupItemBlock.")
+						return
 					}
+
+					// Normal processing - track backed up resources
 					for _, backedUpGR := range response.resources {
 						backedUpGroupResources[backedUpGR] = true
 					}
-					// We could eventually track which itemBlocks have finished
-					// using response.itemBlock
 
-					// updated total is computed as "how many items we've backed up so far,
-					// plus how many items are processed but not yet backed up plus how many
-					// we know of that are remaining to be processed"
+					// Update progress
 					backedUpItems, totalItems := backupRequest.BackedUpItems.BackedUpAndTotalLen()
-
-					// send a progress update
 					update <- progressUpdate{
 						totalItems:    totalItems,
 						itemsBackedUp: backedUpItems,
@@ -566,8 +581,17 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		}
 	}()
 
+	// Get backup context for cancellation checks
+	// If not set (e.g., in tests), use background context
+	ctx := backupRequest.BackupContext
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	// Boolean that indicates that this backup has been cancelled
 	var cancelled bool
+	var cancellationInitiated bool // Track if we've started shutdown
+
 	for i := range items {
 		log.WithFields(map[string]any{
 			"progress":  "",
@@ -576,12 +600,29 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 			"name":      items[i].name,
 		}).Infof("Processing item")
 
-		// Cancellation is an early exit: if we see it's true, no more itemBlocks will be sent to the worker pool
-		// We should be able to safely exit here, as Wg is triggered only when an itemBlock is sent to the worker pool
-		// Processing item log
+		// Check for cancellation (rate-limited to every 3 seconds)
 		cancelled = checkCancelRequest(context.Background(), kb.kbClient, backupRequest, log)
-		if cancelled {
-			// Phase will be set to Cancelling in the backup controller
+		if cancelled && !cancellationInitiated {
+			log.Info("Backup cancellation detected - initiating two-tier shutdown")
+			cancellationInitiated = true
+
+			// TIER 1: Close channel to stop workers accepting new ItemBlocks
+			if backupRequest.WorkerPool != nil {
+				log.Info("Tier 1: Closing ItemBlock channel to stop new work")
+				backupRequest.WorkerPool.CloseChannel()
+			}
+
+			// TIER 2: Cancel backup context to interrupt in-flight processing
+			if backupRequest.BackupCancelFunc != nil {
+				log.Info("Tier 2: Cancelling backup context to interrupt active work")
+				backupRequest.BackupCancelFunc()
+			}
+
+			// Cancel all PodVolumeBackups
+			log.Info("Cancelling all PodVolumeBackups")
+			itemBackupper.podVolumeBackupper.CancelAllPodVolumeBackups()
+
+			// Stop queueing new items
 			break
 		}
 
@@ -625,47 +666,62 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		if itemBlock != nil && len(itemBlock.Items) > 0 && !addNextToBlock {
 			log.Infof("Backing Up Item Block including %s %s/%s (%v items in block)", items[i].groupResource.String(), items[i].namespace, items[i].name, len(itemBlock.Items))
 
-			// Concurrency up
 			wg.Add(1)
-			// Send the itemBlock to the worker pool
-			backupRequest.ItemBlockChannel <- ItemBlockInput{
+
+			// Safe send - channel might be closed during cancellation
+			select {
+			case backupRequest.ItemBlockChannel <- ItemBlockInput{
 				itemBlock:  itemBlock,
 				returnChan: itemBlockReturn,
+			}:
+				// Successfully queued
+			case <-ctx.Done():
+				// Context cancelled while trying to send
+				wg.Done() // Decrement since we won't get a response
+				log.Info("Context cancelled while queueing ItemBlock")
 			}
+
 			// Reset the itemBlock so we can create a new one for the next item
 			itemBlock = nil
-
 		}
 	}
 
-	// If canclled, can we call a version of this which cancels all the PVBs?
-	if cancelled {
-		// todo: Cancel all the PVBs
-		// Best effort, if PVB controller cancels, great.
-		itemBackupper.podVolumeBackupper.CancelAllPodVolumeBackups()
-
-	}
-
-	// GOROUTINE: Goroutine to wait for all the ItemBlocks to be processed
+	// Wait for all ItemBlocks to complete with timeout
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		wg.Wait()
 	}()
 
-	// Blocks here until either all the ItemBlocks are processed or the response context is done (cancellation)
-	// Done this way so we can handle other channels, e.g. cancellation channel
+	// Wait for completion or timeout
+	var waitTimeout bool
 	select {
 	case <-done:
-		log.Info("done processing ItemBlocks")
+		log.Info("All ItemBlocks completed successfully")
+	case <-ctx.Done():
+		log.Info("Backup context cancelled")
+		// Give workers a grace period to finish
+		select {
+		case <-done:
+			log.Info("All ItemBlocks completed within grace period")
+		case <-time.After(10 * time.Second):
+			log.Error("Timeout waiting for ItemBlocks after cancellation - some work may be incomplete")
+			waitTimeout = true
+		}
 	case <-responseCtx.Done():
-		log.Info("ItemBlock processing canceled")
+		log.Info("Response context cancelled")
 	}
-	// cancel response-processing goroutine
+
+	// Cancel response-processing goroutine
 	responseCancel()
 
-	// no more progress updates will be sent on the 'update' channel
+	// No more progress updates will be sent on the 'update' channel
 	quit <- struct{}{}
+
+	// Log warning if we timed out
+	if waitTimeout {
+		log.Warn("Backup completed with timeout - some ItemBlocks may not have been processed")
+	}
 
 	// back up CRD(this is a CRD definition of the resource, it's a CRD instance) for resource if found.
 	// We should only need to do this if we've backed up at least one item for the resource
@@ -811,7 +867,16 @@ func (kb *kubernetesBackupper) executeItemBlockActions(
 	}
 }
 
-func (kb *kubernetesBackupper) backupItemBlock(itemBlock *BackupItemBlock) []schema.GroupResource {
+func (kb *kubernetesBackupper) backupItemBlock(
+	ctx context.Context, // For cancellation
+	itemBlock *BackupItemBlock,
+) []schema.GroupResource {
+	// CHECKPOINT: Before pre-hooks
+	if err := CheckCancelled(ctx); err != nil {
+		itemBlock.Log.Info("Backup cancelled before pre-hooks")
+		return nil
+	}
+
 	// find pods in ItemBlock
 	// filter pods based on whether they still need to be backed up
 	// this list will be used to run pre/post hooks
@@ -842,18 +907,35 @@ func (kb *kubernetesBackupper) backupItemBlock(itemBlock *BackupItemBlock) []sch
 		itemBlock.itemBackupper.backupRequest.BackedUpItems.AddItem(key)
 	}
 
+	// Ensure post-hooks always run (even on cancellation) to clean up pre-hook actions
+	defer func() {
+		if len(postHookPods) > 0 {
+			itemBlock.Log.Debug("Executing post hooks")
+			kb.handleItemBlockPostHooks(itemBlock, postHookPods)
+		}
+	}()
+
+	// CHECKPOINT: Before backing up items
+	if err := CheckCancelled(ctx); err != nil {
+		itemBlock.Log.Info("Backup cancelled before item backup")
+		return nil
+	}
+
 	itemBlock.Log.Debug("Backing up items in BackupItemBlock")
 	var grList []schema.GroupResource
 	for _, item := range itemBlock.Items {
-		if backedUp := kb.backupItem(itemBlock.Log, item.Gr, itemBlock.itemBackupper, item.Item, item.PreferredGVR, itemBlock); backedUp {
+		// CHECKPOINT: Before each item
+		if err := CheckCancelled(ctx); err != nil {
+			itemBlock.Log.Infof("Backup cancelled during item processing (processed %d/%d items)", len(grList), len(itemBlock.Items))
+			return grList // Return what we've backed up so far
+		}
+
+		if backedUp := kb.backupItem(ctx, itemBlock.Log, item.Gr, itemBlock.itemBackupper, item.Item, item.PreferredGVR, itemBlock); backedUp {
 			grList = append(grList, item.Gr)
 		}
 	}
 
-	if len(postHookPods) > 0 {
-		itemBlock.Log.Debug("Executing post hooks")
-		kb.handleItemBlockPostHooks(itemBlock, postHookPods)
-	}
+	// post hooks run before exit
 
 	return grList
 }
@@ -948,8 +1030,16 @@ func (kb *kubernetesBackupper) waitUntilPVBsProcessed(ctx context.Context, log l
 	return wait.PollUntilContextCancel(ctx, 5*time.Second, true, checkFunc)
 }
 
-func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper, unstructured *unstructured.Unstructured, preferredGVR schema.GroupVersionResource, itemBlock *BackupItemBlock) bool {
-	backedUpItem, _, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR, false, false, itemBlock)
+func (kb *kubernetesBackupper) backupItem(
+	ctx context.Context, // For cancellation
+	log logrus.FieldLogger,
+	gr schema.GroupResource,
+	itemBackupper *itemBackupper,
+	unstructured *unstructured.Unstructured,
+	preferredGVR schema.GroupVersionResource,
+	itemBlock *BackupItemBlock,
+) bool {
+	backedUpItem, _, err := itemBackupper.backupItem(ctx, log, unstructured, gr, preferredGVR, false, false, itemBlock)
 	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
 		log.WithField("name", unstructured.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
 		// log each error separately so we get error location info in the log, and an
@@ -968,13 +1058,14 @@ func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.Grou
 }
 
 func (kb *kubernetesBackupper) finalizeItem(
+	ctx context.Context, // For cancellation
 	log logrus.FieldLogger,
 	gr schema.GroupResource,
 	itemBackupper *itemBackupper,
 	unstructured *unstructured.Unstructured,
 	preferredGVR schema.GroupVersionResource,
 ) (bool, []FileForArchive) {
-	backedUpItem, updateFiles, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR, true, true, nil)
+	backedUpItem, updateFiles, err := itemBackupper.backupItem(ctx, log, unstructured, gr, preferredGVR, true, true, nil)
 	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
 		log.WithField("name", unstructured.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
 		// log each error separately so we get error location info in the log, and an
@@ -1028,7 +1119,9 @@ func (kb *kubernetesBackupper) backupCRD(log logrus.FieldLogger, gr schema.Group
 
 	log.Infof("Found associated CRD %s to add to backup", gr.String())
 
-	kb.backupItem(log, gvr.GroupResource(), itemBackupper, unstructured, gvr, nil)
+	// Get context from itemBackupper
+	ctx := itemBackupper.backupRequest.BackupContext
+	kb.backupItem(ctx, log, gvr.GroupResource(), itemBackupper, unstructured, gvr, nil)
 }
 
 func (kb *kubernetesBackupper) writeBackupVersion(tw tarWriter) error {
@@ -1153,7 +1246,9 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 				unstructuredDataUploads = append(unstructuredDataUploads, unstructured)
 			}
 
-			backedUp, itemFiles := kb.finalizeItem(log, item.groupResource, itemBackupper, &unstructured, item.preferredGVR)
+			// Get context from itemBackupper
+			ctx := itemBackupper.backupRequest.BackupContext
+			backedUp, itemFiles := kb.finalizeItem(ctx, log, item.groupResource, itemBackupper, &unstructured, item.preferredGVR)
 			if backedUp {
 				backedUpGroupResources[item.groupResource] = true
 				for _, itemFile := range itemFiles {
