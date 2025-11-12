@@ -92,3 +92,10 @@ func SetupConnectOptions(ctx context.Context, repoOptions udmrepo.RepoOptions) r
 		},
 	}
 }
+
+func RepoOwnerFromRepoOptions(repoOptions udmrepo.RepoOptions) string {
+	hostname := optionalHaveStringWithDefault(udmrepo.GenOptionOwnerDomain, repoOptions.GeneralOptions, udmrepo.GetRepoDomain())
+	username := optionalHaveStringWithDefault(udmrepo.GenOptionOwnerName, repoOptions.GeneralOptions, udmrepo.GetRepoUser())
+
+	return username + "@" + hostname
+}

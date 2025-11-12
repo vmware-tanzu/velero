@@ -18,11 +18,14 @@ package backend
 
 import (
 	"context"
+	"errors"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/kopia/kopia/repo/blob"
 )
+
+var ErrStoreNotExist = errors.New("store does not exist")
 
 // Store defines the methods for Kopia to establish a connection to
 // the backend storage
