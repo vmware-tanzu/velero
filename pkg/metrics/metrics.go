@@ -27,6 +27,11 @@ type ServerMetrics struct {
 	metrics map[string]prometheus.Collector
 }
 
+// Metrics returns the metrics map for testing purposes.
+func (m *ServerMetrics) Metrics() map[string]prometheus.Collector {
+	return m.metrics
+}
+
 const (
 	metricNamespace           = "velero"
 	podVolumeMetricsNamespace = "podVolume"
@@ -75,6 +80,11 @@ const (
 	DataDownloadFailureTotal = "data_download_failure_total"
 	DataDownloadCancelTotal  = "data_download_cancel_total"
 
+	// maintenance job metrics
+	maintenanceJobSuccessTotal    = "maintenance_job_success_total"
+	maintenanceJobFailureTotal    = "maintenance_job_failure_total"
+	maintenanceJobDurationSeconds = "maintenance_job_duration_seconds"
+
 	// Labels
 	nodeMetricLabel         = "node"
 	podVolumeOperationLabel = "operation"
@@ -82,6 +92,7 @@ const (
 	pvbNameLabel            = "pod_volume_backup"
 	scheduleLabel           = "schedule"
 	backupNameLabel         = "backupName"
+	repositoryNameLabel     = "repository_name"
 
 	// metrics values
 	BackupLastStatusSucc    int64 = 1
@@ -332,6 +343,41 @@ func NewServerMetrics() *ServerMetrics {
 					Help:      "Total number of CSI failed volume snapshots",
 				},
 				[]string{scheduleLabel, backupNameLabel},
+			),
+			maintenanceJobSuccessTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      maintenanceJobSuccessTotal,
+					Help:      "Total number of successful maintenance jobs",
+				},
+				[]string{repositoryNameLabel},
+			),
+			maintenanceJobFailureTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      maintenanceJobFailureTotal,
+					Help:      "Total number of failed maintenance jobs",
+				},
+				[]string{repositoryNameLabel},
+			),
+			maintenanceJobDurationSeconds: prometheus.NewHistogramVec(
+				prometheus.HistogramOpts{
+					Namespace: metricNamespace,
+					Name:      maintenanceJobDurationSeconds,
+					Help:      "Time taken to complete maintenance jobs, in seconds",
+					Buckets: []float64{
+						toSeconds(1 * time.Minute),
+						toSeconds(5 * time.Minute),
+						toSeconds(10 * time.Minute),
+						toSeconds(15 * time.Minute),
+						toSeconds(30 * time.Minute),
+						toSeconds(1 * time.Hour),
+						toSeconds(2 * time.Hour),
+						toSeconds(3 * time.Hour),
+						toSeconds(4 * time.Hour),
+					},
+				},
+				[]string{repositoryNameLabel},
 			),
 		},
 	}
@@ -910,5 +956,26 @@ func (m *ServerMetrics) RegisterBackupLocationAvailable(backupLocationName strin
 func (m *ServerMetrics) RegisterBackupLocationUnavailable(backupLocationName string) {
 	if g, ok := m.metrics[backupLocationStatus].(*prometheus.GaugeVec); ok {
 		g.WithLabelValues(backupLocationName).Set(float64(0))
+	}
+}
+
+// RegisterMaintenanceJobSuccess records a successful maintenance job.
+func (m *ServerMetrics) RegisterMaintenanceJobSuccess(repositoryName string) {
+	if c, ok := m.metrics[maintenanceJobSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(repositoryName).Inc()
+	}
+}
+
+// RegisterMaintenanceJobFailure records a failed maintenance job.
+func (m *ServerMetrics) RegisterMaintenanceJobFailure(repositoryName string) {
+	if c, ok := m.metrics[maintenanceJobFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(repositoryName).Inc()
+	}
+}
+
+// ObserveMaintenanceJobDuration records the number of seconds a maintenance job took.
+func (m *ServerMetrics) ObserveMaintenanceJobDuration(repositoryName string, seconds float64) {
+	if h, ok := m.metrics[maintenanceJobDurationSeconds].(*prometheus.HistogramVec); ok {
+		h.WithLabelValues(repositoryName).Observe(seconds)
 	}
 }

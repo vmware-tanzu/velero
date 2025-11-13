@@ -372,3 +372,148 @@ func getHistogramCount(t *testing.T, vec *prometheus.HistogramVec, scheduleLabel
 	t.Fatalf("Histogram with schedule label '%s' not found", scheduleLabel)
 	return 0
 }
+
+// TestMaintenanceJobMetrics verifies that maintenance job metrics are properly recorded.
+func TestMaintenanceJobMetrics(t *testing.T) {
+	tests := []struct {
+		name           string
+		repositoryName string
+		description    string
+	}{
+		{
+			name:           "maintenance job metrics for repository",
+			repositoryName: "default-restic-abcd",
+			description:    "Metrics should be recorded with the repository name label",
+		},
+		{
+			name:           "maintenance job metrics for different repository",
+			repositoryName: "velero-backup-repo-xyz",
+			description:    "Metrics should be recorded with different repository name",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := NewServerMetrics()
+
+			// Test maintenance job success metric
+			t.Run("RegisterMaintenanceJobSuccess", func(t *testing.T) {
+				m.RegisterMaintenanceJobSuccess(tc.repositoryName)
+
+				metric := getMaintenanceMetricValue(t, m.metrics[maintenanceJobSuccessTotal].(*prometheus.CounterVec), tc.repositoryName)
+				assert.Equal(t, float64(1), metric, tc.description)
+			})
+
+			// Test maintenance job failure metric
+			t.Run("RegisterMaintenanceJobFailure", func(t *testing.T) {
+				m.RegisterMaintenanceJobFailure(tc.repositoryName)
+
+				metric := getMaintenanceMetricValue(t, m.metrics[maintenanceJobFailureTotal].(*prometheus.CounterVec), tc.repositoryName)
+				assert.Equal(t, float64(1), metric, tc.description)
+			})
+
+			// Test maintenance job duration metric
+			t.Run("ObserveMaintenanceJobDuration", func(t *testing.T) {
+				m.ObserveMaintenanceJobDuration(tc.repositoryName, 300.5)
+
+				// For histogram, we check the count
+				metric := getMaintenanceHistogramCount(t, m.metrics[maintenanceJobDurationSeconds].(*prometheus.HistogramVec), tc.repositoryName)
+				assert.Equal(t, uint64(1), metric, tc.description)
+			})
+		})
+	}
+}
+
+// TestMultipleMaintenanceJobsAccumulate verifies that multiple maintenance jobs
+// accumulate metrics under the same repository label.
+func TestMultipleMaintenanceJobsAccumulate(t *testing.T) {
+	m := NewServerMetrics()
+	repoName := "default-restic-test"
+
+	// Simulate multiple maintenance job executions
+	m.RegisterMaintenanceJobSuccess(repoName)
+	m.RegisterMaintenanceJobSuccess(repoName)
+	m.RegisterMaintenanceJobSuccess(repoName)
+	m.RegisterMaintenanceJobFailure(repoName)
+	m.RegisterMaintenanceJobFailure(repoName)
+
+	// Record multiple durations
+	m.ObserveMaintenanceJobDuration(repoName, 120.5)
+	m.ObserveMaintenanceJobDuration(repoName, 180.3)
+	m.ObserveMaintenanceJobDuration(repoName, 90.7)
+
+	// Verify accumulated metrics
+	successMetric := getMaintenanceMetricValue(t, m.metrics[maintenanceJobSuccessTotal].(*prometheus.CounterVec), repoName)
+	assert.Equal(t, float64(3), successMetric, "All maintenance job successes should be counted")
+
+	failureMetric := getMaintenanceMetricValue(t, m.metrics[maintenanceJobFailureTotal].(*prometheus.CounterVec), repoName)
+	assert.Equal(t, float64(2), failureMetric, "All maintenance job failures should be counted")
+
+	durationCount := getMaintenanceHistogramCount(t, m.metrics[maintenanceJobDurationSeconds].(*prometheus.HistogramVec), repoName)
+	assert.Equal(t, uint64(3), durationCount, "All maintenance job durations should be observed")
+}
+
+// Helper function to get metric value from a CounterVec with repository_name label
+func getMaintenanceMetricValue(t *testing.T, vec prometheus.Collector, repositoryName string) float64 {
+	t.Helper()
+	ch := make(chan prometheus.Metric, 1)
+	vec.Collect(ch)
+	close(ch)
+
+	for metric := range ch {
+		dto := &dto.Metric{}
+		err := metric.Write(dto)
+		require.NoError(t, err)
+
+		// Check if this metric has the expected repository_name label
+		hasCorrectLabel := false
+		for _, label := range dto.Label {
+			if *label.Name == "repository_name" && *label.Value == repositoryName {
+				hasCorrectLabel = true
+				break
+			}
+		}
+
+		if hasCorrectLabel {
+			if dto.Counter != nil {
+				return *dto.Counter.Value
+			}
+			if dto.Gauge != nil {
+				return *dto.Gauge.Value
+			}
+		}
+	}
+
+	t.Fatalf("Metric with repository_name label '%s' not found", repositoryName)
+	return 0
+}
+
+// Helper function to get histogram count with repository_name label
+func getMaintenanceHistogramCount(t *testing.T, vec *prometheus.HistogramVec, repositoryName string) uint64 {
+	t.Helper()
+	ch := make(chan prometheus.Metric, 1)
+	vec.Collect(ch)
+	close(ch)
+
+	for metric := range ch {
+		dto := &dto.Metric{}
+		err := metric.Write(dto)
+		require.NoError(t, err)
+
+		// Check if this metric has the expected repository_name label
+		hasCorrectLabel := false
+		for _, label := range dto.Label {
+			if *label.Name == "repository_name" && *label.Value == repositoryName {
+				hasCorrectLabel = true
+				break
+			}
+		}
+
+		if hasCorrectLabel && dto.Histogram != nil {
+			return *dto.Histogram.SampleCount
+		}
+	}
+
+	t.Fatalf("Histogram with repository_name label '%s' not found", repositoryName)
+	return 0
+}

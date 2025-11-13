@@ -42,6 +42,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
 	"github.com/vmware-tanzu/velero/pkg/repository/maintenance"
 	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
@@ -66,6 +67,7 @@ type BackupRepoReconciler struct {
 	repoMaintenanceConfig string
 	logLevel              logrus.Level
 	logFormat             *logging.FormatFlag
+	metrics               *metrics.ServerMetrics
 }
 
 func NewBackupRepoReconciler(
@@ -78,6 +80,7 @@ func NewBackupRepoReconciler(
 	repoMaintenanceConfig string,
 	logLevel logrus.Level,
 	logFormat *logging.FormatFlag,
+	metrics *metrics.ServerMetrics,
 ) *BackupRepoReconciler {
 	c := &BackupRepoReconciler{
 		client,
@@ -90,6 +93,7 @@ func NewBackupRepoReconciler(
 		repoMaintenanceConfig,
 		logLevel,
 		logFormat,
+		metrics,
 	}
 
 	return c
@@ -491,6 +495,12 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 	job, err := funcStartMaintenanceJob(r.Client, ctx, req, r.repoMaintenanceConfig, r.logLevel, r.logFormat, log)
 	if err != nil {
 		log.WithError(err).Warn("Starting repo maintenance failed")
+
+		// Record failure metric when job fails to start
+		if r.metrics != nil {
+			r.metrics.RegisterMaintenanceJobFailure(req.Name)
+		}
+
 		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
 			updateRepoMaintenanceHistory(rr, velerov1api.BackupRepositoryMaintenanceFailed, &metav1.Time{Time: startTime}, nil, fmt.Sprintf("Failed to start maintenance job, err: %v", err))
 		})
@@ -505,9 +515,28 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 
 	if status.Result == velerov1api.BackupRepositoryMaintenanceFailed {
 		log.WithError(err).Warn("Pruning repository failed")
+
+		// Record failure metric
+		if r.metrics != nil {
+			r.metrics.RegisterMaintenanceJobFailure(req.Name)
+			if status.StartTimestamp != nil && status.CompleteTimestamp != nil {
+				duration := status.CompleteTimestamp.Sub(status.StartTimestamp.Time).Seconds()
+				r.metrics.ObserveMaintenanceJobDuration(req.Name, duration)
+			}
+		}
+
 		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
 			updateRepoMaintenanceHistory(rr, velerov1api.BackupRepositoryMaintenanceFailed, status.StartTimestamp, status.CompleteTimestamp, status.Message)
 		})
+	}
+
+	// Record success metric
+	if r.metrics != nil {
+		r.metrics.RegisterMaintenanceJobSuccess(req.Name)
+		if status.StartTimestamp != nil && status.CompleteTimestamp != nil {
+			duration := status.CompleteTimestamp.Sub(status.StartTimestamp.Time).Seconds()
+			r.metrics.ObserveMaintenanceJobDuration(req.Name, duration)
+		}
 	}
 
 	return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
