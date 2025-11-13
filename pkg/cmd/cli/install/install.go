@@ -89,6 +89,7 @@ type Options struct {
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
+	ConcurrentBackups               int
 	NodeAgentDisableHostPath        bool
 	kubeletRootDir                  string
 	ServerPriorityClassName         string
@@ -195,6 +196,12 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		"item-block-worker-count",
 		o.ItemBlockWorkerCount,
 		"Number of worker threads to process ItemBlocks. Default is one. Optional.",
+	)
+	flags.IntVar(
+		&o.ConcurrentBackups,
+		"concurrent-backups",
+		o.ConcurrentBackups,
+		"Number of backups to process concurrently. Default is one. Optional.",
 	)
 	flags.StringVar(
 		&o.ServerPriorityClassName,
@@ -313,6 +320,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		RepoMaintenanceJobConfigMap:     o.RepoMaintenanceJobConfigMap,
 		NodeAgentConfigMap:              o.NodeAgentConfigMap,
 		ItemBlockWorkerCount:            o.ItemBlockWorkerCount,
+		ConcurrentBackups:               o.ConcurrentBackups,
 		KubeletRootDir:                  o.kubeletRootDir,
 		NodeAgentDisableHostPath:        o.NodeAgentDisableHostPath,
 		ServerPriorityClassName:         o.ServerPriorityClassName,

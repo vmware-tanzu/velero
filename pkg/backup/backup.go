@@ -117,7 +117,6 @@ type kubernetesBackupper struct {
 	podCommandExecutor        podexec.PodCommandExecutor
 	podVolumeBackupperFactory podvolume.BackupperFactory
 	podVolumeTimeout          time.Duration
-	podVolumeContext          context.Context
 	defaultVolumesToFsBackup  bool
 	clientPageSize            int
 	uploaderType              string
@@ -170,8 +169,22 @@ func NewKubernetesBackupper(
 
 // getNamespaceIncludesExcludes returns an IncludesExcludes list containing which namespaces to
 // include and exclude from the backup.
-func getNamespaceIncludesExcludes(backup *velerov1api.Backup) *collections.IncludesExcludes {
-	return collections.NewIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...)
+func getNamespaceIncludesExcludes(backup *velerov1api.Backup, kbClient kbclient.Client) (*collections.NamespaceIncludesExcludes, []string, error) {
+	includesExcludes := collections.NewNamespaceIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...)
+	nsList := corev1api.NamespaceList{}
+	activeNamespaces := []string{}
+	nsManagedByArgoCD := []string{}
+	if err := kbClient.List(context.Background(), &nsList); err != nil {
+		return nil, nsManagedByArgoCD, err
+	}
+	for _, ns := range nsList.Items {
+		activeNamespaces = append(activeNamespaces, ns.Name)
+		nsLabels := ns.GetLabels()
+		if len(nsLabels[ArgoCDManagedByNamespaceLabel]) > 0 && includesExcludes.ShouldInclude(ns.Name) {
+			nsManagedByArgoCD = append(nsManagedByArgoCD, ns.Name)
+		}
+	}
+	return includesExcludes.ActiveNamespaces(activeNamespaces), nsManagedByArgoCD, nil
 }
 
 func getResourceHooks(hookSpecs []velerov1api.BackupResourceHookSpec, discoveryHelper discovery.Helper) ([]hook.ResourceHook, error) {
@@ -245,8 +258,13 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	if err := kb.writeBackupVersion(tw); err != nil {
 		return errors.WithStack(err)
 	}
-
-	backupRequest.NamespaceIncludesExcludes = getNamespaceIncludesExcludes(backupRequest.Backup)
+	var err error
+	var nsManagedByArgoCD []string
+	backupRequest.NamespaceIncludesExcludes, nsManagedByArgoCD, err = getNamespaceIncludesExcludes(backupRequest.Backup, kb.kbClient)
+	if err != nil {
+		log.WithError(err).Errorf("error listing namespaces")
+		return err
+	}
 	log.Infof("Including namespaces: %s", backupRequest.NamespaceIncludesExcludes.IncludesString())
 	log.Infof("Excluding namespaces: %s", backupRequest.NamespaceIncludesExcludes.ExcludesString())
 
@@ -254,12 +272,8 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	// We will check for the existence of a ArgoCD label in the includedNamespaces and add a warning
 	// so that users are at least aware about the existence of argoCD managed ns in their backup
 	// Related Issue: https://github.com/vmware-tanzu/velero/issues/7905
-	if len(backupRequest.Spec.IncludedNamespaces) > 0 {
-		nsManagedByArgoCD := getNamespacesManagedByArgoCD(kb.kbClient, backupRequest.Spec.IncludedNamespaces, log)
-
-		if len(nsManagedByArgoCD) > 0 {
-			log.Warnf("backup operation may encounter complications and potentially produce undesirable results due to the inclusion of namespaces %v managed by ArgoCD in the backup.", nsManagedByArgoCD)
-		}
+	if len(nsManagedByArgoCD) > 0 {
+		log.Warnf("backup operation may encounter complications and potentially produce undesirable results due to the inclusion of namespaces %v managed by ArgoCD in the backup.", nsManagedByArgoCD)
 	}
 
 	if collections.UseOldResourceFilters(backupRequest.Spec) {
@@ -284,7 +298,6 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 
 	log.Infof("Backing up all volumes using pod volume backup: %t", boolptr.IsSetToTrue(backupRequest.Backup.Spec.DefaultVolumesToFsBackup))
 
-	var err error
 	backupRequest.ResourceHooks, err = getResourceHooks(backupRequest.Spec.Hooks.Resources, kb.discoveryHelper)
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Debugf("Error from getResourceHooks")
@@ -314,12 +327,12 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 
 	var podVolumeCancelFunc context.CancelFunc
-	kb.podVolumeContext, podVolumeCancelFunc = context.WithTimeout(context.Background(), podVolumeTimeout)
+	podVolumeContext, podVolumeCancelFunc := context.WithTimeout(context.Background(), podVolumeTimeout)
 	defer podVolumeCancelFunc()
 
 	var podVolumeBackupper podvolume.Backupper
 	if kb.podVolumeBackupperFactory != nil {
-		podVolumeBackupper, err = kb.podVolumeBackupperFactory.NewBackupper(kb.podVolumeContext, log, backupRequest.Backup, kb.uploaderType)
+		podVolumeBackupper, err = kb.podVolumeBackupperFactory.NewBackupper(podVolumeContext, log, backupRequest.Backup, kb.uploaderType)
 		if err != nil {
 			log.WithError(errors.WithStack(err)).Debugf("Error from NewBackupper")
 			return errors.WithStack(err)
@@ -365,6 +378,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		kbClient:                 kb.kbClient,
 		discoveryHelper:          kb.discoveryHelper,
 		podVolumeBackupper:       podVolumeBackupper,
+		podVolumeContext:         podVolumeContext,
 		podVolumeSnapshotTracker: podvolume.NewTracker(),
 		volumeSnapshotterCache:   NewVolumeSnapshotterCache(volumeSnapshotterGetter),
 		itemHookHandler: &hook.DefaultItemHookHandler{
@@ -546,7 +560,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 			log.Infof("Backing Up Item Block including %s %s/%s (%v items in block)", items[i].groupResource.String(), items[i].namespace, items[i].name, len(itemBlock.Items))
 
 			wg.Add(1)
-			backupRequest.ItemBlockChannel <- ItemBlockInput{
+			backupRequest.WorkerPool.GetInputChannel() <- ItemBlockInput{
 				itemBlock:  itemBlock,
 				returnChan: itemBlockReturn,
 			}
@@ -797,7 +811,7 @@ func (kb *kubernetesBackupper) handleItemBlockPostHooks(itemBlock *BackupItemBlo
 	log := itemBlock.Log
 
 	// the post hooks will not execute until all PVBs of the item block pods are processed
-	if err := kb.waitUntilPVBsProcessed(kb.podVolumeContext, log, itemBlock, hookPods); err != nil {
+	if err := kb.waitUntilPVBsProcessed(itemBlock.itemBackupper.podVolumeContext, log, itemBlock, hookPods); err != nil {
 		log.WithError(err).Error("failed to wait PVBs processed for the ItemBlock")
 		return
 	}
@@ -1255,27 +1269,4 @@ func putVolumeInfos(
 	}
 
 	return backupStore.PutBackupVolumeInfos(backupName, backupVolumeInfoBuf)
-}
-
-func getNamespacesManagedByArgoCD(kbClient kbclient.Client, includedNamespaces []string, log logrus.FieldLogger) []string {
-	var nsManagedByArgoCD []string
-
-	for _, nsName := range includedNamespaces {
-		ns := corev1api.Namespace{}
-		if err := kbClient.Get(context.Background(), kbclient.ObjectKey{Name: nsName}, &ns); err != nil {
-			// check for only those ns that exist and are included in backup
-			// here we ignore cases like "" or "*" specified under includedNamespaces
-			if apierrors.IsNotFound(err) {
-				continue
-			}
-			log.WithError(err).Errorf("error getting namespace %s", nsName)
-			continue
-		}
-
-		nsLabels := ns.GetLabels()
-		if len(nsLabels[ArgoCDManagedByNamespaceLabel]) > 0 {
-			nsManagedByArgoCD = append(nsManagedByArgoCD, nsName)
-		}
-	}
-	return nsManagedByArgoCD
 }
