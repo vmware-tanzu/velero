@@ -25,8 +25,8 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-        "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -336,7 +336,7 @@ func (r *backupQueueReconciler) newQueuedBackupsLister(ctx context.Context, ns s
 	return &queuedBackupsLister{backupList}, nil
 }
 
-func (l *queuedBackupsLister) earlierThan(queuePos int) ([]velerov1api.Backup, int){
+func (l *queuedBackupsLister) earlierThan(queuePos int) ([]velerov1api.Backup, int) {
 	backups := []velerov1api.Backup{}
 	runningCount := 0
 	for _, backup := range l.backups.Items {
