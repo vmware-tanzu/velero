@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+        "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -154,11 +155,7 @@ func (r *backupQueueReconciler) detectNamespaceConflict(ctx context.Context, bac
 }
 
 func detectNSConflictsInternal(backup *velerov1api.Backup, earlierBackups []velerov1api.Backup, clusterNamespaces []string) (bool, string) {
-	backupNamespaces := namespacesForBackup(backup, clusterNamespaces)
-	backupNSMap := make(map[string]struct{})
-	for _, ns := range backupNamespaces {
-		backupNSMap[ns] = struct{}{}
-	}
+	backupNamespaces := sets.NewString(namespacesForBackup(backup, clusterNamespaces)...)
 	for _, earlierBackup := range earlierBackups {
 		// This will never be true for the primary backup, but for the secondary
 		// runnability check for queued backups ahead of the current backup, we
@@ -168,11 +165,8 @@ func detectNSConflictsInternal(backup *velerov1api.Backup, earlierBackups []vele
 			earlierBackup.Status.QueuePosition >= backup.Status.QueuePosition {
 			continue
 		}
-		runningNSList := namespacesForBackup(&earlierBackup, clusterNamespaces)
-		for _, runningNS := range runningNSList {
-			if _, found := backupNSMap[runningNS]; found {
-				return true, earlierBackup.Name
-			}
+		if backupNamespaces.HasAny(namespacesForBackup(&earlierBackup, clusterNamespaces)...) {
+			return true, earlierBackup.Name
 		}
 	}
 	return false, ""
