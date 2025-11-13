@@ -103,3 +103,7 @@ func (r *Request) FillVolumesInformation() {
 	r.VolumesInformation.BackupOperations = *r.GetItemOperationsList()
 	r.VolumesInformation.BackupName = r.Backup.Name
 }
+
+func (r *Request) StopWorkerPool() {
+	r.WorkerPool.Stop()
+}
