@@ -289,7 +289,7 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log.Debug("Preparing backup request")
 	request := b.prepareBackupRequest(ctx, original, log)
 	// delete worker pool after reconcile
-	defer request.WorkerPool.Stop()
+	defer request.StopWorkerPool()
 	if len(request.Status.ValidationErrors) > 0 {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
