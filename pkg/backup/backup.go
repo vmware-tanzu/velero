@@ -293,13 +293,6 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 			return err
 		}
 
-		// Record the expanded wildcard includes/excludes in the request status
-		backupRequest.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
-			IncludeWildcardMatches: expandedIncludes,
-			ExcludeWildcardMatches: expandedExcludes,
-			WildcardResult:         wildcardResult,
-		}
-
 		log.WithFields(logrus.Fields{
 			"expandedIncludes": expandedIncludes,
 			"expandedExcludes": expandedExcludes,
@@ -661,11 +654,6 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 	updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed = itemBackupper.hookTracker.Stat()
 	log.Debugf("hookAttempted: %d, hookFailed: %d", updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed)
-
-	// Add wildcard namespace status if it was set during item collection
-	if backupRequest.Status.WildcardNamespaces != nil {
-		updated.Status.WildcardNamespaces = backupRequest.Status.WildcardNamespaces
-	}
 
 	if err := kube.PatchResource(backupRequest.Backup, updated, kb.kbClient); err != nil {
 		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress and hook status")

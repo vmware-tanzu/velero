@@ -171,16 +171,6 @@ func TestExpandNamespaceWildcards(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-
-			if tc.expectedIncludeMatches == nil && tc.expectedExcludeMatches == nil {
-				// No wildcards case - status should not be set
-				assert.Nil(t, restore.Status.WildcardNamespaces)
-			} else {
-				require.NotNil(t, restore.Status.WildcardNamespaces)
-				assert.ElementsMatch(t, tc.expectedIncludeMatches, restore.Status.WildcardNamespaces.IncludeWildcardMatches)
-				assert.ElementsMatch(t, tc.expectedExcludeMatches, restore.Status.WildcardNamespaces.ExcludeWildcardMatches)
-				assert.ElementsMatch(t, tc.expectedWildcardResult, restore.Status.WildcardNamespaces.WildcardResult)
-			}
 		})
 	}
 }

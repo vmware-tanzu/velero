@@ -315,8 +315,14 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 }
 
 // DescribeBackupStatus describes a backup status in human-readable format.
-func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, details bool,
-	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackups []velerov1api.PodVolumeBackup) {
+func DescribeBackupStatus(ctx context.Context,
+	kbClient kbclient.Client,
+	d *Describer,
+	backup *velerov1api.Backup,
+	details bool,
+	insecureSkipTLSVerify bool,
+	caCertPath string,
+	podVolumeBackups []velerov1api.PodVolumeBackup) {
 	status := backup.Status
 
 	// Status.Version has been deprecated, use Status.FormatVersion
@@ -341,31 +347,6 @@ func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Desc
 	// just display `<nil>`, though this should be temporary.
 	d.Printf("Expiration:\t%s\n", status.Expiration)
 	d.Println()
-
-	// Display wildcard namespace information if present
-	if status.WildcardNamespaces != nil {
-		d.Printf("Wildcard Namespace Processing:\n")
-
-		if len(status.WildcardNamespaces.IncludeWildcardMatches) > 0 {
-			d.Printf("\tNamespaces matched by include patterns:\t%s\n", strings.Join(status.WildcardNamespaces.IncludeWildcardMatches, ", "))
-		} else {
-			d.Printf("\tNamespaces matched by include patterns:\t<none>\n")
-		}
-
-		if len(status.WildcardNamespaces.ExcludeWildcardMatches) > 0 {
-			d.Printf("\tNamespaces matched by exclude patterns:\t%s\n", strings.Join(status.WildcardNamespaces.ExcludeWildcardMatches, ", "))
-		} else {
-			d.Printf("\tNamespaces matched by exclude patterns:\t<none>\n")
-		}
-
-		if len(status.WildcardNamespaces.WildcardResult) > 0 {
-			d.Printf("\tFinal namespaces selected:\t%s\n", strings.Join(status.WildcardNamespaces.WildcardResult, ", "))
-		} else {
-			d.Printf("\tFinal namespaces selected:\t<none>\n")
-		}
-
-		d.Println()
-	}
 
 	if backup.Status.Progress != nil {
 		if backup.Status.Phase == velerov1api.BackupPhaseInProgress {

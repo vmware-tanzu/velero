@@ -2433,13 +2433,6 @@ func (ctx *restoreContext) expandNamespaceWildcards(backupResources map[string]*
 
 	selectedNamespaces := wildcard.GetWildcardResult(expandedIncludes, expandedExcludes)
 
-	// Record the expanded wildcard includes/excludes and final processed namespaces in the restore status
-	ctx.restore.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
-		IncludeWildcardMatches: expandedIncludes,
-		ExcludeWildcardMatches: expandedExcludes,
-		WildcardResult:         selectedNamespaces,
-	}
-
 	ctx.log.Infof("Expanded namespace wildcards - includes: %v, excludes: %v, final: %v",
 		expandedIncludes, expandedExcludes, selectedNamespaces)
 
