@@ -315,8 +315,14 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 }
 
 // DescribeBackupStatus describes a backup status in human-readable format.
-func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, details bool,
-	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackups []velerov1api.PodVolumeBackup) {
+func DescribeBackupStatus(ctx context.Context,
+	kbClient kbclient.Client,
+	d *Describer,
+	backup *velerov1api.Backup,
+	details bool,
+	insecureSkipTLSVerify bool,
+	caCertPath string,
+	podVolumeBackups []velerov1api.PodVolumeBackup) {
 	status := backup.Status
 
 	// Status.Version has been deprecated, use Status.FormatVersion
