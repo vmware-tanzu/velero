@@ -241,7 +241,7 @@ func (r *backupQueueReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		allBackups := &velerov1api.BackupList{}
 		if err := r.Client.List(ctx, allBackups, &client.ListOptions{Namespace: backup.Namespace}); err != nil {
 			r.logger.WithError(err).Error("error listing backups")
-			return ctrl.Result{}, nil //nolint:nilerr // We want to return nil to avoid requeue
+			return ctrl.Result{}, nil
 		}
 		lister := r.newQueuedBackupsLister(allBackups)
 		maxQueuePosition := r.getMaxQueuePosition(lister)
@@ -258,7 +258,7 @@ func (r *backupQueueReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		allBackups := &velerov1api.BackupList{}
 		if err := r.Client.List(ctx, allBackups, &client.ListOptions{Namespace: backup.Namespace}); err != nil {
 			r.logger.WithError(err).Error("error listing backups")
-			return ctrl.Result{}, nil //nolint:nilerr // We want to return nil to avoid requeue
+			return ctrl.Result{}, nil
 		}
 		lister := r.newQueuedBackupsLister(allBackups)
 		earlierBackups, runningCount := lister.earlierThan(backup.Status.QueuePosition)
