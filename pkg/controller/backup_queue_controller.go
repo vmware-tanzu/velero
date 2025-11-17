@@ -197,27 +197,23 @@ func namespacesForBackup(backup *velerov1api.Backup, clusterNamespaces []string)
 	return collections.NewNamespaceIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...).ActiveNamespaces(clusterNamespaces).ResolveNamespaceList()
 }
 func (r *backupQueueReconciler) getMaxQueuePosition(lister *queuedBackupsLister) int {
-	queuedBackups := lister.queued()
+	queuedBackups := lister.orderedQueued()
 	maxPos := 0
-	for _, backup := range queuedBackups {
-		maxPos = max(maxPos, backup.Status.QueuePosition)
+	if len(queuedBackups) > 0 {
+		maxPos = queuedBackups[len(queuedBackups)-1].Status.QueuePosition
 	}
 	return maxPos
-}
-
-func (r *backupQueueReconciler) orderedQueuedBackupsForEnqueue(ctx context.Context, backup *velerov1api.Backup) ([]velerov1api.Backup, error) {
-	lister, err := r.newQueuedBackupsLister(ctx, backup.Namespace)
-	if err != nil {
-		r.logger.WithError(err).Error("error listing backups")
-		return nil, err
-	}
-	return lister.orderedQueued(), nil
 }
 
 func (r *backupQueueReconciler) findQueuedBackupsToRequeue(ctx context.Context, obj client.Object) []reconcile.Request {
 	backup := obj.(*velerov1api.Backup)
 	requests := []reconcile.Request{}
-	backups, _ := r.orderedQueuedBackupsForEnqueue(ctx, backup)
+	allBackups := &velerov1api.BackupList{}
+	if err := r.Client.List(ctx, allBackups, &client.ListOptions{Namespace: backup.Namespace}); err != nil {
+		r.logger.WithError(err).Error("error listing backups")
+		return requests
+	}
+	backups := r.newQueuedBackupsLister(allBackups).orderedQueued()
 	for _, item := range backups {
 		requests = append(requests, reconcile.Request{
 			NamespacedName: types.NamespacedName{
@@ -242,11 +238,12 @@ func (r *backupQueueReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	switch backup.Status.Phase {
 	case "", velerov1api.BackupPhaseNew:
 		// queue new backup
-		lister, err := r.newQueuedBackupsLister(ctx, backup.Namespace)
-		if err != nil {
-			// error is logged in newQueuedBackupsLister func
+		allBackups := &velerov1api.BackupList{}
+		if err := r.Client.List(ctx, allBackups, &client.ListOptions{Namespace: backup.Namespace}); err != nil {
+			r.logger.WithError(err).Error("error listing backups")
 			return ctrl.Result{}, nil //nolint:nilerr // We want to return nil to avoid requeue
 		}
+		lister := r.newQueuedBackupsLister(allBackups)
 		maxQueuePosition := r.getMaxQueuePosition(lister)
 		original := backup.DeepCopy()
 		backup.Status.Phase = velerov1api.BackupPhaseQueued
@@ -258,11 +255,12 @@ func (r *backupQueueReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	case velerov1api.BackupPhaseQueued:
 		// handle queued backup
 		// Find backups ahead of this one (InProgress, ReadyToStart, or Queued with higher position)
-		lister, err := r.newQueuedBackupsLister(ctx, backup.Namespace)
-		if err != nil {
-			// error is logged in newQueuedBackupsLister func
+		allBackups := &velerov1api.BackupList{}
+		if err := r.Client.List(ctx, allBackups, &client.ListOptions{Namespace: backup.Namespace}); err != nil {
+			r.logger.WithError(err).Error("error listing backups")
 			return ctrl.Result{}, nil //nolint:nilerr // We want to return nil to avoid requeue
 		}
+		lister := r.newQueuedBackupsLister(allBackups)
 		earlierBackups, runningCount := lister.earlierThan(backup.Status.QueuePosition)
 		if runningCount >= r.concurrentBackups {
 			log.Debugf("%v concurrent backups are already running, leaving %v queued", r.concurrentBackups, backup.Name)
@@ -318,13 +316,8 @@ type queuedBackupsLister struct {
 	backups *velerov1api.BackupList
 }
 
-func (r *backupQueueReconciler) newQueuedBackupsLister(ctx context.Context, ns string) (*queuedBackupsLister, error) {
-	backupList := &velerov1api.BackupList{}
+func (r *backupQueueReconciler) newQueuedBackupsLister(backupList *velerov1api.BackupList) *queuedBackupsLister {
 	backups := []velerov1api.Backup{}
-	if err := r.Client.List(ctx, backupList, &client.ListOptions{Namespace: ns}); err != nil {
-		r.logger.WithError(err).Error("error listing backups")
-		return nil, err
-	}
 	for _, backup := range backupList.Items {
 		if backup.Status.Phase == velerov1api.BackupPhaseQueued ||
 			backup.Status.Phase == velerov1api.BackupPhaseInProgress ||
@@ -333,7 +326,7 @@ func (r *backupQueueReconciler) newQueuedBackupsLister(ctx context.Context, ns s
 		}
 	}
 	backupList.Items = backups
-	return &queuedBackupsLister{backupList}, nil
+	return &queuedBackupsLister{backupList}
 }
 
 func (l *queuedBackupsLister) earlierThan(queuePos int) ([]velerov1api.Backup, int) {
@@ -351,16 +344,6 @@ func (l *queuedBackupsLister) earlierThan(queuePos int) ([]velerov1api.Backup, i
 		}
 	}
 	return backups, runningCount
-}
-
-func (l *queuedBackupsLister) queued() []velerov1api.Backup {
-	backups := []velerov1api.Backup{}
-	for _, backup := range l.backups.Items {
-		if backup.Status.Phase == velerov1api.BackupPhaseQueued {
-			backups = append(backups, backup)
-		}
-	}
-	return backups
 }
 
 func (l *queuedBackupsLister) orderedQueued() []velerov1api.Backup {
