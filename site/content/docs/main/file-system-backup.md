@@ -693,7 +693,7 @@ spec:
 
 ## Priority Class Configuration
 
-For Velero built-in data mover, data mover pods launched during file system backup will use the priority class name configured in the node-agent configmap. The node-agent daemonset itself gets its priority class from the `--node-agent-priority-class-name` flag during Velero installation. This can help ensure proper scheduling behavior in resource-constrained environments. For more details on configuring data mover pod resources, see [Data Movement Pod Resource Configuration][data-movement-config].
+For Velero built-in data mover, data mover pods launched during file system backup will use the priority class name configured in the node-agent configmap. The node-agent daemonset itself gets its priority class from the `--node-agent-priority-class-name` flag during Velero installation. This can help ensure proper scheduling behavior in resource-constrained environments. For more details on configuring data mover pod resources, see [Data Movement Pod Resource Configuration][21].
 
 ## Resource Consumption
 
@@ -712,7 +712,9 @@ totalPreservedMemory = (128M + 24M * numOfCPUCores) * numOfWorkerNodes
 However, whether and when this limit is reached is related to the data you are backing up/restoring.  
 
 During the restore, the repository may also cache data/metadata so as to reduce the network footprint and speed up the restore. The repository uses its own policy to store and clean up the cache.  
-For Kopia repository, the cache is stored in the node-agent pod's root file system. Velero allows you to configure a limit of the cache size so that the node-agent pod won't be evicted due to running out of the ephemeral storage. For more details, check [Backup Repository Configuration][18].  
+For Kopia repository, by default, the cache is stored in the data mover pod's root file system. If your root file system space is limited, the data mover pods may be evicted due to running out of the ephemeral storage, which causes the restore fails. To cope with this problem, Velero allows you:
+- configure a limit of the cache size per backup repository, for more details, check [Backup Repository Configuration][18].  
+- configure a dedicated volume for cache data, for more details, check [Data Movement Cache Volume][22].  
 
 ## Restic Deprecation  
 
@@ -766,4 +768,5 @@ Velero still effectively manage restic repository, though you cannot write any n
 [18]: backup-repository-configuration.md
 [19]: node-agent-concurrency.md
 [20]: node-agent-prepare-queue-length.md
-[data-movement-config]: data-movement-pod-resource-configuration.md
+[21]: data-movement-pod-resource-configuration.md
+[22]: data-movement-cache-volume.md

@@ -376,7 +376,10 @@ For Velero built-in data mover, Velero uses [BestEffort as the QoS][13] for data
 If you want to constraint the CPU/memory usage, you need to [Customize Data Mover Pod Resource Limits][11]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][12] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.  
 
 During the restore, the repository may also cache data/metadata so as to reduce the network footprint and speed up the restore. The repository uses its own policy to store and clean up the cache.  
-For Kopia repository, the cache is stored in the data mover pod's root file system. Velero allows you to configure a limit of the cache size so that the data mover pod won't be evicted due to running out of the ephemeral storage. For more details, check [Backup Repository Configuration][17]. 
+For Kopia repository, by default, the cache is stored in the data mover pod's root file system. If your root file system space is limited, the data mover pods may be evicted due to running out of the ephemeral storage, which causes the restore fails. To cope with this problem, Velero allows you:
+- configure a limit of the cache size per backup repository, for more details, check [Backup Repository Configuration][17].  
+- configure a dedicated volume for cache data, for more details, check [Data Movement Cache Volume][21].  
+
 
 ### Node Selection
 
@@ -416,4 +419,6 @@ Sometimes, `RestorePVC` needs to be configured to increase the performance of re
 [18]: https://github.com/vmware-tanzu/velero/pull/7576
 [19]: data-movement-restore-pvc-configuration.md
 [20]: node-agent-prepare-queue-length.md
+[21]: data-movement-cache-volume.md
+
 
