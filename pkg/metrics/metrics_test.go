@@ -373,8 +373,8 @@ func getHistogramCount(t *testing.T, vec *prometheus.HistogramVec, scheduleLabel
 	return 0
 }
 
-// TestMaintenanceJobMetrics verifies that maintenance job metrics are properly recorded.
-func TestMaintenanceJobMetrics(t *testing.T) {
+// TestRepoMaintenanceMetrics verifies that repo maintenance metrics are properly recorded.
+func TestRepoMaintenanceMetrics(t *testing.T) {
 	tests := []struct {
 		name           string
 		repositoryName string
@@ -396,61 +396,61 @@ func TestMaintenanceJobMetrics(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := NewServerMetrics()
 
-			// Test maintenance job success metric
-			t.Run("RegisterMaintenanceJobSuccess", func(t *testing.T) {
-				m.RegisterMaintenanceJobSuccess(tc.repositoryName)
+			// Test repo maintenance success metric
+			t.Run("RegisterRepoMaintenanceSuccess", func(t *testing.T) {
+				m.RegisterRepoMaintenanceSuccess(tc.repositoryName)
 
-				metric := getMaintenanceMetricValue(t, m.metrics[maintenanceJobSuccessTotal].(*prometheus.CounterVec), tc.repositoryName)
+				metric := getMaintenanceMetricValue(t, m.metrics[repoMaintenanceSuccessTotal].(*prometheus.CounterVec), tc.repositoryName)
 				assert.Equal(t, float64(1), metric, tc.description)
 			})
 
-			// Test maintenance job failure metric
-			t.Run("RegisterMaintenanceJobFailure", func(t *testing.T) {
-				m.RegisterMaintenanceJobFailure(tc.repositoryName)
+			// Test repo maintenance failure metric
+			t.Run("RegisterRepoMaintenanceFailure", func(t *testing.T) {
+				m.RegisterRepoMaintenanceFailure(tc.repositoryName)
 
-				metric := getMaintenanceMetricValue(t, m.metrics[maintenanceJobFailureTotal].(*prometheus.CounterVec), tc.repositoryName)
+				metric := getMaintenanceMetricValue(t, m.metrics[repoMaintenanceFailureTotal].(*prometheus.CounterVec), tc.repositoryName)
 				assert.Equal(t, float64(1), metric, tc.description)
 			})
 
-			// Test maintenance job duration metric
-			t.Run("ObserveMaintenanceJobDuration", func(t *testing.T) {
-				m.ObserveMaintenanceJobDuration(tc.repositoryName, 300.5)
+			// Test repo maintenance duration metric
+			t.Run("ObserveRepoMaintenanceDuration", func(t *testing.T) {
+				m.ObserveRepoMaintenanceDuration(tc.repositoryName, 300.5)
 
 				// For histogram, we check the count
-				metric := getMaintenanceHistogramCount(t, m.metrics[maintenanceJobDurationSeconds].(*prometheus.HistogramVec), tc.repositoryName)
+				metric := getMaintenanceHistogramCount(t, m.metrics[repoMaintenanceDurationSeconds].(*prometheus.HistogramVec), tc.repositoryName)
 				assert.Equal(t, uint64(1), metric, tc.description)
 			})
 		})
 	}
 }
 
-// TestMultipleMaintenanceJobsAccumulate verifies that multiple maintenance jobs
+// TestMultipleRepoMaintenanceJobsAccumulate verifies that multiple repo maintenance jobs
 // accumulate metrics under the same repository label.
-func TestMultipleMaintenanceJobsAccumulate(t *testing.T) {
+func TestMultipleRepoMaintenanceJobsAccumulate(t *testing.T) {
 	m := NewServerMetrics()
 	repoName := "default-restic-test"
 
-	// Simulate multiple maintenance job executions
-	m.RegisterMaintenanceJobSuccess(repoName)
-	m.RegisterMaintenanceJobSuccess(repoName)
-	m.RegisterMaintenanceJobSuccess(repoName)
-	m.RegisterMaintenanceJobFailure(repoName)
-	m.RegisterMaintenanceJobFailure(repoName)
+	// Simulate multiple repo maintenance job executions
+	m.RegisterRepoMaintenanceSuccess(repoName)
+	m.RegisterRepoMaintenanceSuccess(repoName)
+	m.RegisterRepoMaintenanceSuccess(repoName)
+	m.RegisterRepoMaintenanceFailure(repoName)
+	m.RegisterRepoMaintenanceFailure(repoName)
 
 	// Record multiple durations
-	m.ObserveMaintenanceJobDuration(repoName, 120.5)
-	m.ObserveMaintenanceJobDuration(repoName, 180.3)
-	m.ObserveMaintenanceJobDuration(repoName, 90.7)
+	m.ObserveRepoMaintenanceDuration(repoName, 120.5)
+	m.ObserveRepoMaintenanceDuration(repoName, 180.3)
+	m.ObserveRepoMaintenanceDuration(repoName, 90.7)
 
 	// Verify accumulated metrics
-	successMetric := getMaintenanceMetricValue(t, m.metrics[maintenanceJobSuccessTotal].(*prometheus.CounterVec), repoName)
-	assert.Equal(t, float64(3), successMetric, "All maintenance job successes should be counted")
+	successMetric := getMaintenanceMetricValue(t, m.metrics[repoMaintenanceSuccessTotal].(*prometheus.CounterVec), repoName)
+	assert.Equal(t, float64(3), successMetric, "All repo maintenance successes should be counted")
 
-	failureMetric := getMaintenanceMetricValue(t, m.metrics[maintenanceJobFailureTotal].(*prometheus.CounterVec), repoName)
-	assert.Equal(t, float64(2), failureMetric, "All maintenance job failures should be counted")
+	failureMetric := getMaintenanceMetricValue(t, m.metrics[repoMaintenanceFailureTotal].(*prometheus.CounterVec), repoName)
+	assert.Equal(t, float64(2), failureMetric, "All repo maintenance failures should be counted")
 
-	durationCount := getMaintenanceHistogramCount(t, m.metrics[maintenanceJobDurationSeconds].(*prometheus.HistogramVec), repoName)
-	assert.Equal(t, uint64(3), durationCount, "All maintenance job durations should be observed")
+	durationCount := getMaintenanceHistogramCount(t, m.metrics[repoMaintenanceDurationSeconds].(*prometheus.HistogramVec), repoName)
+	assert.Equal(t, uint64(3), durationCount, "All repo maintenance durations should be observed")
 }
 
 // Helper function to get metric value from a CounterVec with repository_name label

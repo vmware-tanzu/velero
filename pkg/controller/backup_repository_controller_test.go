@@ -1761,7 +1761,7 @@ func TestInitializeRepoWithRepositoryTypes(t *testing.T) {
 	})
 }
 
-func TestMaintenanceJobMetricsRecording(t *testing.T) {
+func TestRepoMaintenanceMetricsRecording(t *testing.T) {
 	now := time.Now().Round(time.Second)
 
 	tests := []struct {
@@ -1862,8 +1862,8 @@ func TestMaintenanceJobMetricsRecording(t *testing.T) {
 			_ = reconciler.runMaintenanceIfDue(t.Context(), test.repo, velerotest.NewLogger())
 
 			// Verify metrics were recorded
-			successCount := getMaintenanceMetricValue(t, m, "maintenance_job_success_total", test.repo.Name)
-			failureCount := getMaintenanceMetricValue(t, m, "maintenance_job_failure_total", test.repo.Name)
+			successCount := getMaintenanceMetricValue(t, m, "repo_maintenance_success_total", test.repo.Name)
+			failureCount := getMaintenanceMetricValue(t, m, "repo_maintenance_failure_total", test.repo.Name)
 			durationCount := getMaintenanceDurationCount(t, m, test.repo.Name)
 
 			if test.expectSuccess {
@@ -1922,7 +1922,7 @@ func getMaintenanceDurationCount(t *testing.T, m *metrics.ServerMetrics, repoNam
 	t.Helper()
 
 	metricMap := m.Metrics()
-	collector, ok := metricMap["maintenance_job_duration_seconds"]
+	collector, ok := metricMap["repo_maintenance_duration_seconds"]
 	if !ok {
 		return 0
 	}
