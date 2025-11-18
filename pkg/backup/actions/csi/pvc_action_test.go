@@ -829,7 +829,7 @@ volumePolicies:
 						"volume-policy": tt.volumePolicyStr,
 					},
 				}
-				require.NoError(t, client.Create(context.Background(), cm))
+				require.NoError(t, client.Create(t.Context(), cm))
 
 				backup.Spec.ResourcePolicy = &corev1api.TypedLocalObjectReference{
 					Kind: "ConfigMap",
