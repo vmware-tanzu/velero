@@ -586,6 +586,280 @@ func TestListGroupedPVCs(t *testing.T) {
 	}
 }
 
+func TestFilterPVCsByVolumePolicy(t *testing.T) {
+	tests := []struct {
+		name            string
+		pvcs            []corev1api.PersistentVolumeClaim
+		pvs             []corev1api.PersistentVolume
+		volumePolicyStr string
+		expectCount     int
+		expectError     bool
+	}{
+		{
+			name: "All PVCs should be included when no volume policy",
+			pvcs: []corev1api.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Namespace: "ns-1"},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-1",
+						StorageClassName: pointer.String("sc-1"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Namespace: "ns-1"},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-2",
+						StorageClassName: pointer.String("sc-1"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+			},
+			pvs: []corev1api.PersistentVolume{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-1"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							CSI: &corev1api.CSIPersistentVolumeSource{Driver: "csi-driver-1"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-2"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							CSI: &corev1api.CSIPersistentVolumeSource{Driver: "csi-driver-1"},
+						},
+					},
+				},
+			},
+			expectCount: 2,
+		},
+		{
+			name: "Filter out NFS PVC by volume policy",
+			pvcs: []corev1api.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc-csi", Namespace: "ns-1"},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-csi",
+						StorageClassName: pointer.String("sc-1"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc-nfs", Namespace: "ns-1"},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-nfs",
+						StorageClassName: pointer.String("sc-nfs"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+			},
+			pvs: []corev1api.PersistentVolume{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-csi"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							CSI: &corev1api.CSIPersistentVolumeSource{Driver: "csi-driver"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-nfs"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							NFS: &corev1api.NFSVolumeSource{
+								Server: "nfs-server",
+								Path:   "/export",
+							},
+						},
+					},
+				},
+			},
+			volumePolicyStr: `
+version: v1
+volumePolicies:
+- conditions:
+    nfs: {}
+  action:
+    type: skip
+`,
+			expectCount: 1,
+		},
+		{
+			name: "All PVCs filtered out by volume policy",
+			pvcs: []corev1api.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc-nfs-1", Namespace: "ns-1"},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-nfs-1",
+						StorageClassName: pointer.String("sc-nfs"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc-nfs-2", Namespace: "ns-1"},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-nfs-2",
+						StorageClassName: pointer.String("sc-nfs"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+			},
+			pvs: []corev1api.PersistentVolume{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-nfs-1"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							NFS: &corev1api.NFSVolumeSource{
+								Server: "nfs-server",
+								Path:   "/export/1",
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-nfs-2"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							NFS: &corev1api.NFSVolumeSource{
+								Server: "nfs-server",
+								Path:   "/export/2",
+							},
+						},
+					},
+				},
+			},
+			volumePolicyStr: `
+version: v1
+volumePolicies:
+- conditions:
+    nfs: {}
+  action:
+    type: skip
+`,
+			expectCount: 0,
+		},
+		{
+			name: "Filter out non-CSI PVCs from mixed driver group",
+			pvcs: []corev1api.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pvc-linstor",
+						Namespace: "ns-1",
+						Labels:    map[string]string{"app.kubernetes.io/instance": "myapp"},
+					},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-linstor",
+						StorageClassName: pointer.String("sc-linstor"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pvc-nfs",
+						Namespace: "ns-1",
+						Labels:    map[string]string{"app.kubernetes.io/instance": "myapp"},
+					},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-nfs",
+						StorageClassName: pointer.String("sc-nfs"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+			},
+			pvs: []corev1api.PersistentVolume{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-linstor"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							CSI: &corev1api.CSIPersistentVolumeSource{Driver: "linstor.csi.linbit.com"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-nfs"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							NFS: &corev1api.NFSVolumeSource{
+								Server: "nfs-server",
+								Path:   "/export",
+							},
+						},
+					},
+				},
+			},
+			volumePolicyStr: `
+version: v1
+volumePolicies:
+- conditions:
+    nfs: {}
+  action:
+    type: skip
+`,
+			expectCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objs := []runtime.Object{}
+			for i := range tt.pvs {
+				objs = append(objs, &tt.pvs[i])
+			}
+
+			client := velerotest.NewFakeControllerRuntimeClient(t, objs...)
+
+			backup := &velerov1api.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-backup",
+					Namespace: "velero",
+				},
+				Spec: velerov1api.BackupSpec{},
+			}
+
+			// Add volume policy ConfigMap if specified
+			if tt.volumePolicyStr != "" {
+				cm := &corev1api.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "volume-policy",
+						Namespace: "velero",
+					},
+					Data: map[string]string{
+						"volume-policy": tt.volumePolicyStr,
+					},
+				}
+				require.NoError(t, client.Create(context.Background(), cm))
+
+				backup.Spec.ResourcePolicy = &corev1api.TypedLocalObjectReference{
+					Kind: "ConfigMap",
+					Name: "volume-policy",
+				}
+			}
+
+			action := &pvcBackupItemAction{
+				log:      velerotest.NewLogger(),
+				crClient: client,
+			}
+
+			result, err := action.filterPVCsByVolumePolicy(tt.pvcs, backup)
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Len(t, result, tt.expectCount)
+
+				// For mixed driver scenarios, verify filtered result can determine single CSI driver
+				if tt.name == "Filter out non-CSI PVCs from mixed driver group" && len(result) > 0 {
+					driver, err := action.determineCSIDriver(result)
+					require.NoError(t, err, "After filtering, determineCSIDriver should not fail with multiple drivers error")
+					require.Equal(t, "linstor.csi.linbit.com", driver, "Should have the Linstor driver after filtering out NFS")
+				}
+			}
+		})
+	}
+}
+
 func TestDetermineCSIDriver(t *testing.T) {
 	tests := []struct {
 		name           string
