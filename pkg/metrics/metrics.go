@@ -80,10 +80,10 @@ const (
 	DataDownloadFailureTotal = "data_download_failure_total"
 	DataDownloadCancelTotal  = "data_download_cancel_total"
 
-	// maintenance job metrics
-	maintenanceJobSuccessTotal    = "maintenance_job_success_total"
-	maintenanceJobFailureTotal    = "maintenance_job_failure_total"
-	maintenanceJobDurationSeconds = "maintenance_job_duration_seconds"
+	// repo maintenance metrics
+	repoMaintenanceSuccessTotal    = "repo_maintenance_success_total"
+	repoMaintenanceFailureTotal    = "repo_maintenance_failure_total"
+	repoMaintenanceDurationSeconds = "repo_maintenance_duration_seconds"
 
 	// Labels
 	nodeMetricLabel         = "node"
@@ -344,27 +344,27 @@ func NewServerMetrics() *ServerMetrics {
 				},
 				[]string{scheduleLabel, backupNameLabel},
 			),
-			maintenanceJobSuccessTotal: prometheus.NewCounterVec(
+			repoMaintenanceSuccessTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
 					Namespace: metricNamespace,
-					Name:      maintenanceJobSuccessTotal,
-					Help:      "Total number of successful maintenance jobs",
+					Name:      repoMaintenanceSuccessTotal,
+					Help:      "Total number of successful repo maintenance jobs",
 				},
 				[]string{repositoryNameLabel},
 			),
-			maintenanceJobFailureTotal: prometheus.NewCounterVec(
+			repoMaintenanceFailureTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
 					Namespace: metricNamespace,
-					Name:      maintenanceJobFailureTotal,
-					Help:      "Total number of failed maintenance jobs",
+					Name:      repoMaintenanceFailureTotal,
+					Help:      "Total number of failed repo maintenance jobs",
 				},
 				[]string{repositoryNameLabel},
 			),
-			maintenanceJobDurationSeconds: prometheus.NewHistogramVec(
+			repoMaintenanceDurationSeconds: prometheus.NewHistogramVec(
 				prometheus.HistogramOpts{
 					Namespace: metricNamespace,
-					Name:      maintenanceJobDurationSeconds,
-					Help:      "Time taken to complete maintenance jobs, in seconds",
+					Name:      repoMaintenanceDurationSeconds,
+					Help:      "Time taken to complete repo maintenance jobs, in seconds",
 					Buckets: []float64{
 						toSeconds(1 * time.Minute),
 						toSeconds(5 * time.Minute),
@@ -959,23 +959,23 @@ func (m *ServerMetrics) RegisterBackupLocationUnavailable(backupLocationName str
 	}
 }
 
-// RegisterMaintenanceJobSuccess records a successful maintenance job.
-func (m *ServerMetrics) RegisterMaintenanceJobSuccess(repositoryName string) {
-	if c, ok := m.metrics[maintenanceJobSuccessTotal].(*prometheus.CounterVec); ok {
+// RegisterRepoMaintenanceSuccess records a successful repo maintenance job.
+func (m *ServerMetrics) RegisterRepoMaintenanceSuccess(repositoryName string) {
+	if c, ok := m.metrics[repoMaintenanceSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(repositoryName).Inc()
 	}
 }
 
-// RegisterMaintenanceJobFailure records a failed maintenance job.
-func (m *ServerMetrics) RegisterMaintenanceJobFailure(repositoryName string) {
-	if c, ok := m.metrics[maintenanceJobFailureTotal].(*prometheus.CounterVec); ok {
+// RegisterRepoMaintenanceFailure records a failed repo maintenance job.
+func (m *ServerMetrics) RegisterRepoMaintenanceFailure(repositoryName string) {
+	if c, ok := m.metrics[repoMaintenanceFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(repositoryName).Inc()
 	}
 }
 
-// ObserveMaintenanceJobDuration records the number of seconds a maintenance job took.
-func (m *ServerMetrics) ObserveMaintenanceJobDuration(repositoryName string, seconds float64) {
-	if h, ok := m.metrics[maintenanceJobDurationSeconds].(*prometheus.HistogramVec); ok {
+// ObserveRepoMaintenanceDuration records the number of seconds a repo maintenance job took.
+func (m *ServerMetrics) ObserveRepoMaintenanceDuration(repositoryName string, seconds float64) {
+	if h, ok := m.metrics[repoMaintenanceDurationSeconds].(*prometheus.HistogramVec); ok {
 		h.WithLabelValues(repositoryName).Observe(seconds)
 	}
 }

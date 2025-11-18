@@ -498,7 +498,7 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 
 		// Record failure metric when job fails to start
 		if r.metrics != nil {
-			r.metrics.RegisterMaintenanceJobFailure(req.Name)
+			r.metrics.RegisterRepoMaintenanceFailure(req.Name)
 		}
 
 		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
@@ -518,10 +518,10 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 
 		// Record failure metric
 		if r.metrics != nil {
-			r.metrics.RegisterMaintenanceJobFailure(req.Name)
+			r.metrics.RegisterRepoMaintenanceFailure(req.Name)
 			if status.StartTimestamp != nil && status.CompleteTimestamp != nil {
 				duration := status.CompleteTimestamp.Sub(status.StartTimestamp.Time).Seconds()
-				r.metrics.ObserveMaintenanceJobDuration(req.Name, duration)
+				r.metrics.ObserveRepoMaintenanceDuration(req.Name, duration)
 			}
 		}
 
@@ -532,10 +532,10 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 
 	// Record success metric
 	if r.metrics != nil {
-		r.metrics.RegisterMaintenanceJobSuccess(req.Name)
+		r.metrics.RegisterRepoMaintenanceSuccess(req.Name)
 		if status.StartTimestamp != nil && status.CompleteTimestamp != nil {
 			duration := status.CompleteTimestamp.Sub(status.StartTimestamp.Time).Seconds()
-			r.metrics.ObserveMaintenanceJobDuration(req.Name, duration)
+			r.metrics.ObserveRepoMaintenanceDuration(req.Name, duration)
 		}
 	}
 
