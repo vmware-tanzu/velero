@@ -298,6 +298,96 @@ You can customize the label key that Velero uses to identify VGS groups. This is
 
 3.  **Default Value (Lowest Priority):** If you don't provide any custom configuration, Velero defaults to using `velero.io/volume-group`.
 
+## Volume Policies and VolumeGroupSnapshots
+
+Volume policies control which volumes should be backed up and how (snapshot vs filesystem backup). When using VolumeGroupSnapshots, volume policies are applied **before** grouping PVCs.
+
+### How Volume Policies Affect VGS
+
+When Velero processes PVCs for a VolumeGroupSnapshot:
+
+1. **Label Matching:** All PVCs with the matching VGS label are identified
+2. **Policy Filtering:** Volume policies are evaluated for each PVC
+3. **Group Creation:** Only PVCs that should be snapshotted (not excluded by policy) are included in the VGS
+4. **Warning Logging:** If any PVCs are excluded from the group by volume policy, a warning is logged
+
+This behavior ensures that volume policies take precedence over VGS labels. The VGS label indicates "group these volumes **if they're being backed up**", while the volume policy determines "which volumes to back up".
+
+### Example Scenario
+
+Consider an application with mixed storage types where some volumes should be excluded:
+
+```yaml
+# Database PVC using CSI driver (should be backed up)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-data
+  namespace: my-app
+  labels:
+    app.kubernetes.io/instance: myapp  # VGS label
+spec:
+  storageClassName: csi-storage
+  # ...
+
+---
+# Config PVC using NFS (should be excluded)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: config-data
+  namespace: my-app
+  labels:
+    app.kubernetes.io/instance: myapp  # Same VGS label
+spec:
+  storageClassName: nfs-storage
+  # ...
+```
+
+**Volume Policy Configuration:**
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: velero-volume-policies
+  namespace: velero
+data:
+  volume-policy: |
+    version: v1
+    volumePolicies:
+    - conditions:
+        nfs: {}
+      action:
+        type: skip
+```
+
+**Backup Configuration:**
+```yaml
+apiVersion: velero.io/v1
+kind: Backup
+metadata:
+  name: myapp-backup
+spec:
+  includedNamespaces:
+  - my-app
+  volumeGroupSnapshotLabelKey: app.kubernetes.io/instance
+  resourcePolicy:
+    kind: ConfigMap
+    name: velero-volume-policies
+```
+
+**Result:**
+- The NFS PVC (`config-data`) is filtered out by the volume policy
+- Only the CSI PVC (`db-data`) is included in the VolumeGroupSnapshot
+- A warning is logged: `PVC my-app/config-data has VolumeGroupSnapshot label app.kubernetes.io/instance=myapp but is excluded by volume policy`
+- The backup succeeds with a single-volume VGS instead of failing with "multiple CSI drivers" error
+
+### Best Practices
+
+1. **Use Specific Labels:** When possible, use VGS labels that only target volumes you want to group, rather than relying on volume policies for filtering
+2. **Monitor Warnings:** Review backup logs for volume policy exclusion warnings to ensure intended PVCs are being backed up
+3. **Test Configurations:** Verify that your volume policy and VGS label combinations produce the expected grouping in a test environment
+
 ## Troubleshooting
 
 ### Common Issues and Solutions
@@ -333,6 +423,36 @@ kubectl logs -n kube-system -l app=ebs-csi-controller --tail=100
 - Verify CSI driver supports VolumeGroupSnapshots
 - Check VolumeGroupSnapshotClass configuration
 - Ensure storage backend supports group snapshots
+
+#### Multiple CSI Drivers Error
+
+**Symptoms:** Backup fails with error about multiple CSI drivers found
+```
+Error backing up item: failed to determine CSI driver for PVCs in VolumeGroupSnapshot group:
+found multiple CSI drivers: linstor.csi.linbit.com and nfs.csi.k8s.io
+```
+
+**Cause:** PVCs with the same VGS label use different CSI drivers or include non-CSI volumes
+
+**Solutions:**
+1. Use more specific labels that only match PVCs using the same CSI driver
+2. Use volume policies to exclude PVCs that shouldn't be snapshotted:
+   ```yaml
+   apiVersion: v1
+   kind: ConfigMap
+   metadata:
+     name: velero-volume-policies
+     namespace: velero
+   data:
+     volume-policy: |
+       version: v1
+       volumePolicies:
+       - conditions:
+           nfs: {}
+         action:
+           type: skip
+   ```
+3. Check backup logs for volume policy warnings to verify filtering is working
 
 #### VolumeGroupSnapshot Setup: Default VolumeSnapshotClass Required
 
