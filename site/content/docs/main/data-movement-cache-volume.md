@@ -6,7 +6,7 @@ layout: docs
 Velero data movement restore (i.e., for CSI snapshot data movement and fs-backup) may request the backup repository to cache data locally so as to reduce the data request from the remote backup storage.  
 The cache behavior is decided by the specific backup repository, and Velero allows you to configure a cache limit for the backup repositories who support it (i.e., kopia repository). For more details, see [Backup Repository Configuration][1].  
 The size of cache may significantly impact on the performance. Specifically, if the cache size is too small, the restore throughput will be severely reduced and much more data would be downloaded from the backup storage.  
-By default, the cache data location is in the data mover pods' root disk. In some environments, the pods's root disk size is very limited, some a large cache size would cause the data mover pods evicted because of running out of ephemeral disk.  
+By default, the cache data location is in the data mover pods' root disk. In some environments, the pods' root disk size is very limited, so a large cache size would cause the data mover pods evicted because of running out of ephemeral disk.  
 
 To cope with the problems and guarantee the data mover pods always run with a fine tuned local cache, Velero supports dedicated cache PVCs for data movement restore, for CSI snapshot data movement and fs-backup.  
 
