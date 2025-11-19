@@ -313,6 +313,12 @@ kubectl -n velero get datauploads -l velero.io/backup-name=YOUR_BACKUP_NAME -w
 kubectl -n velero get datadownloads -l velero.io/restore-name=YOUR_RESTORE_NAME -w
 ```
 
+For each volume, the parallelism is like below:  
+- If it is a file system mode volume, files in the volume are processed in parallel. You can use `--parallel-files-upload` backup flag or `--parallel-files-download` restore flag to control how many files are processed in parallel. Otherwise, if they are not set, Velero by default refers to the number of CPU cores in the node (where the backup/restore is running) for the parallelism. That is to say, the parallelism is not affected by the CPU request/limit set to the data mover pods.  
+- If it is a block mode volume, there is no parallelism, the block data is processed sequentially.  
+
+Notice that Golang 1.25 and later respects the CPU limit set to the pods to decide the physical threads provisioned to the pod processes (see [Container-aware GOMAXPROCS][22] for more details), so for Velero 1.18 (which consumes Golang 1.25) and later, if you set a CPU limit to the data mover pods, you may not get the expected performance (e.g., backup/restore throughput) with the default parallelism. The outcome may or may not be obvious varying on your volume data. If it is required, you could customize `--parallel-files-upload` or `--parallel-files-download` according to the CPU limit set to the data mover pods.  
+
 ### Restart and resume
 When Velero server is restarted, if the resource backup/restore has completed, so the backup/restore has excceded `InProgress` status and is waiting for the completion of the data movements, Velero will recapture the status of the running data movements and resume the execution.  
 When node-agent is restarted, Velero tries to recapture the status of the running data movements and resume the execution; if the resume fails, the data movements are canceled.  
@@ -420,5 +426,6 @@ Sometimes, `RestorePVC` needs to be configured to increase the performance of re
 [19]: data-movement-restore-pvc-configuration.md
 [20]: node-agent-prepare-queue-length.md
 [21]: data-movement-cache-volume.md
+[22]: https://tip.golang.org/doc/go1.25#container-aware-gomaxprocs:~:text=Runtime%C2%B6-,Container%2Daware%20GOMAXPROCS,-%C2%B6
 
 
