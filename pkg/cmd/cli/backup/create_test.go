@@ -64,7 +64,7 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, velerov1api.BackupSpec{
-		TTL:                     metav1.Duration{Duration: o.TTL},
+		TTL:                     metav1.Duration{Duration: o.TTL.Duration},
 		IncludedNamespaces:      []string(o.IncludeNamespaces),
 		SnapshotVolumes:         o.SnapshotVolumes.Value,
 		IncludeClusterResources: o.IncludeClusterResources.Value,
