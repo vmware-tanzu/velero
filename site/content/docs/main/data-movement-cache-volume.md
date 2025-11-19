@@ -33,7 +33,7 @@ The cache PVC behavior could be further fine tuned through `thresholdInGB`. Its 
 
 This configuration decides whether and how to provision cache PVCs, but it doesn't decide their size. Instead, the size is decided by the specific backup repository. Specifically, Velero asks a cache limit from the backup repository and uses this limit to calculate the cache PVC size.  
 The cache limit is decided by the backup repository itself, for Kopia repository, if `cacheLimitMB` is specified in the backup repository configuration, its value will be used; otherwise, a default limit (5 GB) is used.  
-Then Velero inflates the limit with 20% by considering the non-payload overheads and delay cache cleanup behavior varying on backup repositories.    
+Then Velero inflates the limit by 20% by considering the non-payload overheads and delay cache cleanup behavior varying on backup repositories.    
 
 Take Kopia repository and the above cache PVC configuration for example:  
 - When `cacheLimitMB` is not available for the repository, a 6GB cache PVC is created for the backup that is larger than 1GB; otherwise, no cache volume is created
