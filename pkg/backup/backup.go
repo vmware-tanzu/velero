@@ -168,9 +168,9 @@ func NewKubernetesBackupper(
 	}, nil
 }
 
-// getNamespaceIncludesExcludes returns an IncludesExcludes list containing which namespaces to
-// include and exclude from the backup.
-func getNamespaceIncludesExcludes(backup *velerov1api.Backup, kbClient kbclient.Client) (*collections.NamespaceIncludesExcludes, []string, error) {
+// getNamespaceIncludesExcludesAndArgoCDNamespaces returns an IncludesExcludes list containing which namespaces to
+// include and exclude from the backup and a list of namespaces managed by ArgoCD.
+func getNamespaceIncludesExcludesAndArgoCDNamespaces(backup *velerov1api.Backup, kbClient kbclient.Client) (*collections.NamespaceIncludesExcludes, []string, error) {
 	includesExcludes := collections.NewNamespaceIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...)
 	nsList := corev1api.NamespaceList{}
 	activeNamespaces := []string{}
@@ -262,7 +262,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 	var err error
 	var nsManagedByArgoCD []string
-	backupRequest.NamespaceIncludesExcludes, nsManagedByArgoCD, err = getNamespaceIncludesExcludes(backupRequest.Backup, kb.kbClient)
+	backupRequest.NamespaceIncludesExcludes, nsManagedByArgoCD, err = getNamespaceIncludesExcludesAndArgoCDNamespaces(backupRequest.Backup, kb.kbClient)
 	if err != nil {
 		log.WithError(err).Errorf("error listing namespaces")
 		return err
