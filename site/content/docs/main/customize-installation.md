@@ -158,7 +158,7 @@ At installation, You could set resource requests and limits for the Velero pod, 
 |Memory limit|512Mi|N/A|
 {{< /table >}}
   
-For Velero pod, through testing, the Velero maintainers have found these defaults work well when backing up and restoring 1000 or less resources.  
+For Velero pod, through testing, the Velero maintainers have found these defaults work well when backing up and restoring 1000 or less resources. If you are enabling concurrent backups and your backups tend to be large, you may need to increase these limits.
 For node-agent pod, by default it doesn't have CPU/memory request/limit, so that the backups/restores won't break due to resource throttling. The Velero maintainers have also done some [Performance Tests][13] to show the relationship of CPU/memory usage and the scale of data being backed up/restored.
 
 For repository maintenance job, it's no limit on resources by default. You could configure the job resource limitation based on target data to be backed up, some further settings please refer to [repository maintenance job][14].
