@@ -180,7 +180,7 @@ func (c *backupOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 		return ctrl.Result{}, errors.Wrap(err, "error getting backup operations")
 	}
-	stillInProgress, changes, opsCompleted, opsFailed, errs := getBackupItemOperationProgress(backup, pluginManager, operations.Operations)
+	stillInProgress, changes, opsCompleted, opsFailed, errs := getBackupItemOperationProgress(backup, pluginManager, operations.Operations, log)
 	// if len(errs)>0, need to update backup errors and error log
 	operations.ErrsSinceUpdate = append(operations.ErrsSinceUpdate, errs...)
 	backup.Status.Errors += len(operations.ErrsSinceUpdate)
@@ -203,7 +203,10 @@ func (c *backupOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// BackupPhaseWaitingForPluginOperationsPartiallyFailed and needs update
 	// If the only changes are incremental progress, then no write is necessary, progress can remain in memory
 	if !stillInProgress {
-		if backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperations {
+		if isBackupCancelled(backup) {
+			log.Infof("Marking backup %s Cancelled", backup.Name)
+			backup.Status.Phase = velerov1api.BackupPhaseCancelling
+		} else if backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperations {
 			log.Infof("Marking backup %s Finalizing", backup.Name)
 			backup.Status.Phase = velerov1api.BackupPhaseFinalizing
 		} else {
@@ -289,12 +292,15 @@ func (c *backupOperationsReconciler) updateBackupAndOperationsJSON(
 func getBackupItemOperationProgress(
 	backup *velerov1api.Backup,
 	pluginManager clientmgmt.Manager,
-	operationsList []*itemoperation.BackupOperation) (bool, bool, int, int, []string) {
+	operationsList []*itemoperation.BackupOperation,
+	log logrus.FieldLogger) (bool, bool, int, int, []string) {
 	inProgressOperations := false
 	changes := false
 	var errs []string
 	var completedCount, failedCount int
 
+	log.Info("Getting backup item operation progress:")
+	log.Info("length of operationsList: %v", len(operationsList))
 	for _, operation := range operationsList {
 		if operation.Status.Phase == itemoperation.OperationPhaseNew ||
 			operation.Status.Phase == itemoperation.OperationPhaseInProgress {
@@ -360,10 +366,19 @@ func getBackupItemOperationProgress(
 				continue
 			}
 			// cancel operation if past timeout period
-			if operation.Status.Created.Time.Add(backup.Spec.ItemOperationTimeout.Duration).Before(time.Now()) {
+			if operation.Status.Created.Time.Add(backup.Spec.ItemOperationTimeout.Duration).Before(time.Now()) || isBackupCancelled(backup) {
+				if isBackupCancelled(backup) {
+					log.Info("Cancelling operation because backup is cancelled")
+				} else {
+					log.Info("Cancelling operation because it has timed out")
+				}
 				_ = bia.Cancel(operation.Spec.OperationID, backup)
 				operation.Status.Phase = itemoperation.OperationPhaseFailed
-				operation.Status.Error = "Asynchronous action timed out"
+				if isBackupCancelled(backup) {
+					operation.Status.Error = "Asynchronous action cancelled"
+				} else {
+					operation.Status.Error = "Asynchronous action timed out"
+				}
 				errs = append(errs, wrapErrMsg(operation.Status.Error, bia))
 				changes = true
 				failedCount++
@@ -395,4 +410,8 @@ func wrapErrMsg(errMsg string, bia v2.BackupItemAction) string {
 		errMsg += ", "
 	}
 	return fmt.Sprintf("%splugin: %s", errMsg, plugin)
+}
+
+func isBackupCancelled(backup *velerov1api.Backup) bool {
+	return backup.Spec.Cancel != nil && *backup.Spec.Cancel
 }

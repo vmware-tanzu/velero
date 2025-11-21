@@ -268,6 +268,9 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	request := b.prepareBackupRequest(original, log)
 	if len(request.Status.ValidationErrors) > 0 {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
+	} else if original.Spec.Cancel != nil && *original.Spec.Cancel {
+		log.Infof("Marking backup %s Cancelled", original.Name)
+		request.Status.Phase = velerov1api.BackupPhaseCancelling
 	} else {
 		request.Status.Phase = velerov1api.BackupPhaseInProgress
 		request.Status.StartTimestamp = &metav1.Time{Time: b.clock.Now()}
@@ -279,6 +282,11 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// if patch fail, backup can reconcile again as phase would still be "" or New
 	if err := kubeutil.PatchResource(original, request.Backup, b.kbClient); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "error updating Backup status to %s", request.Status.Phase)
+	}
+
+	if request.Status.Phase == velerov1api.BackupPhaseCancelling {
+		log.Infof("Marking backup %s Cancelled", original.Name)
+		return ctrl.Result{}, nil
 	}
 
 	backupScheduleName := request.GetLabels()[velerov1api.ScheduleNameLabel]
@@ -332,6 +340,9 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	case velerov1api.BackupPhaseFailedValidation:
 		b.metrics.RegisterBackupValidationFailure(backupScheduleName)
 		b.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
+	case velerov1api.BackupPhaseCancelling:
+		b.metrics.RegisterBackupFailed(backupScheduleName)
+		b.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
 	}
 	log.Info("Updating backup's status")
 	// Phases were updated in runBackup()
@@ -340,6 +351,7 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// BackupPhaseWaitingForPluginOperationsPartiallyFailed -> backup_operations_controller.go will now reconcile
 	// BackupPhaseFinalizing -> backup_finalizer_controller.go will now reconcile
 	// BackupPhaseFinalizingPartiallyFailed -> backup_finalizer_controller.go will now reconcile
+	// todo: BackupPhaseCancelling -> backup_cancellation_controller.go will now reconcile
 	// BackupPhaseFailed
 	if err := kubeutil.PatchResourceWithRetriesOnErrors(b.resourceTimeout, original, request.Backup, b.kbClient); err != nil {
 		log.WithError(err).Errorf("error updating backup's status from %v to %v", original.Status.Phase, request.Backup.Status.Phase)
@@ -348,11 +360,19 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logger logrus.FieldLogger) *pkgbackup.Request {
+	// Create backup-specific context for Tier 2 cancellation
+	backupCtx, backupCancelFunc := context.WithCancel(b.ctx)
+
 	request := &pkgbackup.Request{
 		Backup:           backup.DeepCopy(), // don't modify items in the cache
 		SkippedPVTracker: pkgbackup.NewSkipPVTracker(),
 		BackedUpItems:    pkgbackup.NewBackedUpItemsMap(),
 		ItemBlockChannel: b.workerPool.GetInputChannel(),
+
+		// Cancellation support (two-tier cancellation system)
+		WorkerPool:       b.workerPool,      // For Tier 1: closing channel to stop workers
+		BackupContext:    backupCtx,         // For Tier 2: cancelling in-flight processing
+		BackupCancelFunc: backupCancelFunc,  // Trigger function for Tier 2 cancellation
 	}
 	request.VolumesInformation.Init()
 
@@ -676,6 +696,9 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 // field is checked to see if the backup was a partial failure.
 
 func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
+	// Ensure backup context is cancelled when we exit to prevent context leaks
+	defer backup.BackupCancelFunc()
+
 	b.logger.WithField(constant.ControllerBackup, kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
 
 	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
@@ -732,6 +755,9 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 		fatalErrs = append(fatalErrs, err)
 	}
 
+	// Investigate how early we can transition phase to Cancelling, what we need to pass tocancel async ops
+	// todo: get cancel from backup request
+
 	// native snapshots phase will either be failed or completed right away
 	// https://github.com/vmware-tanzu/velero/blob/de3ea52f0cc478e99efa7b9524c7f353514261a4/pkg/backup/item_backupper.go#L632-L639
 	backup.Status.VolumeSnapshotsAttempted = len(backup.VolumeSnapshots.Get())
@@ -748,7 +774,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	// Any errors on operations at this point should be added to backup errors.
 	// If any operations are still not complete, then back will not be set to
 	// Completed yet.
-	inProgressOperations, _, opsCompleted, opsFailed, errs := getBackupItemOperationProgress(backup.Backup, pluginManager, *backup.GetItemOperationsList())
+	inProgressOperations, _, opsCompleted, opsFailed, errs := getBackupItemOperationProgress(backup.Backup, pluginManager, *backup.GetItemOperationsList(), backupLog)
 	if len(errs) > 0 {
 		for _, err := range errs {
 			backupLog.Error(err)
@@ -784,6 +810,9 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 		} else {
 			backup.Status.Phase = velerov1api.BackupPhaseFinalizingPartiallyFailed
 		}
+	case backup.Cancel: // Check cancellation first
+		backupLog.Info("Marking backup as cancelling in runBackup")
+		backup.Status.Phase = velerov1api.BackupPhaseCancelling
 	default:
 		if inProgressOperations {
 			backup.Status.Phase = velerov1api.BackupPhaseWaitingForPluginOperations
@@ -795,7 +824,8 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
 	if backup.Status.Phase == velerov1api.BackupPhaseFailed ||
 		backup.Status.Phase == velerov1api.BackupPhasePartiallyFailed ||
-		backup.Status.Phase == velerov1api.BackupPhaseCompleted {
+		backup.Status.Phase == velerov1api.BackupPhaseCompleted ||
+		backup.Status.Phase == velerov1api.BackupPhaseCancelling {
 		backup.Status.CompletionTimestamp = &metav1.Time{Time: b.clock.Now()}
 	}
 	recordBackupMetrics(backupLog, backup.Backup, backupFile, b.metrics, false)
