@@ -32,6 +32,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/wildcard"
 )
 
 type globStringSet struct {
@@ -53,6 +54,143 @@ func (gss globStringSet) match(match string) bool {
 		}
 	}
 	return false
+}
+
+// NamespaceIncludesExcludes adds some features to IncludesExcludes
+// to handle namespace-specific functionality. In particular, it
+// provides a way to list all namespaces included in order to determine
+// overlap between backups, and it will be expanded in the future to
+// handle namespace wildcard values
+type NamespaceIncludesExcludes struct {
+	activeNamespaces []string
+	includesExcludes *IncludesExcludes
+	wildcardExpanded bool
+	wildcardResult   []string
+}
+
+func NewNamespaceIncludesExcludes() *NamespaceIncludesExcludes {
+	return &NamespaceIncludesExcludes{
+		activeNamespaces: []string{},
+		includesExcludes: NewIncludesExcludes(),
+	}
+}
+
+func (nie *NamespaceIncludesExcludes) ActiveNamespaces(activeNamespaces []string) *NamespaceIncludesExcludes {
+	nie.activeNamespaces = activeNamespaces
+	return nie
+}
+
+func (nie *NamespaceIncludesExcludes) IsWildcardExpanded() bool {
+	return nie.wildcardExpanded
+}
+
+// Includes adds items to the includes list. '*' is a wildcard
+// value meaning "include everything".
+func (nie *NamespaceIncludesExcludes) Includes(includes ...string) *NamespaceIncludesExcludes {
+	nie.includesExcludes.Includes(includes...)
+	return nie
+}
+
+// GetIncludes returns the items in the includes list
+func (nie *NamespaceIncludesExcludes) GetIncludes() []string {
+	return nie.includesExcludes.GetIncludes()
+}
+
+func (nie *NamespaceIncludesExcludes) GetExcludes() []string {
+	return nie.includesExcludes.GetExcludes()
+}
+
+// SetIncludes sets the includes list to the given list
+func (nie *NamespaceIncludesExcludes) SetIncludes(includes []string) *NamespaceIncludesExcludes {
+	nie.includesExcludes.includes = newGlobStringSet()
+	nie.includesExcludes.includes.Insert(includes...)
+	return nie
+}
+
+// SetExcludes sets the excludes list to the given list
+func (nie *NamespaceIncludesExcludes) SetExcludes(excludes []string) *NamespaceIncludesExcludes {
+	nie.includesExcludes.excludes = newGlobStringSet()
+	nie.includesExcludes.excludes.Insert(excludes...)
+	return nie
+}
+
+// IncludesString returns a string containing all of the includes, separated by commas, or * if the
+// list is empty.
+func (nie *NamespaceIncludesExcludes) IncludesString() string {
+	return nie.includesExcludes.IncludesString()
+}
+
+// Excludes adds items to the includes list. '*' is a wildcard
+// value meaning "include everything".
+func (nie *NamespaceIncludesExcludes) Excludes(excludes ...string) *NamespaceIncludesExcludes {
+	nie.includesExcludes.Excludes(excludes...)
+	return nie
+}
+
+// IncludesString returns a string containing all of the excludes, separated by commas, or * if the
+// list is empty.
+func (nie *NamespaceIncludesExcludes) ExcludesString() string {
+	return nie.includesExcludes.ExcludesString()
+}
+
+// ShouldInclude returns whether the specified item should be
+// included or not. Everything in the includes list except those
+// items in the excludes list should be included.
+func (nie *NamespaceIncludesExcludes) ShouldInclude(s string) bool {
+	// Special case: if wildcard expansion occurred and resulted in an empty includes list,
+	// it means the wildcard pattern matched nothing, so we should include nothing.
+	// This differs from the default behavior where an empty includes list means "include everything".
+	if nie.wildcardExpanded && nie.includesExcludes.includes.Len() == 0 {
+		return false
+	}
+	return nie.includesExcludes.ShouldInclude(s)
+}
+
+// IncludeEverything returns true if the includes list is empty or '*'
+// and the excludes list is empty, or false otherwise.
+func (nie *NamespaceIncludesExcludes) IncludeEverything() bool {
+	return nie.includesExcludes.IncludeEverything()
+}
+
+// Attempts to expand wildcard patterns, if any, in the includes and excludes lists.
+func (nie *NamespaceIncludesExcludes) ExpandIncludesExcludes() error {
+	includes := nie.GetIncludes()
+	excludes := nie.GetExcludes()
+
+	if wildcard.ShouldExpandWildcards(includes, excludes) {
+		expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(
+			nie.activeNamespaces, includes, excludes)
+		if err != nil {
+			return err
+		}
+
+		nie.SetIncludes(expandedIncludes)
+		nie.SetExcludes(expandedExcludes)
+		nie.wildcardExpanded = true
+	}
+
+	return nil
+}
+
+// ResolveNamespaceList returns a list of all namespaces which will be backed up.
+// The second return value indicates whether wildcard expansion was performed.
+func (nie *NamespaceIncludesExcludes) ResolveNamespaceList() ([]string, error) {
+	// Check if this is being called by non-backup processing e.g. backup queue controller
+	if !nie.wildcardExpanded {
+		err := nie.ExpandIncludesExcludes()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	outNamespaces := []string{}
+	for _, ns := range nie.activeNamespaces {
+		if nie.ShouldInclude(ns) {
+			outNamespaces = append(outNamespaces, ns)
+		}
+	}
+	nie.wildcardResult = outNamespaces
+	return nie.wildcardResult, nil
 }
 
 // IncludesExcludes is a type that manages lists of included
@@ -171,7 +309,7 @@ type IncludesExcludesInterface interface {
 type GlobalIncludesExcludes struct {
 	resourceFilter          IncludesExcludes
 	includeClusterResources *bool
-	namespaceFilter         IncludesExcludes
+	namespaceFilter         NamespaceIncludesExcludes
 
 	helper discovery.Helper
 	logger logrus.FieldLogger
@@ -239,7 +377,7 @@ func (ie *GlobalIncludesExcludes) ShouldExclude(typeName string) bool {
 	return false
 }
 
-func GetGlobalResourceIncludesExcludes(helper discovery.Helper, logger logrus.FieldLogger, includes, excludes []string, includeClusterResources *bool, nsIncludesExcludes IncludesExcludes) *GlobalIncludesExcludes {
+func GetGlobalResourceIncludesExcludes(helper discovery.Helper, logger logrus.FieldLogger, includes, excludes []string, includeClusterResources *bool, nsIncludesExcludes NamespaceIncludesExcludes) *GlobalIncludesExcludes {
 	ret := &GlobalIncludesExcludes{
 		resourceFilter:          *GetResourceIncludesExcludes(helper, includes, excludes),
 		includeClusterResources: includeClusterResources,
@@ -254,9 +392,9 @@ func GetGlobalResourceIncludesExcludes(helper discovery.Helper, logger logrus.Fi
 }
 
 type ScopeIncludesExcludes struct {
-	namespaceScopedResourceFilter IncludesExcludes // namespace-scoped resource filter
-	clusterScopedResourceFilter   IncludesExcludes // cluster-scoped resource filter
-	namespaceFilter               IncludesExcludes // namespace filter
+	namespaceScopedResourceFilter IncludesExcludes          // namespace-scoped resource filter
+	clusterScopedResourceFilter   IncludesExcludes          // cluster-scoped resource filter
+	namespaceFilter               NamespaceIncludesExcludes // namespace filter
 
 	helper discovery.Helper
 	logger logrus.FieldLogger
@@ -384,7 +522,7 @@ func (ie *ScopeIncludesExcludes) CombineWithPolicy(policy *resourcepolicies.Incl
 	ie.logger.Infof("Excluding cluster-scoped resources: %s", ie.clusterScopedResourceFilter.ExcludesString())
 }
 
-func newScopeIncludesExcludes(nsIncludesExcludes IncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
+func newScopeIncludesExcludes(nsIncludesExcludes NamespaceIncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
 	ret := &ScopeIncludesExcludes{
 		namespaceScopedResourceFilter: IncludesExcludes{
 			includes: newGlobStringSet(),
@@ -404,7 +542,7 @@ func newScopeIncludesExcludes(nsIncludesExcludes IncludesExcludes, helper discov
 
 // GetScopeResourceIncludesExcludes function is similar with GetResourceIncludesExcludes,
 // but it's used for scoped Includes/Excludes, and can handle both cluster-scoped and namespace-scoped resources.
-func GetScopeResourceIncludesExcludes(helper discovery.Helper, logger logrus.FieldLogger, namespaceIncludes, namespaceExcludes, clusterIncludes, clusterExcludes []string, nsIncludesExcludes IncludesExcludes) *ScopeIncludesExcludes {
+func GetScopeResourceIncludesExcludes(helper discovery.Helper, logger logrus.FieldLogger, namespaceIncludes, namespaceExcludes, clusterIncludes, clusterExcludes []string, nsIncludesExcludes NamespaceIncludesExcludes) *ScopeIncludesExcludes {
 	ret := generateScopedIncludesExcludes(
 		namespaceIncludes,
 		namespaceExcludes,
@@ -581,7 +719,7 @@ func generateIncludesExcludes(includes, excludes []string, mapFunc func(string) 
 
 // generateScopedIncludesExcludes function is similar with generateIncludesExcludes,
 // but it's used for scoped Includes/Excludes.
-func generateScopedIncludesExcludes(namespacedIncludes, namespacedExcludes, clusterIncludes, clusterExcludes []string, mapFunc func(string, bool) string, nsIncludesExcludes IncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
+func generateScopedIncludesExcludes(namespacedIncludes, namespacedExcludes, clusterIncludes, clusterExcludes []string, mapFunc func(string, bool) string, nsIncludesExcludes NamespaceIncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
 	res := newScopeIncludesExcludes(nsIncludesExcludes, helper, logger)
 
 	generateFilter(res.namespaceScopedResourceFilter.includes, namespacedIncludes, mapFunc, true)
