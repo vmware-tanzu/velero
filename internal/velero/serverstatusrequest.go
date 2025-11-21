@@ -20,6 +20,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
+	"os"
 )
 
 type PluginLister interface {
@@ -34,8 +35,15 @@ func GetInstalledPluginInfo(pluginLister PluginLister) []velerov1api.PluginInfo 
 		list := pluginLister.List(v)
 		for _, plugin := range list {
 			pluginInfo := velerov1api.PluginInfo{
-				Name: plugin.Name,
-				Kind: plugin.Kind.String(),
+				Name:    plugin.Name,
+				Kind:    plugin.Kind.String(),
+				Command: plugin.Command,
+			}
+			// If the plugin was registered by the Velero server binary (os.Args[0])
+			// mark it as built-in. Built-in plugins are considered mandatory and
+			// cannot be removed via modifying init containers.
+			if plugin.Command == os.Args[0] {
+				pluginInfo.BuiltIn = true
 			}
 			plugins = append(plugins, pluginInfo)
 		}
