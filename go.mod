@@ -42,7 +42,6 @@ require (
 	github.com/vmware-tanzu/crash-diagnostics v0.3.7
 	go.uber.org/zap v1.27.0
 	golang.org/x/mod v0.29.0
-	golang.org/x/net v0.47.0
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/text v0.31.0
 	google.golang.org/api v0.241.0
@@ -182,6 +181,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
+	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/term v0.37.0 // indirect

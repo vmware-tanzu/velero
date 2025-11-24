@@ -23,6 +23,8 @@ import (
 	"os"
 	"strings"
 
+	"context"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
@@ -36,7 +38,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	. "github.com/vmware-tanzu/velero/test"
