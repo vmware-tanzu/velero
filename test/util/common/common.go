@@ -33,7 +33,7 @@ func GetListByCmdPipes(ctx context.Context, cmdLines []*OsCommandLine) ([]string
 	var cmds []*exec.Cmd
 
 	for _, cmdline := range cmdLines {
-		cmd := exec.Command(cmdline.Cmd, cmdline.Args...)
+		cmd := exec.CommandContext(ctx, cmdline.Cmd, cmdline.Args...)
 		cmds = append(cmds, cmd)
 	}
 	fmt.Println(cmds)
