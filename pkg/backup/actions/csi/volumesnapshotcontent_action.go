@@ -97,6 +97,14 @@ func (p *volumeSnapshotContentBackupItemAction) Execute(
 		})
 	}
 
+	if snapCont.Spec.VolumeSnapshotClassName != nil {
+		// Delete VolumeSnapshotClass from the VolumeSnapshotContent.
+		// This is necessary to make the restore independent of the VolumeSnapshotClass.
+		snapCont.Spec.VolumeSnapshotClassName = nil
+		p.log.Infof("Deleted VolumeSnapshotClassName from VolumeSnapshotContent %s to make restore independent of VolumeSnapshotClass",
+			snapCont.Name)
+	}
+
 	snapContMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&snapCont)
 	if err != nil {
 		return nil, nil, "", nil, errors.WithStack(err)
