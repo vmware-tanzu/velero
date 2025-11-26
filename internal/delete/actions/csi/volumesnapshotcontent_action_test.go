@@ -70,7 +70,7 @@ func TestVSCExecute(t *testing.T) {
 		},
 		{
 			name:      "Normal case, VolumeSnapshot should be deleted",
-			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
+			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).VolumeSnapshotClassName("volumesnapshotclass").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
 			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
 			expectErr: false,
 			function: func(
@@ -82,7 +82,7 @@ func TestVSCExecute(t *testing.T) {
 			},
 		},
 		{
-			name:      "Normal case, VolumeSnapshot should be deleted",
+			name:      "Error case, deletion fails",
 			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
 			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
 			expectErr: true,
