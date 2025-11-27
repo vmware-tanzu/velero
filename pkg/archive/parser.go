@@ -64,7 +64,7 @@ func NewParser(log logrus.FieldLogger, fs filesystem.Interface) *Parser {
 
 // Parse reads an extracted backup on the file system and returns
 // a structured catalog of the resources and items contained within it.
-func (p *Parser) Parse(dir string) (map[string]*ResourceItems, error) {
+func (p *Parser) Parse(dir string, longNames map[string]string) (map[string]*ResourceItems, error) {
 	// ensure top-level "resources" directory exists, and read subdirectories
 	// of it, where each one is expected to correspond to a resource.
 	resourcesDir := filepath.Join(dir, velerov1api.ResourcesDir)
@@ -81,9 +81,8 @@ func (p *Parser) Parse(dir string) (map[string]*ResourceItems, error) {
 			p.log.Warnf("Ignoring unexpected file %q in directory %q", resourceDir.Name(), strings.TrimPrefix(resourcesDir, dir+"/"))
 			continue
 		}
-
 		resourceItems := &ResourceItems{
-			GroupResource:    resourceDir.Name(),
+			GroupResource:    itemNameIfHasLongName(resourceDir.Name(), longNames),
 			ItemsByNamespace: map[string][]string{},
 		}
 
@@ -95,7 +94,7 @@ func (p *Parser) Parse(dir string) (map[string]*ResourceItems, error) {
 			return nil, errors.Wrapf(err, "error checking for existence of directory %q", strings.TrimPrefix(clusterScopedDir, dir+"/"))
 		}
 		if exists {
-			items, err := p.getResourceItemsForScope(clusterScopedDir, dir)
+			items, err := p.getResourceItemsForScope(clusterScopedDir, dir, longNames)
 			if err != nil {
 				return nil, err
 			}
@@ -124,7 +123,7 @@ func (p *Parser) Parse(dir string) (map[string]*ResourceItems, error) {
 					continue
 				}
 
-				items, err := p.getResourceItemsForScope(filepath.Join(namespaceScopedDir, namespaceDir.Name()), dir)
+				items, err := p.getResourceItemsForScope(filepath.Join(namespaceScopedDir, namespaceDir.Name()), dir, longNames)
 				if err != nil {
 					return nil, err
 				}
@@ -135,7 +134,7 @@ func (p *Parser) Parse(dir string) (map[string]*ResourceItems, error) {
 			}
 		}
 
-		resources[resourceDir.Name()] = resourceItems
+		resources[itemNameIfHasLongName(resourceDir.Name(), longNames)] = resourceItems
 	}
 
 	return resources, nil
@@ -143,7 +142,7 @@ func (p *Parser) Parse(dir string) (map[string]*ResourceItems, error) {
 
 // getResourceItemsForScope returns the list of items with a namespace or
 // cluster-scoped subdirectory for a specific resource.
-func (p *Parser) getResourceItemsForScope(dir, archiveRootDir string) ([]string, error) {
+func (p *Parser) getResourceItemsForScope(dir, archiveRootDir string, longNames map[string]string) ([]string, error) {
 	files, err := p.fs.ReadDir(dir)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading contents of directory %q", strings.TrimPrefix(dir, archiveRootDir+"/"))
@@ -156,10 +155,20 @@ func (p *Parser) getResourceItemsForScope(dir, archiveRootDir string) ([]string,
 			continue
 		}
 
-		items = append(items, strings.TrimSuffix(file.Name(), ".json"))
+		items = append(items, itemNameIfHasLongName(strings.TrimSuffix(file.Name(), ".json"), longNames))
 	}
 
 	return items, nil
+}
+
+func itemNameIfHasLongName(itemName string, longNames map[string]string) string {
+	if longNames == nil {
+		return itemName
+	}
+	if longName, ok := longNames[itemName]; ok {
+		return longName
+	}
+	return itemName
 }
 
 // checkAndReadDir is a wrapper around fs.DirExists and fs.ReadDir that does checks
@@ -183,7 +192,7 @@ func (p *Parser) checkAndReadDir(dir string) ([]os.FileInfo, error) {
 
 // ParseGroupVersions extracts the versions for each API Group from the backup
 // directory names and stores them in a metav1 APIGroup object.
-func (p *Parser) ParseGroupVersions(dir string) (map[string]metav1.APIGroup, error) {
+func (p *Parser) ParseGroupVersions(dir string, longNames map[string]string) (map[string]metav1.APIGroup, error) {
 	resourcesDir := filepath.Join(dir, velerov1api.ResourcesDir)
 
 	// Get the subdirectories inside the "resources" directory. The subdirectories
@@ -197,8 +206,9 @@ func (p *Parser) ParseGroupVersions(dir string) (map[string]metav1.APIGroup, err
 
 	// Loop through the resource.group directory names.
 	for _, rgd := range rgDirs {
+		rgdName := itemNameIfHasLongName(rgd.Name(), longNames)
 		group := metav1.APIGroup{
-			Name: extractGroupName(rgd.Name()),
+			Name: extractGroupName(rgdName),
 		}
 
 		rgdPath := filepath.Join(resourcesDir, rgd.Name())
@@ -213,7 +223,7 @@ func (p *Parser) ParseGroupVersions(dir string) (map[string]metav1.APIGroup, err
 		var supportedVersions []metav1.GroupVersionForDiscovery
 
 		for _, gvd := range gvDirs {
-			gvdName := gvd.Name()
+			gvdName := itemNameIfHasLongName(gvd.Name(), longNames)
 
 			// Don't save the namespaces or clusters directories in list of
 			// supported API Group Versions.
@@ -241,7 +251,7 @@ func (p *Parser) ParseGroupVersions(dir string) (map[string]metav1.APIGroup, err
 
 		group.Versions = supportedVersions
 
-		resourceAGs[rgd.Name()] = group
+		resourceAGs[rgdName] = group
 	}
 
 	return resourceAGs, nil
