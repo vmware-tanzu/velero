@@ -87,11 +87,12 @@ func NewBackupFinalizerReconciler(
 // +kubebuilder:rbac:groups=velero.io,resources=backups/status,verbs=get;update;patch
 
 func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	
+	// LOG
 	log := r.log.WithFields(logrus.Fields{
 		"controller": "backup-finalizer",
 		"backup":     req.NamespacedName,
 	})
-
 	// Fetch the Backup instance.
 	log.Debug("Getting Backup")
 	backup := &velerov1api.Backup{}
@@ -105,6 +106,7 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
+	// Check phase, only process if phase matches
 	switch backup.Status.Phase {
 	case velerov1api.BackupPhaseFinalizing, velerov1api.BackupPhaseFinalizingPartiallyFailed:
 		// only process backups finalizing after  plugin operations are complete
@@ -113,6 +115,7 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
+	// Defer func to patch backup object and status after each reconciliation
 	original := backup.DeepCopy()
 	defer func() {
 		switch backup.Status.Phase {
@@ -133,7 +136,9 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return
 		}
 	}()
-
+	
+	// Get the operations associated with the backup
+	// BackupLocation -> backupStore -> backupItemOperations
 	location := &velerov1api.BackupStorageLocation{}
 	if err := r.client.Get(ctx, kbclient.ObjectKey{
 		Namespace: backup.Namespace,
@@ -163,8 +168,11 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		SkippedPVTracker: pkgbackup.NewSkipPVTracker(),
 		BackedUpItems:    pkgbackup.NewBackedUpItemsMap(),
 	}
+
 	var outBackupFile *os.File
 	if len(operations) > 0 {
+
+		// File inits
 		log.Info("Setting up finalized backup temp file")
 		inBackupFile, err := downloadToTempFile(backup.Name, backupStore, log)
 		if err != nil {
@@ -178,6 +186,7 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		defer closeAndRemoveFile(outBackupFile, log)
 
+		// Get all possible plugin actions
 		log.Info("Getting backup item actions")
 		actions, err := pluginManager.GetBackupItemActionsV2()
 		if err != nil {
@@ -201,6 +210,8 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, errors.WithStack(err)
 		}
 	}
+
+	
 	backupScheduleName := backupRequest.GetLabels()[velerov1api.ScheduleNameLabel]
 	switch backup.Status.Phase {
 	case velerov1api.BackupPhaseFinalizing:

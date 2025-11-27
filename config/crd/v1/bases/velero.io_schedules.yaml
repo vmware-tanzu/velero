@@ -80,6 +80,10 @@ spec:
                   Template is the definition of the Backup to be run
                   on the provided schedule
                 properties:
+                  cancel:
+                    description: Cancel specifies whether to cancel the backup.
+                    nullable: true
+                    type: boolean
                   csiSnapshotTimeout:
                     description: |-
                       CSISnapshotTimeout specifies the time used to wait for CSI VolumeSnapshot status turns to

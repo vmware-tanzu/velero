@@ -88,12 +88,27 @@ type FileForArchive struct {
 // If finalize is true, then it returns the bytes instead of writing them to the tarWriter
 // In addition to the error return, backupItem also returns a bool indicating whether the item
 // was actually backed up.
-func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool, itemBlock *BackupItemBlock) (bool, []FileForArchive, error) {
-	selectedForBackup, files, err := ib.backupItemInternal(logger, obj, groupResource, preferredGVR, mustInclude, finalize, itemBlock)
+func (ib *itemBackupper) backupItem(
+	ctx context.Context, // For cancellation
+	logger logrus.FieldLogger,
+	obj runtime.Unstructured,
+	groupResource schema.GroupResource,
+	preferredGVR schema.GroupVersionResource,
+	mustInclude, finalize bool,
+	itemBlock *BackupItemBlock,
+) (bool, []FileForArchive, error) {
+	selectedForBackup, files, err := ib.backupItemInternal(ctx, logger, obj, groupResource, preferredGVR, mustInclude, finalize, itemBlock)
 	// return if not selected, an error occurred, there are no files to add, or for finalize
 	if !selectedForBackup || err != nil || len(files) == 0 || finalize {
 		return selectedForBackup, files, err
 	}
+
+	// CHECKPOINT: Before tar writes
+	if err := CheckCancelled(ctx); err != nil {
+		logger.Info("Backup cancelled before tar write")
+		return false, nil, err
+	}
+
 	ib.tarWriter.Lock()
 	defer ib.tarWriter.Unlock()
 	for _, file := range files {
@@ -150,7 +165,20 @@ func (ib *itemBackupper) itemInclusionChecks(log logrus.FieldLogger, mustInclude
 	return true
 }
 
-func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool, itemBlock *BackupItemBlock) (bool, []FileForArchive, error) {
+func (ib *itemBackupper) backupItemInternal(
+	ctx context.Context, // For cancellation
+	logger logrus.FieldLogger,
+	obj runtime.Unstructured,
+	groupResource schema.GroupResource,
+	preferredGVR schema.GroupVersionResource,
+	mustInclude, finalize bool,
+	itemBlock *BackupItemBlock,
+) (bool, []FileForArchive, error) {
+	// CHECKPOINT: At the beginning of item processing
+	if err := CheckCancelled(ctx); err != nil {
+		return false, nil, err
+	}
+
 	var itemFiles []FileForArchive
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
@@ -237,7 +265,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	// the group version of the object.
 	versionPath := resourceVersion(obj)
 
-	updatedObj, additionalItemFiles, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata, finalize, itemBlock)
+	updatedObj, additionalItemFiles, err := ib.executeActions(ctx, log, obj, groupResource, name, namespace, metadata, finalize, itemBlock)
 	if err != nil {
 		backupErrs = append(backupErrs, err)
 		return false, itemFiles, kubeerrs.NewAggregate(backupErrs)
@@ -342,6 +370,7 @@ func (ib *itemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *corev1api
 }
 
 func (ib *itemBackupper) executeActions(
+	ctx context.Context, // For cancellation
 	log logrus.FieldLogger,
 	obj runtime.Unstructured,
 	groupResource schema.GroupResource,
@@ -489,7 +518,7 @@ func (ib *itemBackupper) executeActions(
 			}
 
 			for _, item := range itemList {
-				_, additionalItemFiles, err := ib.backupItem(log, item.Item, additionalItem.GroupResource, item.PreferredGVR, mustInclude, finalize, itemBlock)
+				_, additionalItemFiles, err := ib.backupItem(ctx, log, item.Item, additionalItem.GroupResource, item.PreferredGVR, mustInclude, finalize, itemBlock)
 				if err != nil {
 					return nil, itemFiles, err
 				}
