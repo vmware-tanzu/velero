@@ -1,0 +1,10 @@
+Implement wildcard namespace pattern expansion for backup namespace includes/excludes.
+
+This change adds support for wildcard patterns (*, ?, [abc], {a,b,c}) in namespace includes and excludes during backup operations. 
+When wildcard patterns are detected, they are expanded against the list of active namespaces in the cluster before the backup proceeds.
+
+Key features:
+- Wildcard patterns in namespace includes/excludes are automatically detected and expanded
+- Pattern validation ensures unsupported patterns (regex, consecutive asterisks) are rejected
+- Empty wildcard results (e.g., "invalid*" matching no namespaces) correctly result in empty backups
+- Exact namespace names and "*" continue to work as before (no expansion needed)
