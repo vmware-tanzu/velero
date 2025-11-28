@@ -268,3 +268,25 @@ func HostPodVolumeMountPath() string {
 func HostPodVolumeMountPathWin() string {
 	return "\\" + HostPodVolumeMountPoint
 }
+
+// GetAllLabelsFromNodeAgent returns all labels from the node-agent DaemonSet
+func GetAllLabelsFromNodeAgent(ctx context.Context, kubeClient kubernetes.Interface, namespace string, osType string) (map[string]string, error) {
+	dsName := daemonSet
+	if osType == kube.NodeOSWindows {
+		dsName = daemonsetWindows
+	}
+
+	ds, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, dsName, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting %s daemonset", dsName)
+	}
+
+	labels := make(map[string]string)
+	if ds.Spec.Template.Labels != nil {
+		for k, v := range ds.Spec.Template.Labels {
+			labels[k] = v
+		}
+	}
+
+	return labels, nil
+}
