@@ -119,6 +119,8 @@ toc:
         url: /output-file-format
       - page: API types
         url: /api-types
+      - page: Supported ConfigMap
+        url: /supported-configmaps
       - page: Support process
         url: /support-process
       - page: For maintainers
