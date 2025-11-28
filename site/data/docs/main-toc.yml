@@ -77,6 +77,10 @@ toc:
         url: /data-movement-node-selection
       - page: Node-agent Concurrency
         url: /node-agent-concurrency
+      - page: Node-agent Prepare Queue Length
+        url: /node-agent-prepare-queue-length
+      - page: Date Movement Cache Volume  
+        url: /data-movement-cache-volume
   - title: Plugins
     subfolderitems:
       - page: Overview
@@ -117,6 +121,8 @@ toc:
         url: /output-file-format
       - page: API types
         url: /api-types
+      - page: Supported ConfigMap
+        url: /supported-configmaps
       - page: Support process
         url: /support-process
       - page: For maintainers

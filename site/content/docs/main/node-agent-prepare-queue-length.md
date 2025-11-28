@@ -46,12 +46,13 @@ spec:
 
 ## Related Documentation
 
-- [Node-agent Configuration](node-agent-config.md) - Complete reference for all configuration options
+- [Node-agent Configuration](supported-configmaps/node-agent-configmap.md) - Complete reference for all configuration options
 - [Node-agent Concurrency](node-agent-concurrency.md) - Configure concurrent operations per node
 - [Node Selection for Data Movement](data-movement-node-selection.md) - Configure which nodes run data movement
 - [Data Movement Pod Resource Configuration](data-movement-pod-resource-configuration.md) - Configure pod resources
 - [BackupPVC Configuration](data-movement-backup-pvc-configuration.md) - Configure backup storage
 - [RestorePVC Configuration](data-movement-restore-pvc-configuration.md) - Configure restore storage
+- [Cache PVC Configuration](data-movement-cache-volume.md) - Configure restore data mover storage
 
 [1]: csi-snapshot-data-movement.md
 [2]: file-system-backup.md
