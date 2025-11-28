@@ -503,7 +503,7 @@ func TestNamespaceScopedShouldInclude(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			discoveryHelper := setupDiscoveryClientWithResources(tc.apiResources)
 			logger := logrus.StandardLogger()
-			scopeIncludesExcludes := GetScopeResourceIncludesExcludes(discoveryHelper, logger, tc.namespaceScopedIncludes, tc.namespaceScopedExcludes, []string{}, []string{}, *NewIncludesExcludes())
+			scopeIncludesExcludes := GetScopeResourceIncludesExcludes(discoveryHelper, logger, tc.namespaceScopedIncludes, tc.namespaceScopedExcludes, []string{}, []string{}, *NewNamespaceIncludesExcludes())
 
 			if got := scopeIncludesExcludes.ShouldInclude((tc.item)); got != tc.want {
 				t.Errorf("want %t, got %t", tc.want, got)
@@ -676,7 +676,7 @@ func TestClusterScopedShouldInclude(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			discoveryHelper := setupDiscoveryClientWithResources(tc.apiResources)
 			logger := logrus.StandardLogger()
-			nsIncludeExclude := NewIncludesExcludes().Includes(tc.nsIncludes...)
+			nsIncludeExclude := NewNamespaceIncludesExcludes().Includes(tc.nsIncludes...)
 			scopeIncludesExcludes := GetScopeResourceIncludesExcludes(discoveryHelper, logger, []string{}, []string{}, tc.clusterScopedIncludes, tc.clusterScopedExcludes, *nsIncludeExclude)
 
 			if got := scopeIncludesExcludes.ShouldInclude((tc.item)); got != tc.want {
@@ -732,7 +732,7 @@ func TestGetScopedResourceIncludesExcludes(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := logrus.StandardLogger()
-			nsIncludeExclude := NewIncludesExcludes()
+			nsIncludeExclude := NewNamespaceIncludesExcludes()
 			resources := GetScopeResourceIncludesExcludes(setupDiscoveryClientWithResources(tc.apiResources), logger, tc.namespaceScopedIncludes, tc.namespaceScopedExcludes, tc.clusterScopedIncludes, tc.clusterScopedExcludes, *nsIncludeExclude)
 
 			assert.Equal(t, tc.expectedNamespaceScopedIncludes, resources.namespaceScopedResourceFilter.includes.List())
@@ -830,7 +830,7 @@ func TestScopeIncludesExcludes_CombineWithPolicy(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := logrus.StandardLogger()
 			discoveryHelper := setupDiscoveryClientWithResources(apiResources)
-			sie := GetScopeResourceIncludesExcludes(discoveryHelper, logger, tc.namespaceScopedIncludes, tc.namespaceScopedExcludes, tc.clusterScopedIncludes, tc.clusterScopedExcludes, *NewIncludesExcludes())
+			sie := GetScopeResourceIncludesExcludes(discoveryHelper, logger, tc.namespaceScopedIncludes, tc.namespaceScopedExcludes, tc.clusterScopedIncludes, tc.clusterScopedExcludes, *NewNamespaceIncludesExcludes())
 			sie.CombineWithPolicy(tc.policy)
 			assert.True(t, tc.verify(*sie))
 		})
@@ -981,9 +981,9 @@ func TestShouldExcluded(t *testing.T) {
 
 			var ie IncludesExcludesInterface
 			if tc.filterType == "global" {
-				ie = GetGlobalResourceIncludesExcludes(setupDiscoveryClientWithResources(tc.apiResources), logger, tc.clusterIncludes, tc.clusterExcludes, tc.includeClusterResources, *NewIncludesExcludes())
+				ie = GetGlobalResourceIncludesExcludes(setupDiscoveryClientWithResources(tc.apiResources), logger, tc.clusterIncludes, tc.clusterExcludes, tc.includeClusterResources, *NewNamespaceIncludesExcludes())
 			} else if tc.filterType == "scope" {
-				ie = GetScopeResourceIncludesExcludes(setupDiscoveryClientWithResources(tc.apiResources), logger, []string{}, []string{}, tc.clusterIncludes, tc.clusterExcludes, *NewIncludesExcludes())
+				ie = GetScopeResourceIncludesExcludes(setupDiscoveryClientWithResources(tc.apiResources), logger, []string{}, []string{}, tc.clusterIncludes, tc.clusterExcludes, *NewNamespaceIncludesExcludes())
 			}
 			assert.Equal(t, tc.resourceIsExcluded, ie.ShouldExclude(tc.resourceName))
 		})

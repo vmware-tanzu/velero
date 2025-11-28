@@ -222,6 +222,12 @@ func (b *BackupBuilder) Phase(phase velerov1api.BackupPhase) *BackupBuilder {
 	return b
 }
 
+// Phase sets the Backup's queue position.
+func (b *BackupBuilder) QueuePosition(queuePos int) *BackupBuilder {
+	b.object.Status.QueuePosition = queuePos
+	return b
+}
+
 // StorageLocation sets the Backup's storage location.
 func (b *BackupBuilder) StorageLocation(location string) *BackupBuilder {
 	b.object.Spec.StorageLocation = location
