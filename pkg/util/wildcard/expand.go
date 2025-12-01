@@ -3,7 +3,6 @@ package wildcard
 import (
 	"errors"
 	"strings"
-	"unicode"
 
 	"github.com/gobwas/glob"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -61,47 +60,40 @@ func validateWildcardPatterns(patterns []string) error {
 
 // validateBracePatterns checks for malformed brace patterns like unclosed braces or empty braces
 func validateBracePatterns(pattern string) error {
-	openBraces := 0
-	i := 0
+	depth := 0
 
-	for i < len(pattern) {
-		switch pattern[i] {
-		case '{':
-			start := i
-			openBraces++
-			i++
+	for i := 0; i < len(pattern); i++ {
+		if pattern[i] == '{' {
+			braceStart := i
+			depth++
 
-			// Look for the closing brace
-			hasContent := false
-			for i < len(pattern) && pattern[i] != '}' {
-				if pattern[i] != ',' && !unicode.IsSpace(rune(pattern[i])) {
-					hasContent = true
+			// Scan ahead to find the matching closing brace and validate content
+			for i++; i < len(pattern) && depth > 0; i++ {
+				if pattern[i] == '{' {
+					depth++
+				} else if pattern[i] == '}' {
+					depth--
+					if depth == 0 {
+						// Found matching closing brace - validate content
+						content := pattern[braceStart+1 : i]
+						if strings.Trim(content, ", \t") == "" {
+							return errors.New("wildcard pattern contains empty brace pattern '{}'")
+						}
+						break
+					}
 				}
-				i++
 			}
 
-			if i >= len(pattern) {
+			// If we exited the loop without finding a match (depth > 0), brace is unclosed
+			if depth > 0 {
 				return errors.New("wildcard pattern contains unclosed brace '{'")
 			}
 
-			// Check if brace content is empty or just commas/spaces
-			braceContent := pattern[start+1 : i]
-			if !hasContent || braceContent == "" || strings.Trim(braceContent, ", \t") == "" {
-				return errors.New("wildcard pattern contains empty brace pattern '{}'")
-			}
-
-			openBraces--
-		case '}':
-			if openBraces == 0 {
-				return errors.New("wildcard pattern contains unmatched closing brace '}'")
-			}
-			openBraces--
+			// i is now positioned at the closing brace; the outer loop will increment it
+		} else if pattern[i] == '}' {
+			// Found a closing brace without a matching opening brace
+			return errors.New("wildcard pattern contains unmatched closing brace '}'")
 		}
-		i++
-	}
-
-	if openBraces > 0 {
-		return errors.New("wildcard pattern contains unclosed brace '{'")
 	}
 
 	return nil

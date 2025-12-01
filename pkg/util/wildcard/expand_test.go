@@ -461,6 +461,238 @@ func TestExpandWildcardsPrivate(t *testing.T) {
 	}
 }
 
+func TestValidateBracePatterns(t *testing.T) {
+	tests := []struct {
+		name        string
+		pattern     string
+		expectError bool
+		errorMsg    string
+	}{
+		// Valid patterns
+		{
+			name:        "valid single brace pattern",
+			pattern:     "app-{prod,staging}",
+			expectError: false,
+		},
+		{
+			name:        "valid brace with single option",
+			pattern:     "app-{prod}",
+			expectError: false,
+		},
+		{
+			name:        "valid brace with three options",
+			pattern:     "app-{prod,staging,dev}",
+			expectError: false,
+		},
+		{
+			name:        "valid pattern with text before and after brace",
+			pattern:     "prefix-{a,b}-suffix",
+			expectError: false,
+		},
+		{
+			name:        "valid pattern with no braces",
+			pattern:     "app-prod",
+			expectError: false,
+		},
+		{
+			name:        "valid pattern with asterisk",
+			pattern:     "app-*",
+			expectError: false,
+		},
+		{
+			name:        "valid brace with spaces around content",
+			pattern:     "app-{ prod , staging }",
+			expectError: false,
+		},
+		{
+			name:        "valid brace with numbers",
+			pattern:     "ns-{1,2,3}",
+			expectError: false,
+		},
+		{
+			name:        "valid brace with hyphens in options",
+			pattern:     "{app-prod,db-staging}",
+			expectError: false,
+		},
+
+		// Unclosed opening braces
+		{
+			name:        "unclosed opening brace at end",
+			pattern:     "app-{prod,staging",
+			expectError: true,
+			errorMsg:    "unclosed brace",
+		},
+		{
+			name:        "unclosed opening brace at start",
+			pattern:     "{prod,staging",
+			expectError: true,
+			errorMsg:    "unclosed brace",
+		},
+		{
+			name:        "unclosed opening brace in middle",
+			pattern:     "app-{prod-test",
+			expectError: true,
+			errorMsg:    "unclosed brace",
+		},
+		{
+			name:        "multiple unclosed braces",
+			pattern:     "app-{prod-{staging",
+			expectError: true,
+			errorMsg:    "unclosed brace",
+		},
+
+		// Unmatched closing braces
+		{
+			name:        "unmatched closing brace at end",
+			pattern:     "app-prod}",
+			expectError: true,
+			errorMsg:    "unmatched closing brace",
+		},
+		{
+			name:        "unmatched closing brace at start",
+			pattern:     "}app-prod",
+			expectError: true,
+			errorMsg:    "unmatched closing brace",
+		},
+		{
+			name:        "unmatched closing brace in middle",
+			pattern:     "app-}prod",
+			expectError: true,
+			errorMsg:    "unmatched closing brace",
+		},
+		{
+			name:        "extra closing brace after valid pair",
+			pattern:     "app-{prod,staging}}",
+			expectError: true,
+			errorMsg:    "unmatched closing brace",
+		},
+
+		// Empty brace patterns
+		{
+			name:        "completely empty braces",
+			pattern:     "app-{}",
+			expectError: true,
+			errorMsg:    "empty brace pattern",
+		},
+		{
+			name:        "braces with only spaces",
+			pattern:     "app-{   }",
+			expectError: true,
+			errorMsg:    "empty brace pattern",
+		},
+		{
+			name:        "braces with only comma",
+			pattern:     "app-{,}",
+			expectError: true,
+			errorMsg:    "empty brace pattern",
+		},
+		{
+			name:        "braces with only commas",
+			pattern:     "app-{,,,}",
+			expectError: true,
+			errorMsg:    "empty brace pattern",
+		},
+		{
+			name:        "braces with commas and spaces",
+			pattern:     "app-{ , , }",
+			expectError: true,
+			errorMsg:    "empty brace pattern",
+		},
+		{
+			name:        "braces with tabs and commas",
+			pattern:     "app-{\t,\t}",
+			expectError: true,
+			errorMsg:    "empty brace pattern",
+		},
+		{
+			name:        "empty braces at start",
+			pattern:     "{}app-prod",
+			expectError: true,
+			errorMsg:    "empty brace pattern",
+		},
+		{
+			name:        "empty braces standalone",
+			pattern:     "{}",
+			expectError: true,
+			errorMsg:    "empty brace pattern",
+		},
+
+		// Edge cases
+		{
+			name:        "empty pattern",
+			pattern:     "",
+			expectError: false,
+		},
+		{
+			name:        "pattern with only opening brace",
+			pattern:     "{",
+			expectError: true,
+			errorMsg:    "unclosed brace",
+		},
+		{
+			name:        "pattern with only closing brace",
+			pattern:     "}",
+			expectError: true,
+			errorMsg:    "unmatched closing brace",
+		},
+		{
+			name:        "valid brace with special characters inside",
+			pattern:     "app-{prod-1,staging_2,dev.3}",
+			expectError: false,
+		},
+		{
+			name:        "brace with asterisk inside option",
+			pattern:     "app-{prod*,staging}",
+			expectError: false,
+		},
+		{
+			name:        "multiple valid brace patterns",
+			pattern:     "{app,db}-{prod,staging}",
+			expectError: false,
+		},
+		{
+			name:        "brace with single character",
+			pattern:     "app-{a}",
+			expectError: false,
+		},
+		{
+			name:        "brace with trailing comma but has content",
+			pattern:     "app-{prod,staging,}",
+			expectError: false, // Has content, so it's valid
+		},
+		{
+			name:        "brace with leading comma but has content",
+			pattern:     "app-{,prod,staging}",
+			expectError: false, // Has content, so it's valid
+		},
+		{
+			name:        "brace with leading comma but has content",
+			pattern:     "app-{{,prod,staging}",
+			expectError: true, // unclosed brace
+		},
+		{
+			name:        "brace with leading comma but has content",
+			pattern:     "app-{,prod,staging}}",
+			expectError: true, // unmatched closing brace
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateBracePatterns(tt.pattern)
+
+			if tt.expectError {
+				require.Error(t, err, "Expected error for pattern: %s", tt.pattern)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg, "Error message should contain: %s", tt.errorMsg)
+				}
+			} else {
+				assert.NoError(t, err, "Expected no error for pattern: %s", tt.pattern)
+			}
+		})
+	}
+}
+
 // Edge case tests
 func TestExpandWildcardsEdgeCases(t *testing.T) {
 	t.Run("nil inputs", func(t *testing.T) {
