@@ -68,17 +68,19 @@ func validateBracePatterns(pattern string) error {
 			depth++
 
 			// Scan ahead to find the matching closing brace and validate content
-			for i++; i < len(pattern) && depth > 0; i++ {
-				if pattern[i] == '{' {
+			for j := i + 1; j < len(pattern) && depth > 0; j++ {
+				if pattern[j] == '{' {
 					depth++
-				} else if pattern[i] == '}' {
+				} else if pattern[j] == '}' {
 					depth--
 					if depth == 0 {
 						// Found matching closing brace - validate content
-						content := pattern[braceStart+1 : i]
+						content := pattern[braceStart+1 : j]
 						if strings.Trim(content, ", \t") == "" {
 							return errors.New("wildcard pattern contains empty brace pattern '{}'")
 						}
+						// Skip to the closing brace
+						i = j
 						break
 					}
 				}
