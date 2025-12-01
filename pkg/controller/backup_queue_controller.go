@@ -47,6 +47,7 @@ type backupQueueReconciler struct {
 	Scheme            *runtime.Scheme
 	logger            logrus.FieldLogger
 	concurrentBackups int
+	backupTracker     BackupTracker
 	frequency         time.Duration
 }
 
@@ -60,12 +61,14 @@ func NewBackupQueueReconciler(
 	scheme *runtime.Scheme,
 	logger logrus.FieldLogger,
 	concurrentBackups int,
+	backupTracker BackupTracker,
 ) *backupQueueReconciler {
 	return &backupQueueReconciler{
 		Client:            client,
 		Scheme:            scheme,
 		logger:            logger,
 		concurrentBackups: max(concurrentBackups, 1),
+		backupTracker:     backupTracker,
 		frequency:         defaultQueuedBackupRecheckFrequency,
 	}
 }
@@ -261,11 +264,11 @@ func (r *backupQueueReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, nil
 		}
 		lister := r.newQueuedBackupsLister(allBackups)
-		earlierBackups, runningCount := lister.earlierThan(backup.Status.QueuePosition)
-		if runningCount >= r.concurrentBackups {
+		if r.backupTracker.RunningCount() >= r.concurrentBackups {
 			log.Debugf("%v concurrent backups are already running, leaving %v queued", r.concurrentBackups, backup.Name)
 			return ctrl.Result{}, nil
 		}
+		earlierBackups := lister.earlierThan(backup.Status.QueuePosition)
 		foundConflict, conflictBackup, clusterNamespaces, err := r.detectNamespaceConflict(ctx, backup, earlierBackups)
 		if err != nil {
 			log.WithError(err).Error("error listing namespaces")
@@ -287,6 +290,7 @@ func (r *backupQueueReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		if err := kube.PatchResource(original, backup, r.Client); err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "error updating Backup status to %s", backup.Status.Phase)
 		}
+		r.backupTracker.AddReadyToStart(backup.Namespace, backup.Name)
 		log.Debug("Updating queuePosition for remaining queued backups")
 		queuedBackups := lister.orderedQueued()
 		newQueuePos := 1
@@ -329,21 +333,15 @@ func (r *backupQueueReconciler) newQueuedBackupsLister(backupList *velerov1api.B
 	return &queuedBackupsLister{backupList}
 }
 
-func (l *queuedBackupsLister) earlierThan(queuePos int) ([]velerov1api.Backup, int) {
+func (l *queuedBackupsLister) earlierThan(queuePos int) []velerov1api.Backup {
 	backups := []velerov1api.Backup{}
-	runningCount := 0
 	for _, backup := range l.backups.Items {
 		// InProgress and ReadyToStart backups have QueuePosition==0
 		if backup.Status.QueuePosition < queuePos {
 			backups = append(backups, backup)
 		}
-		// InProgress and ReadyToStart backups count towards the concurrentBackups limit
-		if backup.Status.Phase == velerov1api.BackupPhaseInProgress ||
-			backup.Status.Phase == velerov1api.BackupPhaseReadyToStart {
-			runningCount++
-		}
 	}
-	return backups, runningCount
+	return backups
 }
 
 func (l *queuedBackupsLister) orderedQueued() []velerov1api.Backup {

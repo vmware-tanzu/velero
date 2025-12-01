@@ -202,9 +202,15 @@ func TestBackupQueueReconciler(t *testing.T) {
 				return
 			}
 
+			backupTracker := NewBackupTracker()
 			initObjs := []runtime.Object{}
 			for _, priorBackup := range test.priorBackups {
 				initObjs = append(initObjs, priorBackup)
+				if priorBackup.Status.Phase == velerov1api.BackupPhaseReadyToStart {
+					backupTracker.AddReadyToStart(priorBackup.Namespace, priorBackup.Name)
+				} else if priorBackup.Status.Phase == velerov1api.BackupPhaseInProgress {
+					backupTracker.Add(priorBackup.Namespace, priorBackup.Name)
+				}
 			}
 			for _, ns := range test.namespaces {
 				initObjs = append(initObjs, builder.ForNamespace(ns).Result())
@@ -214,7 +220,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, initObjs...)
 			logger := logrus.New()
 			log := logger.WithField("controller", "backup-queue-test")
-			r := NewBackupQueueReconciler(fakeClient, scheme, log, test.concurrentBackups)
+			r := NewBackupQueueReconciler(fakeClient, scheme, log, test.concurrentBackups, backupTracker)
 			req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}}
 			res, err := r.Reconcile(t.Context(), req)
 			gotErr := err != nil

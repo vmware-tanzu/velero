@@ -917,6 +917,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.mgr.GetScheme(),
 			s.logger,
 			s.config.ConcurrentBackups,
+			backupTracker,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupQueue)
 		}

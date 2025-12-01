@@ -323,6 +323,8 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		switch request.Status.Phase {
 		case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed, velerov1api.BackupPhaseFailedValidation:
 			b.backupTracker.Delete(request.Namespace, request.Name)
+		case velerov1api.BackupPhaseWaitingForPluginOperations, velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed, velerov1api.BackupPhaseFinalizing, velerov1api.BackupPhaseFinalizingPartiallyFailed:
+			b.backupTracker.AddPostProcessing(request.Namespace, request.Name)
 		}
 	}()
 
