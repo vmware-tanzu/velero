@@ -39,6 +39,9 @@ default the source PVC's storage class will be used.
 The users can specify the ConfigMap name during velero installation by CLI:
 `velero install --node-agent-configmap=<ConfigMap-Name>`
 
+- `annotations`: permits to set annotations on the backupPVC itself. typically useful for some CSI provider which cannot mount
+  a VolumeSnapshot without a custom annotation.
+
 A sample of `backupPVC` config as part of the ConfigMap would look like:
 ```json
 {
@@ -51,8 +54,11 @@ A sample of `backupPVC` config as part of the ConfigMap would look like:
             "storageClass": "backupPVC-storage-class"
         },
         "storage-class-3": {
-            "readOnly": true
-        }        
+            "readOnly": true,
+            "annotations": {
+              "some-csi.provider.io/readOnlyClone": true
+            }
+        },
         "storage-class-4": {
             "readOnly": true,
             "spcNoRelabeling": true

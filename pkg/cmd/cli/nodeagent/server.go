@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/bombsimon/logrusr/v3"
+	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -39,14 +40,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
+	cacheutil "k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-
-	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
@@ -60,11 +60,11 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	repository "github.com/vmware-tanzu/velero/pkg/repository/manager"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
-
-	cacheutil "k8s.io/client-go/tools/cache"
 )
 
 var (
@@ -85,6 +85,7 @@ type nodeAgentServerConfig struct {
 	resourceTimeout         time.Duration
 	dataMoverPrepareTimeout time.Duration
 	nodeAgentConfig         string
+	backupRepoConfig        string
 }
 
 func NewServerCommand(f client.Factory) *cobra.Command {
@@ -122,6 +123,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.dataMoverPrepareTimeout, "data-mover-prepare-timeout", config.dataMoverPrepareTimeout, "How long to wait for preparing a DataUpload/DataDownload. Default is 30 minutes.")
 	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "The address to expose prometheus metrics")
 	command.Flags().StringVar(&config.nodeAgentConfig, "node-agent-configmap", config.nodeAgentConfig, "The name of ConfigMap containing node-agent configurations.")
+	command.Flags().StringVar(&config.backupRepoConfig, "backup-repository-configmap", config.backupRepoConfig, "The name of ConfigMap containing backup repository configurations.")
 
 	return command
 }
@@ -140,8 +142,10 @@ type nodeAgentServer struct {
 	kubeClient        kubernetes.Interface
 	csiSnapshotClient *snapshotv1client.Clientset
 	dataPathMgr       *datapath.Manager
-	dataPathConfigs   *nodeagent.Configs
+	dataPathConfigs   *velerotypes.NodeAgentConfigs
+	backupRepoConfigs map[string]string
 	vgdpCounter       *exposer.VgdpCounter
+	repoConfigMgr     repository.ConfigManager
 }
 
 func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, config nodeAgentServerConfig) (*nodeAgentServer, error) {
@@ -235,6 +239,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		namespace:      factory.Namespace(),
 		nodeName:       nodeName,
 		metricsAddress: config.metricsAddress,
+		repoConfigMgr:  repository.NewConfigManager(logger),
 	}
 
 	// the cache isn't initialized yet when "validatePodVolumesHostPath" is called, the client returned by the manager cannot
@@ -252,7 +257,14 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		return nil, err
 	}
 
-	s.getDataPathConfigs()
+	if err := s.getDataPathConfigs(); err != nil {
+		return nil, err
+	}
+
+	if err := s.getBackupRepoConfigs(); err != nil {
+		return nil, err
+	}
+
 	s.dataPathMgr = datapath.NewManager(s.getDataPathConcurrentNum(defaultDataPathConcurrentNum))
 
 	return s, nil
@@ -301,11 +313,13 @@ func (s *nodeAgentServer) run() {
 		s.logger.Infof("Using customized loadAffinity %v", loadAffinity)
 	}
 
-	var backupPVCConfig map[string]nodeagent.BackupPVC
+	var backupPVCConfig map[string]velerotypes.BackupPVC
 	if s.dataPathConfigs != nil && s.dataPathConfigs.BackupPVCConfig != nil {
 		backupPVCConfig = s.dataPathConfigs.BackupPVCConfig
 		s.logger.Infof("Using customized backupPVC config %v", backupPVCConfig)
 	}
+
+	privilegedFsBackup := s.dataPathConfigs != nil && s.dataPathConfigs.PrivilegedFsBackup
 
 	podResources := corev1api.ResourceRequirements{}
 	if s.dataPathConfigs != nil && s.dataPathConfigs.PodResources != nil {
@@ -326,12 +340,30 @@ func (s *nodeAgentServer) run() {
 		}
 	}
 
-	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger, dataMovePriorityClass)
+	if s.dataPathConfigs != nil && s.dataPathConfigs.CachePVCConfig != nil {
+		if err := s.validateCachePVCConfig(*s.dataPathConfigs.CachePVCConfig); err != nil {
+			s.logger.WithError(err).Warnf("Ignore cache config %v", s.dataPathConfigs.CachePVCConfig)
+		} else {
+			s.logger.Infof("Using cache volume configs %v", s.dataPathConfigs.CachePVCConfig)
+		}
+	}
+
+	var cachePVCConfig *velerotypes.CachePVC
+	if s.dataPathConfigs != nil && s.dataPathConfigs.CachePVCConfig != nil {
+		cachePVCConfig = s.dataPathConfigs.CachePVCConfig
+		s.logger.Infof("Using customized cachePVC config %v", cachePVCConfig)
+	}
+
+	if s.backupRepoConfigs != nil {
+		s.logger.Infof("Using backup repo config %v", s.backupRepoConfigs)
+	}
+
+	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger, dataMovePriorityClass, privilegedFsBackup)
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
 	}
 
-	pvrReconciler := controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.logger, dataMovePriorityClass)
+	pvrReconciler := controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, s.backupRepoConfigs, cachePVCConfig, podResources, s.logger, dataMovePriorityClass, privilegedFsBackup, s.repoConfigMgr)
 	if err := pvrReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
@@ -361,7 +393,7 @@ func (s *nodeAgentServer) run() {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
-	var restorePVCConfig nodeagent.RestorePVC
+	var restorePVCConfig velerotypes.RestorePVC
 	if s.dataPathConfigs != nil && s.dataPathConfigs.RestorePVCConfig != nil {
 		restorePVCConfig = *s.dataPathConfigs.RestorePVCConfig
 		s.logger.Infof("Using customized restorePVC config %v", restorePVCConfig)
@@ -375,12 +407,15 @@ func (s *nodeAgentServer) run() {
 		s.vgdpCounter,
 		loadAffinity,
 		restorePVCConfig,
+		s.backupRepoConfigs,
+		cachePVCConfig,
 		podResources,
 		s.nodeName,
 		s.config.dataMoverPrepareTimeout,
 		s.logger,
 		s.metrics,
 		dataMovePriorityClass,
+		s.repoConfigMgr,
 	)
 
 	if err := dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
@@ -546,19 +581,38 @@ func (s *nodeAgentServer) markLegacyPVRsFailed(client ctrlclient.Client) {
 
 var getConfigsFunc = nodeagent.GetConfigs
 
-func (s *nodeAgentServer) getDataPathConfigs() {
+func (s *nodeAgentServer) getDataPathConfigs() error {
 	if s.config.nodeAgentConfig == "" {
 		s.logger.Info("No node-agent configMap is specified")
-		return
+		return nil
 	}
 
 	configs, err := getConfigsFunc(s.ctx, s.namespace, s.kubeClient, s.config.nodeAgentConfig)
 	if err != nil {
-		s.logger.WithError(err).Warnf("Failed to get node agent configs from configMap %s, ignore it", s.config.nodeAgentConfig)
-		return
+		return errors.Wrapf(err, "error getting node agent configs from configMap %s", s.config.nodeAgentConfig)
 	}
 
 	s.dataPathConfigs = configs
+	return nil
+}
+
+func (s *nodeAgentServer) getBackupRepoConfigs() error {
+	if s.config.backupRepoConfig == "" {
+		s.logger.Info("No backup repo configMap is specified")
+		return nil
+	}
+
+	cm, err := s.kubeClient.CoreV1().ConfigMaps(s.namespace).Get(s.ctx, s.config.backupRepoConfig, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "error getting backup repo configs from configMap %s", s.config.backupRepoConfig)
+	}
+
+	if cm.Data == nil {
+		return errors.Errorf("no data is in the backup repo configMap %s", s.config.backupRepoConfig)
+	}
+
+	s.backupRepoConfigs = cm.Data
+	return nil
 }
 
 func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
@@ -615,4 +669,21 @@ func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
 	}
 
 	return concurrentNum
+}
+
+func (s *nodeAgentServer) validateCachePVCConfig(config velerotypes.CachePVC) error {
+	if config.StorageClass == "" {
+		return errors.New("storage class is absent")
+	}
+
+	sc, err := s.kubeClient.StorageV1().StorageClasses().Get(s.ctx, config.StorageClass, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "error getting storage class %s", config.StorageClass)
+	}
+
+	if sc.ReclaimPolicy != nil && *sc.ReclaimPolicy != corev1api.PersistentVolumeReclaimDelete {
+		return errors.Errorf("unexpected storage class reclaim policy %v", *sc.ReclaimPolicy)
+	}
+
+	return nil
 }

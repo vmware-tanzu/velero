@@ -275,7 +275,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			log.WithError(err).Warn("Failed to get keepLatestMaintenanceJobs from ConfigMap, using CLI parameter value")
 		}
 
-		if err := maintenance.DeleteOldJobs(r.Client, req.Name, keepJobs, log); err != nil {
+		if err := maintenance.DeleteOldJobs(r.Client, *backupRepo, keepJobs, log); err != nil {
 			log.WithError(err).Warn("Failed to delete old maintenance jobs")
 		}
 	}
@@ -608,7 +608,7 @@ func getBackupRepositoryConfig(ctx context.Context, ctrlClient client.Client, co
 
 	jsonData, found := loc.Data[repoType]
 	if !found {
-		log.Info("No data for repo type %s in config map %s", repoType, configName)
+		log.Infof("No data for repo type %s in config map %s", repoType, configName)
 		return nil, nil
 	}
 

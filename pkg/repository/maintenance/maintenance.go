@@ -27,23 +27,23 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	appsv1api "k8s.io/api/apps/v1"
 	batchv1api "k8s.io/api/batch/v1"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerolabel "github.com/vmware-tanzu/velero/pkg/label"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	appsv1api "k8s.io/api/apps/v1"
-
-	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
-
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 const (
@@ -58,21 +58,6 @@ const (
 	DefaultMaintenanceJobMemLimit    = "0"
 )
 
-type JobConfigs struct {
-	// LoadAffinities is the config for repository maintenance job load affinity.
-	LoadAffinities []*kube.LoadAffinity `json:"loadAffinity,omitempty"`
-
-	// PodResources is the config for the CPU and memory resources setting.
-	PodResources *kube.PodResources `json:"podResources,omitempty"`
-
-	// KeepLatestMaintenanceJobs is the number of latest maintenance jobs to keep for the repository.
-	KeepLatestMaintenanceJobs *int `json:"keepLatestMaintenanceJobs,omitempty"`
-
-	// PriorityClassName is the priority class name for the maintenance job pod
-	// Note: This is only read from the global configuration, not per-repository
-	PriorityClassName string `json:"priorityClassName,omitempty"`
-}
-
 func GenerateJobName(repo string) string {
 	millisecond := time.Now().UTC().UnixMilli() // millisecond
 
@@ -85,11 +70,22 @@ func GenerateJobName(repo string) string {
 }
 
 // DeleteOldJobs deletes old maintenance jobs and keeps the latest N jobs
-func DeleteOldJobs(cli client.Client, repo string, keep int, logger logrus.FieldLogger) error {
+func DeleteOldJobs(cli client.Client, repo velerov1api.BackupRepository, keep int, logger logrus.FieldLogger) error {
 	logger.Infof("Start to delete old maintenance jobs. %d jobs will be kept.", keep)
 	// Get the maintenance job list by label
 	jobList := &batchv1api.JobList{}
-	err := cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
+	err := cli.List(
+		context.TODO(),
+		jobList,
+		&client.ListOptions{
+			Namespace: repo.Namespace,
+			LabelSelector: labels.SelectorFromSet(
+				map[string]string{
+					RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name),
+				},
+			),
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -215,7 +211,7 @@ func getJobConfig(
 	veleroNamespace string,
 	repoMaintenanceJobConfig string,
 	repo *velerov1api.BackupRepository,
-) (*JobConfigs, error) {
+) (*velerotypes.JobConfigs, error) {
 	var cm corev1api.ConfigMap
 	if err := client.Get(
 		ctx,
@@ -248,10 +244,10 @@ func getJobConfig(
 	repoJobConfigKey := repo.Spec.VolumeNamespace + "-" +
 		repo.Spec.BackupStorageLocation + "-" + repo.Spec.RepositoryType
 
-	var result *JobConfigs
+	var result *velerotypes.JobConfigs
 	if _, ok := cm.Data[repoJobConfigKey]; ok {
 		logger.Debugf("Find the repo maintenance config %s for repo %s", repoJobConfigKey, repo.Name)
-		result = new(JobConfigs)
+		result = new(velerotypes.JobConfigs)
 		if err := json.Unmarshal([]byte(cm.Data[repoJobConfigKey]), result); err != nil {
 			return nil, errors.Wrapf(
 				err,
@@ -265,10 +261,10 @@ func getJobConfig(
 		logger.Debugf("Find the global repo maintenance config for repo %s", repo.Name)
 
 		if result == nil {
-			result = new(JobConfigs)
+			result = new(velerotypes.JobConfigs)
 		}
 
-		globalResult := new(JobConfigs)
+		globalResult := new(velerotypes.JobConfigs)
 
 		if err := json.Unmarshal([]byte(cm.Data[GlobalKeyForRepoMaintenanceJobCM]), globalResult); err != nil {
 			return nil, errors.Wrapf(
@@ -356,10 +352,17 @@ func WaitJobComplete(cli client.Client, ctx context.Context, jobName, ns string,
 // and then return the maintenance jobs' status in the range of limit
 func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1api.BackupRepository, limit int, log logrus.FieldLogger) ([]velerov1api.BackupRepositoryMaintenanceStatus, error) {
 	jobList := &batchv1api.JobList{}
-	err := cli.List(context.TODO(), jobList, &client.ListOptions{
-		Namespace: repo.Namespace,
-	},
-		client.MatchingLabels(map[string]string{RepositoryNameLabel: repo.Name}),
+	err := cli.List(
+		context.TODO(),
+		jobList,
+		&client.ListOptions{
+			Namespace: repo.Namespace,
+			LabelSelector: labels.SelectorFromSet(
+				map[string]string{
+					RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name),
+				},
+			),
+		},
 	)
 
 	if err != nil {
@@ -466,7 +469,36 @@ func StartNewJob(
 	return maintenanceJob.Name, nil
 }
 
-func getPriorityClassName(ctx context.Context, cli client.Client, config *JobConfigs, logger logrus.FieldLogger) string {
+// buildTolerationsForMaintenanceJob builds the tolerations for maintenance jobs.
+// It includes the required Windows toleration for backward compatibility and filters
+// tolerations from the Velero deployment to only include those with keys that are
+// in the ThirdPartyTolerations allowlist, following the same pattern as labels and annotations.
+func buildTolerationsForMaintenanceJob(deployment *appsv1api.Deployment) []corev1api.Toleration {
+	// Start with the Windows toleration for backward compatibility
+	windowsToleration := corev1api.Toleration{
+		Key:      "os",
+		Operator: "Equal",
+		Effect:   "NoSchedule",
+		Value:    "windows",
+	}
+	result := []corev1api.Toleration{windowsToleration}
+
+	// Filter tolerations from the Velero deployment to only include allowed ones
+	// Only tolerations that exist on the deployment AND have keys in the allowlist are inherited
+	deploymentTolerations := veleroutil.GetTolerationsFromVeleroServer(deployment)
+	for _, k := range util.ThirdPartyTolerations {
+		for _, toleration := range deploymentTolerations {
+			if toleration.Key == k {
+				result = append(result, toleration)
+				break // Only add the first matching toleration for each allowed key
+			}
+		}
+	}
+
+	return result
+}
+
+func getPriorityClassName(ctx context.Context, cli client.Client, config *velerotypes.JobConfigs, logger logrus.FieldLogger) string {
 	// Use the priority class name from the global job configuration if available
 	// Note: Priority class is only read from global config, not per-repository
 	if config != nil && config.PriorityClassName != "" {
@@ -491,7 +523,7 @@ func buildJob(
 	ctx context.Context,
 	repo *velerov1api.BackupRepository,
 	bslName string,
-	config *JobConfigs,
+	config *velerotypes.JobConfigs,
 	logLevel logrus.Level,
 	logFormat *logging.FormatFlag,
 	logger logrus.FieldLogger,
@@ -546,7 +578,7 @@ func buildJob(
 	}
 
 	podLabels := map[string]string{
-		RepositoryNameLabel: repo.Name,
+		RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name),
 	}
 
 	for _, k := range util.ThirdPartyLabels {
@@ -576,7 +608,7 @@ func buildJob(
 			Name:      GenerateJobName(repo.Name),
 			Namespace: repo.Namespace,
 			Labels: map[string]string{
-				RepositoryNameLabel: repo.Name,
+				RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name),
 			},
 		},
 		Spec: batchv1api.JobSpec{
@@ -610,15 +642,8 @@ func buildJob(
 					SecurityContext:    podSecurityContext,
 					Volumes:            volumes,
 					ServiceAccountName: serviceAccount,
-					Tolerations: []corev1api.Toleration{
-						{
-							Key:      "os",
-							Operator: "Equal",
-							Effect:   "NoSchedule",
-							Value:    "windows",
-						},
-					},
-					ImagePullSecrets: imagePullSecrets,
+					Tolerations:        buildTolerationsForMaintenanceJob(deployment),
+					ImagePullSecrets:   imagePullSecrets,
 				},
 			},
 		},

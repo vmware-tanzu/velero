@@ -66,7 +66,7 @@ func TestNewDeleteCommand(t *testing.T) {
 		return
 	}
 
-	cmd := exec.Command(os.Args[0], []string{"-test.run=TestNewDeleteCommand"}...)
+	cmd := exec.CommandContext(t.Context(), os.Args[0], []string{"-test.run=TestNewDeleteCommand"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
 	stdout, _, err := veleroexec.RunCommand(cmd)
 

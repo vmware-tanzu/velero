@@ -23,8 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -37,6 +35,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	"github.com/vmware-tanzu/velero/pkg/install"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
@@ -538,6 +538,30 @@ func (o *Options) Validate(c *cobra.Command, args []string, f client.Factory) er
 
 	if o.PodVolumeOperationTimeout < 0 {
 		return errors.New("--pod-volume-operation-timeout must be non-negative")
+	}
+
+	crClient, err := f.KubebuilderClient()
+	if err != nil {
+		return fmt.Errorf("fail to create go-client %w", err)
+	}
+
+	if len(o.NodeAgentConfigMap) > 0 {
+		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.NodeAgentConfigMap, &velerotypes.NodeAgentConfigs{}); err != nil {
+			return fmt.Errorf("--node-agent-configmap specified ConfigMap %s is invalid: %w", o.NodeAgentConfigMap, err)
+		}
+	}
+
+	if len(o.RepoMaintenanceJobConfigMap) > 0 {
+		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.RepoMaintenanceJobConfigMap, &velerotypes.JobConfigs{}); err != nil {
+			return fmt.Errorf("--repo-maintenance-job-configmap specified ConfigMap %s is invalid: %w", o.RepoMaintenanceJobConfigMap, err)
+		}
+	}
+
+	if len(o.BackupRepoConfigMap) > 0 {
+		config := make(map[string]any)
+		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.BackupRepoConfigMap, &config); err != nil {
+			return fmt.Errorf("--backup-repository-configmap specified ConfigMap %s is invalid: %w", o.BackupRepoConfigMap, err)
+		}
 	}
 
 	return nil

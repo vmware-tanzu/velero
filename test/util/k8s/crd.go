@@ -22,8 +22,9 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )

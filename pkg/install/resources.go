@@ -426,6 +426,10 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 			dsOpts = append(dsOpts, WithNodeAgentConfigMap(o.NodeAgentConfigMap))
 		}
 
+		if len(o.BackupRepoConfigMap) > 0 {
+			dsOpts = append(dsOpts, WithBackupRepoConfigMap(o.BackupRepoConfigMap))
+		}
+
 		if len(o.KubeletRootDir) > 0 {
 			dsOpts = append(dsOpts, WithKubeletRootDir(o.KubeletRootDir))
 		}

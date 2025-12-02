@@ -23,6 +23,8 @@ By default, `velero install` does not install Velero's [File System Backup][3]. 
 
 If you've already run `velero install` without the `--use-node-agent` flag, you can run the same command again, including the `--use-node-agent` flag, to add the file system backup to your existing install.
 
+Note that for some use cases (including installation on OpenShift clusters) the fs-backup pods must run in a Privileged security context. This is configured through the node-agent configmap (see below) by setting `privilegedFsBackup` to `true` in the configmap.
+
 ## CSI Snapshot Data Movement
 
 Velero node-agent is required by [CSI Snapshot Data Movement][12] when Velero built-in data mover is used. By default, `velero install` does not install Velero's node-agent. To enable it, specify the `--use-node-agent` flag.
@@ -474,6 +476,37 @@ If you get an error like `complete:13: command not found: compdef`, then add the
   compinit
   ```
 
+## Advanced configuration through external ConfigMaps
+
+Velero supports to configure its some advanced behaviors by external ConfigMaps.
+Velero itself isn't responsible for creating and maintaining these ConfigMaps, instead the users should do that.
+
+By far, `velero install` supports the following parameters to specify the external ConfigMap names:
+* --backup-repository-configmap: [backup repository configuration document][15]
+* --node-agent-configmap: [node-agent concurrency configuration document][16], and there are some other documents specify other parts of node-agent-config.
+* --repo-maintenance-job-configmap: [repository maintenance configuration document][17]
+
+From v1.17, Velero adds verification for the ConfigMaps in CLI and server side, which means `velero install` CLI will fail and velero server and node-agent pod will exit if the specified ConfigMaps don't exist or are invalid.
+
+The change's aim is validating the ConfigMaps and fail early instead of finding the ConfigMaps are not valid during running data mover pod or repository maintenance job.
+
+However, there means the user cannot just running `velero install` CLI then get a working environment, when the external ConfigMaps are involved.
+
+The new workflow is:
+* Create the needed namespace: `kubectl create ns velero`
+* Add PSA labels to the namespace: `kubectl label ns velero pod-security.velero.io/enforce=privileged`
+* Create the needed ConfigMaps.
+* Run the `velero install` CLI:
+  ``` bash
+  velero install \
+    --provider aws \
+    ......
+    --backup-repository-configmap=... \
+    --node-agent-configmap=... \
+    --repo-maintenance-job-configmap=...
+  ```
+
+
 [1]: https://github.com/vmware-tanzu/velero/releases/latest
 [2]: namespace.md
 [3]: file-system-backup.md
@@ -487,3 +520,6 @@ If you get an error like `complete:13: command not found: compdef`, then add the
 [12]: csi-snapshot-data-movement.md
 [13]: performance-guidance.md
 [14]: repository-maintenance.md
+[15]: backup-repository-configuration.md
+[16]: node-agent-concurrency.md
+[17]: repository-maintenance.md

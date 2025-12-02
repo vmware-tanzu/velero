@@ -50,6 +50,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -76,7 +77,7 @@ type DataUploadReconciler struct {
 	dataPathMgr           *datapath.Manager
 	vgdpCounter           *exposer.VgdpCounter
 	loadAffinity          []*kube.LoadAffinity
-	backupPVCConfig       map[string]nodeagent.BackupPVC
+	backupPVCConfig       map[string]velerotypes.BackupPVC
 	podResources          corev1api.ResourceRequirements
 	preparingTimeout      time.Duration
 	metrics               *metrics.ServerMetrics
@@ -92,7 +93,7 @@ func NewDataUploadReconciler(
 	dataPathMgr *datapath.Manager,
 	counter *exposer.VgdpCounter,
 	loadAffinity []*kube.LoadAffinity,
-	backupPVCConfig map[string]nodeagent.BackupPVC,
+	backupPVCConfig map[string]velerotypes.BackupPVC,
 	podResources corev1api.ResourceRequirements,
 	clock clocks.WithTickerAndDelayedExecution,
 	nodeName string,
@@ -492,6 +493,7 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 		du.Status.Path = result.Backup.Source.ByPath
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseCompleted
 		du.Status.SnapshotID = result.Backup.SnapshotID
+		du.Status.IncrementalBytes = result.Backup.IncrementalBytes
 		du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if result.Backup.EmptySnapshot {
 			du.Status.Message = "volume was empty so no data was upload"
@@ -915,6 +917,13 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			return nil, errors.Wrapf(err, "failed to get PVC %s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC)
 		}
 
+		pv := &corev1api.PersistentVolume{}
+		if err := r.client.Get(context.Background(), types.NamespacedName{
+			Name: pvc.Spec.VolumeName,
+		}, pv); err != nil {
+			return nil, errors.Wrapf(err, "failed to get source PV %s", pvc.Spec.VolumeName)
+		}
+
 		nodeOS := kube.GetPVCAttachingNodeOS(pvc, r.kubeClient.CoreV1(), r.kubeClient.StorageV1(), log)
 
 		if err := kube.HasNodeWithOS(context.Background(), nodeOS, r.kubeClient.CoreV1()); err != nil {
@@ -962,6 +971,8 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 		return &exposer.CSISnapshotExposeParam{
 			SnapshotName:          du.Spec.CSISnapshot.VolumeSnapshot,
 			SourceNamespace:       du.Spec.SourceNamespace,
+			SourcePVCName:         pvc.Name,
+			SourcePVName:          pv.Name,
 			StorageClass:          du.Spec.CSISnapshot.StorageClass,
 			HostingPodLabels:      hostingPodLabels,
 			HostingPodAnnotations: hostingPodAnnotation,

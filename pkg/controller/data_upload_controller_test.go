@@ -22,8 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vmware-tanzu/velero/pkg/nodeagent"
-
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned/fake"
 	"github.com/pkg/errors"
@@ -56,6 +54,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -242,7 +241,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		dataPathMgr,
 		nil,
 		nil,
-		map[string]nodeagent.BackupPVC{},
+		map[string]velerotypes.BackupPVC{},
 		corev1api.ResourceRequirements{},
 		testclocks.NewFakeClock(now),
 		"test-node",
@@ -851,11 +850,20 @@ func TestOnDataUploadCompleted(t *testing.T) {
 	// Add the DataUpload object to the fake client
 	require.NoError(t, r.client.Create(ctx, du))
 	r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
-	r.OnDataUploadCompleted(ctx, namespace, duName, datapath.Result{})
+	r.OnDataUploadCompleted(ctx, namespace, duName, datapath.Result{
+		Backup: datapath.BackupResult{
+			SnapshotID: "fake-id",
+			Source: datapath.AccessPoint{
+				ByPath: "fake-path",
+			},
+		},
+	})
 	updatedDu := &velerov2alpha1api.DataUpload{}
 	require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 	assert.Equal(t, velerov2alpha1api.DataUploadPhaseCompleted, updatedDu.Status.Phase)
 	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
+	assert.Equal(t, "fake-id", updatedDu.Status.SnapshotID)
+	assert.Equal(t, "fake-path", updatedDu.Status.Path)
 }
 
 func TestFindDataUploadForPod(t *testing.T) {

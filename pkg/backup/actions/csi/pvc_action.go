@@ -621,8 +621,30 @@ func (p *pvcBackupItemAction) getVolumeSnapshotReference(
 			return nil, errors.Wrapf(err, "failed to list PVCs in VolumeGroupSnapshot group %q in namespace %q", group, pvc.Namespace)
 		}
 
+		// Filter PVCs by volume policy
+		filteredPVCs, err := p.filterPVCsByVolumePolicy(groupedPVCs, backup)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to filter PVCs by volume policy for VolumeGroupSnapshot group %q", group)
+		}
+
+		// Warn if any PVCs were filtered out
+		if len(filteredPVCs) < len(groupedPVCs) {
+			for _, originalPVC := range groupedPVCs {
+				found := false
+				for _, filteredPVC := range filteredPVCs {
+					if originalPVC.Name == filteredPVC.Name {
+						found = true
+						break
+					}
+				}
+				if !found {
+					p.log.Warnf("PVC %s/%s has VolumeGroupSnapshot label %s=%s but is excluded by volume policy", originalPVC.Namespace, originalPVC.Name, vgsLabelKey, group)
+				}
+			}
+		}
+
 		// Determine the CSI driver for the grouped PVCs
-		driver, err := p.determineCSIDriver(groupedPVCs)
+		driver, err := p.determineCSIDriver(filteredPVCs)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to determine CSI driver for PVCs in VolumeGroupSnapshot group %q", group)
 		}
@@ -643,7 +665,7 @@ func (p *pvcBackupItemAction) getVolumeSnapshotReference(
 		}
 
 		// Wait for all the VS objects associated with the VGS to have status and VGS Name (VS readiness is checked in legacy flow) and get the PVC-to-VS map
-		vsMap, err := p.waitForVGSAssociatedVS(ctx, groupedPVCs, newVGS, backup.Spec.CSISnapshotTimeout.Duration)
+		vsMap, err := p.waitForVGSAssociatedVS(ctx, filteredPVCs, newVGS, backup.Spec.CSISnapshotTimeout.Duration)
 		if err != nil {
 			return nil, errors.Wrapf(err, "timeout waiting for VolumeSnapshots to have status created via VolumeGroupSnapshot %s", newVGS.Name)
 		}
@@ -732,6 +754,40 @@ func (p *pvcBackupItemAction) listGroupedPVCs(ctx context.Context, namespace, la
 	}
 
 	return pvcList.Items, nil
+}
+
+func (p *pvcBackupItemAction) filterPVCsByVolumePolicy(
+	pvcs []corev1api.PersistentVolumeClaim,
+	backup *velerov1api.Backup,
+) ([]corev1api.PersistentVolumeClaim, error) {
+	var filteredPVCs []corev1api.PersistentVolumeClaim
+
+	for _, pvc := range pvcs {
+		// Convert PVC to unstructured for ShouldPerformSnapshotWithBackup
+		pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pvc)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to convert PVC %s/%s to unstructured", pvc.Namespace, pvc.Name)
+		}
+		unstructuredPVC := &unstructured.Unstructured{Object: pvcMap}
+
+		// Check if this PVC should be snapshotted according to volume policies
+		shouldSnapshot, err := volumehelper.ShouldPerformSnapshotWithBackup(
+			unstructuredPVC,
+			kuberesource.PersistentVolumeClaims,
+			*backup,
+			p.crClient,
+			p.log,
+		)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to check volume policy for PVC %s/%s", pvc.Namespace, pvc.Name)
+		}
+
+		if shouldSnapshot {
+			filteredPVCs = append(filteredPVCs, pvc)
+		}
+	}
+
+	return filteredPVCs, nil
 }
 
 func (p *pvcBackupItemAction) determineCSIDriver(
