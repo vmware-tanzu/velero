@@ -64,6 +64,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	podvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
 )
 
 // BackupVersion is the current backup major version for Velero.
@@ -408,6 +409,21 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(items)}
 
+	// Build PVC-to-Pod cache for improved volume policy lookup performance.
+	// This avoids O(N*M) complexity when there are many PVCs and pods.
+	// See issue #9179 for details.
+	pvcPodCache := podvolumeutil.NewPVCPodCache()
+	namespaces := backupRequest.NamespaceIncludesExcludes.GetIncludes()
+	if len(namespaces) > 0 {
+		if err := pvcPodCache.BuildCacheForNamespaces(context.Background(), namespaces, kb.kbClient); err != nil {
+			// Log warning but continue - the cache will fall back to direct lookups
+			log.WithError(err).Warn("Failed to build PVC-to-Pod cache, falling back to direct lookups")
+			pvcPodCache = nil
+		} else {
+			log.Infof("Built PVC-to-Pod cache for %d namespaces", len(namespaces))
+		}
+	}
+
 	itemBackupper := &itemBackupper{
 		backupRequest:            backupRequest,
 		tarWriter:                tw,
@@ -422,13 +438,14 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 			PodCommandExecutor: kb.podCommandExecutor,
 		},
 		hookTracker: hook.NewHookTracker(),
-		volumeHelperImpl: volumehelper.NewVolumeHelperImpl(
+		volumeHelperImpl: volumehelper.NewVolumeHelperImplWithCache(
 			backupRequest.ResPolicies,
 			backupRequest.Spec.SnapshotVolumes,
 			log,
 			kb.kbClient,
 			boolptr.IsSetToTrue(backupRequest.Spec.DefaultVolumesToFsBackup),
 			!backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()),
+			pvcPodCache,
 		),
 		kubernetesBackupper: kb,
 	}

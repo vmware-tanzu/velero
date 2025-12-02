@@ -33,6 +33,9 @@ type volumeHelperImpl struct {
 	// to the volume policy check, but fs-backup is based on the pod resource,
 	// the resource filter on PVC and PV doesn't work on this scenario.
 	backupExcludePVC bool
+	// pvcPodCache provides cached PVC to Pod mappings for improved performance.
+	// When there are many PVCs and pods, using this cache avoids O(N*M) lookups.
+	pvcPodCache *podvolumeutil.PVCPodCache
 }
 
 func NewVolumeHelperImpl(
@@ -50,6 +53,29 @@ func NewVolumeHelperImpl(
 		client:                   client,
 		defaultVolumesToFSBackup: defaultVolumesToFSBackup,
 		backupExcludePVC:         backupExcludePVC,
+		pvcPodCache:              nil, // Cache will be nil by default for backward compatibility
+	}
+}
+
+// NewVolumeHelperImplWithCache creates a VolumeHelper with a PVC-to-Pod cache for improved performance.
+// The cache should be built before backup processing begins.
+func NewVolumeHelperImplWithCache(
+	volumePolicy *resourcepolicies.Policies,
+	snapshotVolumes *bool,
+	logger logrus.FieldLogger,
+	client crclient.Client,
+	defaultVolumesToFSBackup bool,
+	backupExcludePVC bool,
+	pvcPodCache *podvolumeutil.PVCPodCache,
+) VolumeHelper {
+	return &volumeHelperImpl{
+		volumePolicy:             volumePolicy,
+		snapshotVolumes:          snapshotVolumes,
+		logger:                   logger,
+		client:                   client,
+		defaultVolumesToFSBackup: defaultVolumesToFSBackup,
+		backupExcludePVC:         backupExcludePVC,
+		pvcPodCache:              pvcPodCache,
 	}
 }
 
@@ -105,10 +131,12 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 	// If this PV is claimed, see if we've already taken a (pod volume backup)
 	// snapshot of the contents of this PV. If so, don't take a snapshot.
 	if pv.Spec.ClaimRef != nil {
-		pods, err := podvolumeutil.GetPodsUsingPVC(
+		// Use cached lookup if available for better performance with many PVCs/pods
+		pods, err := podvolumeutil.GetPodsUsingPVCWithCache(
 			pv.Spec.ClaimRef.Namespace,
 			pv.Spec.ClaimRef.Name,
 			v.client,
+			v.pvcPodCache,
 		)
 		if err != nil {
 			v.logger.WithError(err).Errorf("fail to get pod for PV %s", pv.Name)
