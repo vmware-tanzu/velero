@@ -65,9 +65,11 @@ func TestClientConfig(t *testing.T) {
 			string(common.PluginKindItemBlockAction):     ibav1.NewItemBlockActionPlugin(common.ClientLogger(logger)),
 		},
 		Logger: cb.pluginLogger,
-		Cmd:    exec.Command(cb.commandName, cb.commandArgs...),
+		Cmd:    exec.CommandContext(t.Context(), cb.commandName, cb.commandArgs...),
 	}
 
 	cc := cb.clientConfig()
-	assert.Equal(t, expected, cc)
+	assert.Equal(t, expected.HandshakeConfig, cc.HandshakeConfig)
+	assert.Equal(t, expected.AllowedProtocols, cc.AllowedProtocols)
+	assert.Equal(t, expected.Plugins, cc.Plugins)
 }

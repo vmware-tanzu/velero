@@ -48,15 +48,18 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	repository "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	"github.com/vmware-tanzu/velero/pkg/restorehelper"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 func NewPodVolumeRestoreReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
-	counter *exposer.VgdpCounter, nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, podResources corev1api.ResourceRequirements,
-	logger logrus.FieldLogger, dataMovePriorityClass string, privileged bool) *PodVolumeRestoreReconciler {
+	counter *exposer.VgdpCounter, nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, backupRepoConfigs map[string]string,
+	cacheVolumeConfigs *velerotypes.CachePVC, podResources corev1api.ResourceRequirements, logger logrus.FieldLogger, dataMovePriorityClass string,
+	privileged bool, repoConfigMgr repository.ConfigManager) *PodVolumeRestoreReconciler {
 	return &PodVolumeRestoreReconciler{
 		client:                client,
 		mgr:                   mgr,
@@ -65,6 +68,8 @@ func NewPodVolumeRestoreReconciler(client client.Client, mgr manager.Manager, ku
 		nodeName:              nodeName,
 		clock:                 &clocks.RealClock{},
 		podResources:          podResources,
+		backupRepoConfigs:     backupRepoConfigs,
+		cacheVolumeConfigs:    cacheVolumeConfigs,
 		dataPathMgr:           dataPathMgr,
 		vgdpCounter:           counter,
 		preparingTimeout:      preparingTimeout,
@@ -73,6 +78,7 @@ func NewPodVolumeRestoreReconciler(client client.Client, mgr manager.Manager, ku
 		cancelledPVR:          make(map[string]time.Time),
 		dataMovePriorityClass: dataMovePriorityClass,
 		privileged:            privileged,
+		repoConfigMgr:         repoConfigMgr,
 	}
 }
 
@@ -84,6 +90,8 @@ type PodVolumeRestoreReconciler struct {
 	nodeName              string
 	clock                 clocks.WithTickerAndDelayedExecution
 	podResources          corev1api.ResourceRequirements
+	backupRepoConfigs     map[string]string
+	cacheVolumeConfigs    *velerotypes.CachePVC
 	exposer               exposer.PodVolumeExposer
 	dataPathMgr           *datapath.Manager
 	vgdpCounter           *exposer.VgdpCounter
@@ -92,6 +100,7 @@ type PodVolumeRestoreReconciler struct {
 	cancelledPVR          map[string]time.Time
 	dataMovePriorityClass string
 	privileged            bool
+	repoConfigMgr         repository.ConfigManager
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumerestores,verbs=get;list;watch;create;update;patch;delete
@@ -886,6 +895,19 @@ func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolume
 		}
 	}
 
+	var cacheVolume *exposer.CacheConfigs
+	if r.cacheVolumeConfigs != nil {
+		if limit, err := r.repoConfigMgr.ClientSideCacheLimit(velerov1api.BackupRepositoryTypeKopia, r.backupRepoConfigs); err != nil {
+			log.WithError(err).Warnf("Failed to get client side cache limit for repo type %s from configs %v", velerov1api.BackupRepositoryTypeKopia, r.backupRepoConfigs)
+		} else {
+			cacheVolume = &exposer.CacheConfigs{
+				Limit:             limit,
+				StorageClass:      r.cacheVolumeConfigs.StorageClass,
+				ResidentThreshold: r.cacheVolumeConfigs.ResidentThreshold,
+			}
+		}
+	}
+
 	return exposer.PodVolumeExposeParam{
 		Type:                  exposer.PodVolumeExposeTypeRestore,
 		ClientNamespace:       pvr.Spec.Pod.Namespace,
@@ -896,6 +918,8 @@ func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolume
 		HostingPodTolerations: hostingPodTolerations,
 		OperationTimeout:      r.resourceTimeout,
 		Resources:             r.podResources,
+		RestoreSize:           pvr.Spec.SnapshotSize,
+		CacheVolume:           cacheVolume,
 		// Priority class name for the data mover pod, retrieved from node-agent-configmap
 		PriorityClassName: r.dataMovePriorityClass,
 		Privileged:        r.privileged,

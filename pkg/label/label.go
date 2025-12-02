@@ -18,6 +18,7 @@ package label
 
 import (
 	"crypto/sha256"
+	"crypto/sha3"
 	"encoding/hex"
 	"fmt"
 
@@ -47,6 +48,17 @@ func GetValidName(label string) string {
 	}
 
 	return label[:charsFromLabel] + strSha[:6]
+}
+
+// ReturnNameOrHash returns the original name if it is within the DNS1035LabelMaxLength limit,
+// otherwise it returns the sha3 Sum224 hash(length is 56) of the name.
+func ReturnNameOrHash(name string) string {
+	if len(name) <= validation.DNS1035LabelMaxLength {
+		return name
+	}
+
+	hash := sha3.Sum224([]byte(name))
+	return hex.EncodeToString(hash[:])
 }
 
 // NewSelectorForBackup returns a Selector based on the backup name.

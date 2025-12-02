@@ -44,9 +44,7 @@ toc:
       - page: Restore Resource Modifiers
         url: /restore-resource-modifiers
       - page: Run in any namespace
-        url: /namespace
-      - page: File system backup
-        url: /file-system-backup        
+        url: /namespace       
       - page: CSI Support
         url: /csi
       - page: Volume Group Snapshots
@@ -67,6 +65,8 @@ toc:
     subfolderitems:
       - page: CSI Snapshot Data Mover
         url: /csi-snapshot-data-movement
+      - page: File system backup
+        url: /file-system-backup        
       - page: Data Movement Backup PVC Configuration
         url: /data-movement-backup-pvc-configuration
       - page: Data Movement Restore PVC Configuration
@@ -75,6 +75,8 @@ toc:
         url: /data-movement-pod-resource-configuration        
       - page: Data Movement Node Selection Configuration
         url: /data-movement-node-selection
+      - page: Data Movement Cache PVC Configuration
+        url: /data-movement-cache-volume.md
       - page: Node-agent Concurrency
         url: /node-agent-concurrency
   - title: Plugins

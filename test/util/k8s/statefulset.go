@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"os/exec"
 
+	"context"
+
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )

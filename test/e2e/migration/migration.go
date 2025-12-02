@@ -142,6 +142,7 @@ func (m *migrationE2E) Backup() error {
 						"Fail to set images for the migrate-from Velero installation.")
 
 					m.veleroCLI2Version.VeleroCLI, err = veleroutil.InstallVeleroCLI(
+						m.Ctx,
 						m.veleroCLI2Version.VeleroVersion)
 					Expect(err).To(Succeed())
 				}
