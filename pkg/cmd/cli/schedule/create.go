@@ -150,7 +150,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				LabelSelector:                    o.BackupOptions.Selector.LabelSelector,
 				OrLabelSelectors:                 o.BackupOptions.OrSelector.OrLabelSelectors,
 				SnapshotVolumes:                  o.BackupOptions.SnapshotVolumes.Value,
-				TTL:                              metav1.Duration{Duration: o.BackupOptions.TTL},
+				TTL:                              metav1.Duration{Duration: o.BackupOptions.TTL.Duration},
 				StorageLocation:                  o.BackupOptions.StorageLocation,
 				VolumeSnapshotLocations:          o.BackupOptions.SnapshotLocations,
 				DefaultVolumesToFsBackup:         o.BackupOptions.DefaultVolumesToFsBackup.Value,
