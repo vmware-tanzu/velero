@@ -127,7 +127,8 @@ func (r *backupQueueReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					return oldBackup.Status.Phase == velerov1api.BackupPhaseInProgress &&
 						newBackup.Status.Phase != velerov1api.BackupPhaseInProgress ||
 						oldBackup.Status.Phase != velerov1api.BackupPhaseQueued &&
-							newBackup.Status.Phase == velerov1api.BackupPhaseQueued
+							newBackup.Status.Phase == velerov1api.BackupPhaseQueued &&
+							r.backupTracker.RunningCount() < r.concurrentBackups
 				},
 				CreateFunc: func(event.CreateEvent) bool {
 					return false
@@ -197,7 +198,13 @@ func (r *backupQueueReconciler) checkForEarlierRunnableBackups(backup *velerov1a
 }
 
 func namespacesForBackup(backup *velerov1api.Backup, clusterNamespaces []string) []string {
-	return collections.NewNamespaceIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...).ActiveNamespaces(clusterNamespaces).ResolveNamespaceList()
+	// Ignore error here. If a backup has invalid namespace wildcards, the backup controller
+	// will validate and fail it. Consider the ns list empty for conflict detection purposes.
+	nsList, err := collections.NewNamespaceIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...).ActiveNamespaces(clusterNamespaces).ResolveNamespaceList()
+	if err != nil {
+		return []string{}
+	}
+	return nsList
 }
 func (r *backupQueueReconciler) getMaxQueuePosition(lister *queuedBackupsLister) int {
 	queuedBackups := lister.orderedQueued()
