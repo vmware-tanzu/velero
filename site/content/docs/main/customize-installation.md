@@ -17,6 +17,56 @@ By default, `velero install` expects a credentials file for your `velero` IAM ac
 
 If you are using an alternate identity mechanism, such as kube2iam/kiam on AWS, Workload Identity on GKE, etc., that does not require a credentials file, you can specify the `--no-secret` flag instead of `--secret-file`.
 
+## Run in restricted environments
+
+In highly restricted environments where secret creation or access is not permitted, you can disable the repository credentials secret requirement. This is useful when you only need Velero for Kubernetes manifest backups and volume snapshots without filesystem-level backups.
+
+To disable repository credentials secret creation, you can use either:
+
+### Command line flag
+
+Add the `--disable-repo-credentials-secret` flag to your Velero server deployment:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: velero
+spec:
+  template:
+    spec:
+      containers:
+      - name: velero
+        image: velero/velero:latest
+        command:
+        - /velero
+        args:
+        - server
+        - --disable-repo-credentials-secret
+```
+
+### Environment variable
+
+Set the `DISABLE_REPO_CREDENTIALS_SECRET` environment variable to `true`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: velero
+spec:
+  template:
+    spec:
+      containers:
+      - name: velero
+        image: velero/velero:latest
+        env:
+        - name: DISABLE_REPO_CREDENTIALS_SECRET
+          value: "true"
+```
+
+**Note:** When this option is enabled, filesystem-level backups will not work as they require repository credentials. Only Kubernetes manifest backups and volume snapshots will function properly.
+
 ## Enable file system backup
 
 By default, `velero install` does not install Velero's [File System Backup][3]. To enable it, specify the `--use-node-agent` flag.
