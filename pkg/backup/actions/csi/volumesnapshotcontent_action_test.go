@@ -42,7 +42,7 @@ func TestVSCExecute(t *testing.T) {
 		expectedItems []velero.ResourceIdentifier
 	}{
 		{
-			name: "Invalid VolumeSnapshotClass",
+			name: "Invalid VolumeSnapshotContent",
 			item: velerotest.UnstructuredOrDie(
 				`
 				{
