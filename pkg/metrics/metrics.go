@@ -83,6 +83,9 @@ const (
 	// repo maintenance metrics
 	repoMaintenanceSuccessTotal    = "repo_maintenance_success_total"
 	repoMaintenanceFailureTotal    = "repo_maintenance_failure_total"
+	// repoMaintenanceDurationSeconds tracks the distribution of maintenance job durations.
+	// Each completed job's duration is recorded in the appropriate bucket, allowing
+	// analysis of individual job performance and trending over time.
 	repoMaintenanceDurationSeconds = "repo_maintenance_duration_seconds"
 
 	// Labels
