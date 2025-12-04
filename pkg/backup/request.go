@@ -69,7 +69,7 @@ type Request struct {
 	ResPolicies               *resourcepolicies.Policies
 	SkippedPVTracker          *skipPVTracker
 	VolumesInformation        volume.BackupVolumesInformation
-	ItemBlockChannel          chan ItemBlockInput
+	WorkerPool                *ItemBlockWorkerPool
 }
 
 // BackupVolumesInformation contains the information needs by generating
@@ -102,4 +102,8 @@ func (r *Request) FillVolumesInformation() {
 	r.VolumesInformation.PodVolumeBackups = r.PodVolumeBackups
 	r.VolumesInformation.BackupOperations = *r.GetItemOperationsList()
 	r.VolumesInformation.BackupName = r.Backup.Name
+}
+
+func (r *Request) StopWorkerPool() {
+	r.WorkerPool.Stop()
 }
