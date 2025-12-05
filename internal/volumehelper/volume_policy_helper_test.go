@@ -830,6 +830,27 @@ func TestVolumeHelperImplWithCache_ShouldPerformSnapshot(t *testing.T) {
 			shouldSnapshot:      true,
 			expectedErr:         false,
 		},
+		{
+			name:          "No volume policy, defaultVolumesToFSBackup with cache, skips snapshot",
+			inputObj:      builder.ForPersistentVolume("example-pv").StorageClass("gp2-csi").ClaimRef("ns", "pvc-1").Result(),
+			groupResource: kuberesource.PersistentVolumes,
+			pod: builder.ForPod("ns", "pod-1").Volumes(
+				&corev1api.Volume{
+					Name: "volume",
+					VolumeSource: corev1api.VolumeSource{
+						PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc-1",
+						},
+					},
+				},
+			).Result(),
+			resourcePolicies:         nil,
+			snapshotVolumesFlag:      ptr.To(true),
+			defaultVolumesToFSBackup: true,
+			buildCache:               true,
+			shouldSnapshot:           false,
+			expectedErr:              false,
+		},
 	}
 
 	objs := []runtime.Object{
