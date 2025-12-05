@@ -34,6 +34,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	podvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
 )
 
 func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
@@ -737,4 +738,150 @@ func TestGetVolumeFromResource(t *testing.T) {
 		_, _, err := helper.getVolumeFromResource("invalid")
 		assert.ErrorContains(t, err, "resource is not a PersistentVolume or Volume")
 	})
+}
+
+func TestVolumeHelperImplWithCache_ShouldPerformSnapshot(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		inputObj                 runtime.Object
+		groupResource            schema.GroupResource
+		pod                      *corev1api.Pod
+		resourcePolicies         *resourcepolicies.ResourcePolicies
+		snapshotVolumesFlag      *bool
+		defaultVolumesToFSBackup bool
+		buildCache               bool
+		shouldSnapshot           bool
+		expectedErr              bool
+	}{
+		{
+			name:          "VolumePolicy match with cache, returns true",
+			inputObj:      builder.ForPersistentVolume("example-pv").StorageClass("gp2-csi").ClaimRef("ns", "pvc-1").Result(),
+			groupResource: kuberesource.PersistentVolumes,
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Snapshot,
+						},
+					},
+				},
+			},
+			snapshotVolumesFlag: ptr.To(true),
+			buildCache:          true,
+			shouldSnapshot:      true,
+			expectedErr:         false,
+		},
+		{
+			name:          "VolumePolicy not match, fs-backup via opt-out with cache, skips snapshot",
+			inputObj:      builder.ForPersistentVolume("example-pv").StorageClass("gp3-csi").ClaimRef("ns", "pvc-1").Result(),
+			groupResource: kuberesource.PersistentVolumes,
+			pod: builder.ForPod("ns", "pod-1").Volumes(
+				&corev1api.Volume{
+					Name: "volume",
+					VolumeSource: corev1api.VolumeSource{
+						PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc-1",
+						},
+					},
+				},
+			).Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Snapshot,
+						},
+					},
+				},
+			},
+			snapshotVolumesFlag:      ptr.To(true),
+			defaultVolumesToFSBackup: true,
+			buildCache:               true,
+			shouldSnapshot:           false,
+			expectedErr:              false,
+		},
+		{
+			name:          "Cache not built, falls back to direct lookup",
+			inputObj:      builder.ForPersistentVolume("example-pv").StorageClass("gp2-csi").ClaimRef("ns", "pvc-1").Result(),
+			groupResource: kuberesource.PersistentVolumes,
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Snapshot,
+						},
+					},
+				},
+			},
+			snapshotVolumesFlag: ptr.To(true),
+			buildCache:          false,
+			shouldSnapshot:      true,
+			expectedErr:         false,
+		},
+	}
+
+	objs := []runtime.Object{
+		&corev1api.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "ns",
+				Name:      "pvc-1",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
+			if tc.pod != nil {
+				require.NoError(t, fakeClient.Create(t.Context(), tc.pod))
+			}
+
+			var p *resourcepolicies.Policies
+			if tc.resourcePolicies != nil {
+				p = &resourcepolicies.Policies{}
+				err := p.BuildPolicy(tc.resourcePolicies)
+				require.NoError(t, err)
+			}
+
+			var cache *podvolumeutil.PVCPodCache
+			if tc.buildCache {
+				cache = podvolumeutil.NewPVCPodCache()
+				err := cache.BuildCacheForNamespaces(t.Context(), []string{"ns"}, fakeClient)
+				require.NoError(t, err)
+			}
+
+			vh := NewVolumeHelperImplWithCache(
+				p,
+				tc.snapshotVolumesFlag,
+				logrus.StandardLogger(),
+				fakeClient,
+				tc.defaultVolumesToFSBackup,
+				false,
+				cache,
+			)
+
+			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.inputObj)
+			require.NoError(t, err)
+
+			actualShouldSnapshot, actualError := vh.ShouldPerformSnapshot(&unstructured.Unstructured{Object: obj}, tc.groupResource)
+			if tc.expectedErr {
+				require.Error(t, actualError)
+				return
+			}
+			require.NoError(t, actualError)
+			require.Equalf(t, tc.shouldSnapshot, actualShouldSnapshot, "Want shouldSnapshot as %t; Got shouldSnapshot as %t", tc.shouldSnapshot, actualShouldSnapshot)
+		})
+	}
 }
