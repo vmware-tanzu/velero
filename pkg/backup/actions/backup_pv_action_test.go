@@ -149,3 +149,176 @@ func TestBackupPVAction(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, additional)
 }
+
+func TestCleanupStaleVeleroLabels(t *testing.T) {
+	tests := []struct {
+		name             string
+		inputPVC         *corev1api.PersistentVolumeClaim
+		backup           *v1.Backup
+		expectedLabels   map[string]string
+		expectedSelector *metav1.LabelSelector
+	}{
+		{
+			name: "removes restore-name labels",
+			inputPVC: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pvc",
+					Labels: map[string]string{
+						"velero.io/restore-name": "old-restore",
+						"app":                    "myapp",
+					},
+				},
+			},
+			backup: &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "current-backup"}},
+			expectedLabels: map[string]string{
+				"app": "myapp",
+			},
+		},
+		{
+			name: "removes backup-name labels that don't match current backup",
+			inputPVC: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pvc",
+					Labels: map[string]string{
+						"velero.io/backup-name": "old-backup",
+						"app":                   "myapp",
+					},
+				},
+			},
+			backup: &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "current-backup"}},
+			expectedLabels: map[string]string{
+				"app": "myapp",
+			},
+		},
+		{
+			name: "keeps backup-name labels that match current backup",
+			inputPVC: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pvc",
+					Labels: map[string]string{
+						"velero.io/backup-name": "current-backup",
+						"app":                   "myapp",
+					},
+				},
+			},
+			backup: &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "current-backup"}},
+			expectedLabels: map[string]string{
+				"velero.io/backup-name": "current-backup",
+				"app":                   "myapp",
+			},
+		},
+		{
+			name: "removes volume-snapshot-name labels",
+			inputPVC: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pvc",
+					Labels: map[string]string{
+						"velero.io/volume-snapshot-name": "old-snapshot",
+						"app":                            "myapp",
+					},
+				},
+			},
+			backup: &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "current-backup"}},
+			expectedLabels: map[string]string{
+				"app": "myapp",
+			},
+		},
+		{
+			name: "removes velero labels from selector match labels",
+			inputPVC: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pvc",
+				},
+				Spec: corev1api.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"velero.io/restore-name": "old-restore",
+							"velero.io/backup-name":  "old-backup",
+							"app":                    "myapp",
+						},
+					},
+				},
+			},
+			backup:         &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "current-backup"}},
+			expectedLabels: nil,
+			expectedSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "myapp",
+				},
+			},
+		},
+		{
+			name: "handles PVC with no labels",
+			inputPVC: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pvc",
+				},
+			},
+			backup:         &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "current-backup"}},
+			expectedLabels: nil,
+		},
+		{
+			name: "handles PVC with no selector",
+			inputPVC: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pvc",
+					Labels: map[string]string{
+						"app": "myapp",
+					},
+				},
+			},
+			backup: &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "current-backup"}},
+			expectedLabels: map[string]string{
+				"app": "myapp",
+			},
+			expectedSelector: nil,
+		},
+		{
+			name: "removes multiple stale velero labels",
+			inputPVC: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pvc",
+					Labels: map[string]string{
+						"velero.io/restore-name":         "old-restore",
+						"velero.io/backup-name":          "old-backup",
+						"velero.io/volume-snapshot-name": "old-snapshot",
+						"app":                            "myapp",
+						"env":                            "prod",
+					},
+				},
+				Spec: corev1api.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"velero.io/restore-name": "old-restore",
+							"app":                    "myapp",
+						},
+					},
+				},
+			},
+			backup: &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "current-backup"}},
+			expectedLabels: map[string]string{
+				"app": "myapp",
+				"env": "prod",
+			},
+			expectedSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "myapp",
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			action := NewPVCAction(velerotest.NewLogger())
+
+			// Create a copy of the input PVC to avoid modifying the test case
+			pvcCopy := tc.inputPVC.DeepCopy()
+
+			action.cleanupStaleVeleroLabels(pvcCopy, tc.backup)
+
+			assert.Equal(t, tc.expectedLabels, pvcCopy.Labels, "Labels should match expected values")
+			assert.Equal(t, tc.expectedSelector, pvcCopy.Spec.Selector, "Selector should match expected values")
+		})
+	}
+}
