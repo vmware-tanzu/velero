@@ -885,3 +885,153 @@ func TestVolumeHelperImplWithCache_ShouldPerformSnapshot(t *testing.T) {
 		})
 	}
 }
+
+func TestVolumeHelperImplWithCache_ShouldPerformFSBackup(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		pod                      *corev1api.Pod
+		resources                []runtime.Object
+		resourcePolicies         *resourcepolicies.ResourcePolicies
+		snapshotVolumesFlag      *bool
+		defaultVolumesToFSBackup bool
+		buildCache               bool
+		shouldFSBackup           bool
+		expectedErr              bool
+	}{
+		{
+			name: "VolumePolicy match with cache, return true",
+			pod: builder.ForPod("ns", "pod-1").
+				Volumes(
+					&corev1api.Volume{
+						Name: "vol-1",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-1",
+							},
+						},
+					}).Result(),
+			resources: []runtime.Object{
+				builder.ForPersistentVolumeClaim("ns", "pvc-1").
+					VolumeName("pv-1").
+					StorageClass("gp2-csi").Phase(corev1api.ClaimBound).Result(),
+				builder.ForPersistentVolume("pv-1").StorageClass("gp2-csi").Result(),
+			},
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.FSBackup,
+						},
+					},
+				},
+			},
+			buildCache:     true,
+			shouldFSBackup: true,
+			expectedErr:    false,
+		},
+		{
+			name: "VolumePolicy match with cache, action is snapshot, return false",
+			pod: builder.ForPod("ns", "pod-1").
+				Volumes(
+					&corev1api.Volume{
+						Name: "vol-1",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-1",
+							},
+						},
+					}).Result(),
+			resources: []runtime.Object{
+				builder.ForPersistentVolumeClaim("ns", "pvc-1").
+					VolumeName("pv-1").
+					StorageClass("gp2-csi").Phase(corev1api.ClaimBound).Result(),
+				builder.ForPersistentVolume("pv-1").StorageClass("gp2-csi").Result(),
+			},
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Snapshot,
+						},
+					},
+				},
+			},
+			buildCache:     true,
+			shouldFSBackup: false,
+			expectedErr:    false,
+		},
+		{
+			name: "Cache not built, falls back to direct lookup, opt-in annotation",
+			pod: builder.ForPod("ns", "pod-1").
+				ObjectMeta(builder.WithAnnotations(velerov1api.VolumesToBackupAnnotation, "vol-1")).
+				Volumes(
+					&corev1api.Volume{
+						Name: "vol-1",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-1",
+							},
+						},
+					}).Result(),
+			resources: []runtime.Object{
+				builder.ForPersistentVolumeClaim("ns", "pvc-1").
+					VolumeName("pv-1").
+					StorageClass("gp2-csi").Phase(corev1api.ClaimBound).Result(),
+				builder.ForPersistentVolume("pv-1").StorageClass("gp2-csi").Result(),
+			},
+			buildCache:               false,
+			defaultVolumesToFSBackup: false,
+			shouldFSBackup:           true,
+			expectedErr:              false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, tc.resources...)
+			if tc.pod != nil {
+				require.NoError(t, fakeClient.Create(t.Context(), tc.pod))
+			}
+
+			var p *resourcepolicies.Policies
+			if tc.resourcePolicies != nil {
+				p = &resourcepolicies.Policies{}
+				err := p.BuildPolicy(tc.resourcePolicies)
+				require.NoError(t, err)
+			}
+
+			var cache *podvolumeutil.PVCPodCache
+			if tc.buildCache {
+				cache = podvolumeutil.NewPVCPodCache()
+				err := cache.BuildCacheForNamespaces(t.Context(), []string{"ns"}, fakeClient)
+				require.NoError(t, err)
+			}
+
+			vh := NewVolumeHelperImplWithCache(
+				p,
+				tc.snapshotVolumesFlag,
+				logrus.StandardLogger(),
+				fakeClient,
+				tc.defaultVolumesToFSBackup,
+				false,
+				cache,
+			)
+
+			actualShouldFSBackup, actualError := vh.ShouldPerformFSBackup(tc.pod.Spec.Volumes[0], *tc.pod)
+			if tc.expectedErr {
+				require.Error(t, actualError)
+				return
+			}
+			require.NoError(t, actualError)
+			require.Equalf(t, tc.shouldFSBackup, actualShouldFSBackup, "Want shouldFSBackup as %t; Got shouldFSBackup as %t", tc.shouldFSBackup, actualShouldFSBackup)
+		})
+	}
+}
