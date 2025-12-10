@@ -631,6 +631,10 @@ However, if you run a backup which aborts halfway(some internal snapshots are th
 By default, one `PodVolumeBackup`/`PodVolumeRestore` request is handled in a node at a time. You can configure more parallelism per node by [node-agent Concurrency Configuration][19].  
 By the meantime, one data mover pod is created for each volume to be backed up/restored, if there is no available concurrency quota, the data mover pod has to wait there. To make a control of the data mover pods, you can configure the [node-agent Prepare Queue Length][20].  
 
+For each volume, files in the volume are processed in parallel. You can use `--parallel-files-upload` backup flag or `--parallel-files-download` restore flag to control how many files are processed in parallel. Otherwise, if they are not set, Velero by default refers to the number of CPU cores in the node (where the backup/restore is running) for the parallelism. That is to say, the parallelism is not affected by the CPU request/limit set to the data mover pods.  
+
+Notice that Golang 1.25 and later respects the CPU limit set to the pods to decide the physical threads provisioned to the pod processes (see [Container-aware GOMAXPROCS][23] for more details), so for Velero 1.18 (which consumes Golang 1.25) and later, if you set a CPU limit to the data mover pods, you may not get the expected performance (e.g., backup/restore throughput) with the default parallelism. The outcome may or may not be obvious varying on your volume data. If it is required, you could customize `--parallel-files-upload` or `--parallel-files-download` according to the CPU limit set to the data mover pods.  
+
 ### Restart and resume
 When Velero server is restarted, the running backups/restores will be marked as `Failed`. The corresponding `PodVolumeBackup`/`PodVolumeRestore` will be canceled.   
 When node-agent is restarted, the controller will try to recapture and resume the `PodVolumeBackup`/`PodVolumeRestore`. If the resume fails, the `PodVolumeBackup`/`PodVolumeRestore` will be canceled.  
@@ -693,7 +697,7 @@ spec:
 
 ## Priority Class Configuration
 
-For Velero built-in data mover, data mover pods launched during file system backup will use the priority class name configured in the node-agent configmap. The node-agent daemonset itself gets its priority class from the `--node-agent-priority-class-name` flag during Velero installation. This can help ensure proper scheduling behavior in resource-constrained environments. For more details on configuring data mover pod resources, see [Data Movement Pod Resource Configuration][data-movement-config].
+For Velero built-in data mover, data mover pods launched during file system backup will use the priority class name configured in the node-agent configmap. The node-agent daemonset itself gets its priority class from the `--node-agent-priority-class-name` flag during Velero installation. This can help ensure proper scheduling behavior in resource-constrained environments. For more details on configuring data mover pod resources, see [Data Movement Pod Resource Configuration][21].
 
 ## Resource Consumption
 
@@ -701,18 +705,10 @@ Both the uploader and repository consume remarkable CPU/memory during the backup
 Velero node-agent uses [BestEffort as the QoS][14] for node-agent pods (so no CPU/memory request/limit is set), so that backups/restores wouldn't fail due to resource throttling in any cases.  
 If you want to constraint the CPU/memory usage, you need to [customize the resource limits][15]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][16] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.   
 
-Some memory is preserved by the node-agent to avoid frequent memory allocations, therefore, after you run a file-system backup/restore, you won't see node-agent releases all the memory until it restarts. There is a limit for the memory preservation, so the memory won't increase all the time. The limit varies from the number of CPU cores in the cluster nodes, as calculated below:  
-```
-preservedMemoryInOneNode = 128M + 24M * numOfCPUCores
-```  
-The memory perservation only happens in the nodes where backups/restores ever occur. Assuming file-system backups/restores occur in ever worker node and you have equal CPU cores in each node, the maximum possibly preserved memory in your cluster is:
-```
-totalPreservedMemory = (128M + 24M * numOfCPUCores) * numOfWorkerNodes
-```  
-However, whether and when this limit is reached is related to the data you are backing up/restoring.  
-
 During the restore, the repository may also cache data/metadata so as to reduce the network footprint and speed up the restore. The repository uses its own policy to store and clean up the cache.  
-For Kopia repository, the cache is stored in the node-agent pod's root file system. Velero allows you to configure a limit of the cache size so that the node-agent pod won't be evicted due to running out of the ephemeral storage. For more details, check [Backup Repository Configuration][18].  
+For Kopia repository, by default, the cache is stored in the data mover pod's root file system. If your root file system space is limited, the data mover pods may be evicted due to running out of the ephemeral storage, which causes the restore fails. To cope with this problem, Velero allows you:
+- configure a limit of the cache size per backup repository, for more details, check [Backup Repository Configuration][18].  
+- configure a dedicated volume for cache data, for more details, check [Data Movement Cache Volume][22].  
 
 ## Restic Deprecation  
 
@@ -766,4 +762,6 @@ Velero still effectively manage restic repository, though you cannot write any n
 [18]: backup-repository-configuration.md
 [19]: node-agent-concurrency.md
 [20]: node-agent-prepare-queue-length.md
-[data-movement-config]: data-movement-pod-resource-configuration.md
+[21]: data-movement-pod-resource-configuration.md
+[22]: data-movement-cache-volume.md
+[23]: https://tip.golang.org/doc/go1.25#container-aware-gomaxprocs:~:text=Runtime%C2%B6-,Container%2Daware%20GOMAXPROCS,-%C2%B6

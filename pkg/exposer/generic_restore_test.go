@@ -26,6 +26,7 @@ import (
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	storagev1api "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -105,6 +106,10 @@ func TestRestoreExpose(t *testing.T) {
 		targetPVCName   string
 		targetNamespace string
 		kubeReactors    []reactor
+		cacheVolume     *CacheConfigs
+		expectBackupPod bool
+		expectBackupPVC bool
+		expectCachePVC  bool
 		err             string
 	}{
 		{
@@ -167,6 +172,70 @@ func TestRestoreExpose(t *testing.T) {
 			},
 			err: "error to create restore pvc: fake-create-error",
 		},
+		{
+			name:            "succeed",
+			targetPVCName:   "fake-target-pvc",
+			targetNamespace: "fake-ns",
+			ownerRestore:    restore,
+			kubeClientObj: []runtime.Object{
+				targetPVCObj,
+				daemonSet,
+				storageClass,
+			},
+			expectBackupPod: true,
+			expectBackupPVC: true,
+		},
+		{
+			name:            "succeed, cache config, no cache volume",
+			targetPVCName:   "fake-target-pvc",
+			targetNamespace: "fake-ns",
+			ownerRestore:    restore,
+			kubeClientObj: []runtime.Object{
+				targetPVCObj,
+				daemonSet,
+				storageClass,
+			},
+			cacheVolume:     &CacheConfigs{},
+			expectBackupPod: true,
+			expectBackupPVC: true,
+		},
+		{
+			name:            "create cache volume fail",
+			targetPVCName:   "fake-target-pvc",
+			targetNamespace: "fake-ns",
+			ownerRestore:    restore,
+			kubeClientObj: []runtime.Object{
+				targetPVCObj,
+				daemonSet,
+				storageClass,
+			},
+			cacheVolume: &CacheConfigs{Limit: 1024},
+			kubeReactors: []reactor{
+				{
+					verb:     "create",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-create-error")
+					},
+				},
+			},
+			err: "error to create cache pvc: fake-create-error",
+		},
+		{
+			name:            "succeed with cache volume",
+			targetPVCName:   "fake-target-pvc",
+			targetNamespace: "fake-ns",
+			ownerRestore:    restore,
+			kubeClientObj: []runtime.Object{
+				targetPVCObj,
+				daemonSet,
+				storageClass,
+			},
+			cacheVolume:     &CacheConfigs{Limit: 1024},
+			expectBackupPod: true,
+			expectBackupPVC: true,
+			expectCachePVC:  true,
+		},
 	}
 
 	for _, test := range tests {
@@ -203,9 +272,36 @@ func TestRestoreExpose(t *testing.T) {
 					Resources:        corev1api.ResourceRequirements{},
 					ExposeTimeout:    time.Millisecond,
 					LoadAffinity:     nil,
+					CacheVolume:      test.cacheVolume,
 				},
 			)
-			require.EqualError(t, err, test.err)
+
+			if test.err != "" {
+				require.EqualError(t, err, test.err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			_, err = exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(t.Context(), ownerObject.Name, metav1.GetOptions{})
+			if test.expectBackupPod {
+				require.NoError(t, err)
+			} else {
+				require.True(t, apierrors.IsNotFound(err))
+			}
+
+			_, err = exposer.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(t.Context(), ownerObject.Name, metav1.GetOptions{})
+			if test.expectBackupPVC {
+				require.NoError(t, err)
+			} else {
+				require.True(t, apierrors.IsNotFound(err))
+			}
+
+			_, err = exposer.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(t.Context(), getCachePVCName(ownerObject), metav1.GetOptions{})
+			if test.expectCachePVC {
+				require.NoError(t, err)
+			} else {
+				require.True(t, apierrors.IsNotFound(err))
+			}
 		})
 	}
 }
@@ -549,6 +645,7 @@ func Test_ReastoreDiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-restore",
+			UID:       "fake-pod-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: restore.APIVersion,
@@ -574,6 +671,7 @@ func Test_ReastoreDiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-restore",
+			UID:       "fake-pod-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: restore.APIVersion,
@@ -602,6 +700,7 @@ func Test_ReastoreDiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-restore",
+			UID:       "fake-pvc-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: restore.APIVersion,
@@ -620,6 +719,7 @@ func Test_ReastoreDiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-restore",
+			UID:       "fake-pvc-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: restore.APIVersion,
@@ -640,6 +740,38 @@ func Test_ReastoreDiagnoseExpose(t *testing.T) {
 	restorePV := corev1api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "fake-pv",
+		},
+		Status: corev1api.PersistentVolumeStatus{
+			Phase:   corev1api.VolumePending,
+			Message: "fake-pv-message",
+		},
+	}
+
+	cachePVCWithVolumeName := corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-restore-cache",
+			UID:       "fake-cache-pvc-uid",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: restore.APIVersion,
+					Kind:       restore.Kind,
+					Name:       restore.Name,
+					UID:        restore.UID,
+				},
+			},
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeName: "fake-pv-cache",
+		},
+		Status: corev1api.PersistentVolumeClaimStatus{
+			Phase: corev1api.ClaimPending,
+		},
+	}
+
+	cachePV := corev1api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-pv-cache",
 		},
 		Status: corev1api.PersistentVolumeStatus{
 			Phase:   corev1api.VolumePending,
@@ -757,6 +889,98 @@ end diagnose restore exposer`,
 Pod velero/fake-restore, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to fake-pv
+PV fake-pv, phase Pending, reason , message fake-pv-message
+end diagnose restore exposer`,
+		},
+		{
+			name:         "cache pvc with volume name, no pv",
+			ownerRestore: restore,
+			kubeClientObj: []runtime.Object{
+				&restorePodWithNodeName,
+				&restorePVCWithVolumeName,
+				&cachePVCWithVolumeName,
+				&nodeAgentPod,
+			},
+			expected: `begin diagnose restore exposer
+Pod velero/fake-restore, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+PVC velero/fake-restore, phase Pending, binding to fake-pv
+error getting restore pv fake-pv, err: persistentvolumes "fake-pv" not found
+PVC velero/fake-restore-cache, phase Pending, binding to fake-pv-cache
+error getting cache pv fake-pv-cache, err: persistentvolumes "fake-pv-cache" not found
+end diagnose restore exposer`,
+		},
+		{
+			name:         "cache pvc with volume name, pv exists",
+			ownerRestore: restore,
+			kubeClientObj: []runtime.Object{
+				&restorePodWithNodeName,
+				&restorePVCWithVolumeName,
+				&cachePVCWithVolumeName,
+				&restorePV,
+				&cachePV,
+				&nodeAgentPod,
+			},
+			expected: `begin diagnose restore exposer
+Pod velero/fake-restore, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+PVC velero/fake-restore, phase Pending, binding to fake-pv
+PV fake-pv, phase Pending, reason , message fake-pv-message
+PVC velero/fake-restore-cache, phase Pending, binding to fake-pv-cache
+PV fake-pv-cache, phase Pending, reason , message fake-pv-message
+end diagnose restore exposer`,
+		},
+		{
+			name:         "with events",
+			ownerRestore: restore,
+			kubeClientObj: []runtime.Object{
+				&restorePodWithNodeName,
+				&restorePVCWithVolumeName,
+				&restorePV,
+				&nodeAgentPod,
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: velerov1.DefaultNamespace, Name: "event-1"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-uid-1"},
+					Reason:         "reason-1",
+					Message:        "message-1",
+				},
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: velerov1.DefaultNamespace, Name: "event-2"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Reason:         "reason-2",
+					Message:        "message-2",
+				},
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: velerov1.DefaultNamespace, Name: "event-3"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pvc-uid"},
+					Reason:         "reason-3",
+					Message:        "message-3",
+				},
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: "other-namespace", Name: "event-4"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Reason:         "reason-4",
+					Message:        "message-4",
+				},
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: velerov1.DefaultNamespace, Name: "event-5"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Reason:         "reason-5",
+					Message:        "message-5",
+				},
+			},
+			expected: `begin diagnose restore exposer
+Pod velero/fake-restore, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+Pod event reason reason-2, message message-2
+Pod event reason reason-5, message message-5
+PVC velero/fake-restore, phase Pending, binding to fake-pv
+PVC event reason reason-3, message message-3
 PV fake-pv, phase Pending, reason , message fake-pv-message
 end diagnose restore exposer`,
 		},
@@ -915,6 +1139,7 @@ func TestCreateRestorePod(t *testing.T) {
 				test.nodeOS,
 				test.affinity,
 				"", // priority class name
+				nil,
 			)
 
 			require.NoError(t, err)

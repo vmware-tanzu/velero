@@ -1,0 +1,1 @@
+don't copy securitycontext from first container if configmap found

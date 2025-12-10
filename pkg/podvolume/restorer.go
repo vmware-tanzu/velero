@@ -92,9 +92,15 @@ func newRestorer(
 
 	_, _ = pvrInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: func(_, obj any) {
-				pvr := obj.(*velerov1api.PodVolumeRestore)
+			UpdateFunc: func(oldObj, newObj any) {
+				pvr := newObj.(*velerov1api.PodVolumeRestore)
+				pvrOld := oldObj.(*velerov1api.PodVolumeRestore)
+
 				if pvr.GetLabels()[velerov1api.RestoreUIDLabel] != string(restore.UID) {
+					return
+				}
+
+				if pvr.Status.Phase == pvrOld.Status.Phase {
 					return
 				}
 
@@ -179,7 +185,7 @@ func (r *restorer) RestorePodVolumes(data RestoreData, tracker *volume.RestoreVo
 			}
 		}
 
-		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, repoIdentifier, backupInfo.uploaderType, data.SourceNamespace, pvc)
+		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, backupInfo.snapshotSize, repoIdentifier, backupInfo.uploaderType, data.SourceNamespace, pvc)
 		if err := veleroclient.CreateRetryGenerateName(r.crClient, r.ctx, volumeRestore); err != nil {
 			errs = append(errs, errors.WithStack(err))
 			continue
@@ -252,7 +258,7 @@ ForEachVolume:
 	return errs
 }
 
-func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backupLocation, volume, snapshot, repoIdentifier, uploaderType, sourceNamespace string, pvc *corev1api.PersistentVolumeClaim) *velerov1api.PodVolumeRestore {
+func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backupLocation, volume, snapshot string, size int64, repoIdentifier, uploaderType, sourceNamespace string, pvc *corev1api.PersistentVolumeClaim) *velerov1api.PodVolumeRestore {
 	pvr := &velerov1api.PodVolumeRestore{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    restore.Namespace,
@@ -281,6 +287,7 @@ func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backu
 			},
 			Volume:                volume,
 			SnapshotID:            snapshot,
+			SnapshotSize:          size,
 			BackupStorageLocation: backupLocation,
 			RepoIdentifier:        repoIdentifier,
 			UploaderType:          uploaderType,

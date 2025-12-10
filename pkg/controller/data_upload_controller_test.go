@@ -850,11 +850,20 @@ func TestOnDataUploadCompleted(t *testing.T) {
 	// Add the DataUpload object to the fake client
 	require.NoError(t, r.client.Create(ctx, du))
 	r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
-	r.OnDataUploadCompleted(ctx, namespace, duName, datapath.Result{})
+	r.OnDataUploadCompleted(ctx, namespace, duName, datapath.Result{
+		Backup: datapath.BackupResult{
+			SnapshotID: "fake-id",
+			Source: datapath.AccessPoint{
+				ByPath: "fake-path",
+			},
+		},
+	})
 	updatedDu := &velerov2alpha1api.DataUpload{}
 	require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 	assert.Equal(t, velerov2alpha1api.DataUploadPhaseCompleted, updatedDu.Status.Phase)
 	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
+	assert.Equal(t, "fake-id", updatedDu.Status.SnapshotID)
+	assert.Equal(t, "fake-path", updatedDu.Status.Path)
 }
 
 func TestFindDataUploadForPod(t *testing.T) {

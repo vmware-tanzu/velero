@@ -22,7 +22,8 @@ func TestPkgImportNoCloudProvider(t *testing.T) {
 	t.Logf("Current test file path: %s", filename)
 	t.Logf("Current test directory: %s", filepath.Dir(filename)) // should be this package name
 	// go list -f {{.Deps}} ./<path-to-this-package-dir>
-	cmd := exec.Command(
+	cmd := exec.CommandContext(
+		t.Context(),
 		"go",
 		"list",
 		"-f",

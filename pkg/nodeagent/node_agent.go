@@ -143,6 +143,10 @@ func GetConfigs(ctx context.Context, namespace string, kubeClient kubernetes.Int
 		return nil, errors.Errorf("data is not available in config map %s", configName)
 	}
 
+	if len(cm.Data) > 1 {
+		return nil, errors.Errorf("more than one keys are found in ConfigMap %s's data. only expect one", configName)
+	}
+
 	jsonString := ""
 	for _, v := range cm.Data {
 		jsonString = v

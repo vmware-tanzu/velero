@@ -268,11 +268,19 @@ func ToSystemAffinity(loadAffinities []*LoadAffinity) *corev1api.Affinity {
 	return nil
 }
 
-func DiagnosePod(pod *corev1api.Pod) string {
+func DiagnosePod(pod *corev1api.Pod, events *corev1api.EventList) string {
 	diag := fmt.Sprintf("Pod %s/%s, phase %s, node name %s\n", pod.Namespace, pod.Name, pod.Status.Phase, pod.Spec.NodeName)
 
 	for _, condition := range pod.Status.Conditions {
 		diag += fmt.Sprintf("Pod condition %s, status %s, reason %s, message %s\n", condition.Type, condition.Status, condition.Reason, condition.Message)
+	}
+
+	if events != nil {
+		for _, e := range events.Items {
+			if e.InvolvedObject.UID == pod.UID && e.Type == corev1api.EventTypeWarning {
+				diag += fmt.Sprintf("Pod event reason %s, message %s\n", e.Reason, e.Message)
+			}
+		}
 	}
 
 	return diag

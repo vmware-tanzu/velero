@@ -60,6 +60,10 @@ func TestDaemonSet(t *testing.T) {
 	assert.Len(t, ds.Spec.Template.Spec.Containers[0].Args, 3)
 	assert.Equal(t, "--node-agent-configmap=node-agent-config-map", ds.Spec.Template.Spec.Containers[0].Args[2])
 
+	ds = DaemonSet("velero", WithBackupRepoConfigMap("backup-repo-config-map"))
+	assert.Len(t, ds.Spec.Template.Spec.Containers[0].Args, 3)
+	assert.Equal(t, "--backup-repository-configmap=backup-repo-config-map", ds.Spec.Template.Spec.Containers[0].Args[2])
+
 	ds = DaemonSet("velero", WithServiceAccountName("test-sa"))
 	assert.Equal(t, "test-sa", ds.Spec.Template.Spec.ServiceAccountName)
 

@@ -30,10 +30,11 @@ type Result struct {
 
 // BackupResult represents the result of a backup
 type BackupResult struct {
-	SnapshotID    string      `json:"snapshotID"`
-	EmptySnapshot bool        `json:"emptySnapshot"`
-	Source        AccessPoint `json:"source,omitempty"`
-	TotalBytes    int64       `json:"totalBytes,omitempty"`
+	SnapshotID       string      `json:"snapshotID"`
+	EmptySnapshot    bool        `json:"emptySnapshot"`
+	Source           AccessPoint `json:"source,omitempty"`
+	TotalBytes       int64       `json:"totalBytes,omitempty"`
+	IncrementalBytes int64       `json:"incrementalBytes,omitempty"`
 }
 
 // RestoreResult represents the result of a restore

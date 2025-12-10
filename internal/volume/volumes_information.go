@@ -170,6 +170,9 @@ type SnapshotDataMovementInfo struct {
 	// Moved snapshot data size.
 	Size int64 `json:"size"`
 
+	// Moved snapshot incremental size.
+	IncrementalSize int64 `json:"incrementalSize,omitempty"`
+
 	// The DataUpload's Status.Phase value
 	Phase velerov2alpha1.DataUploadPhase
 }
@@ -217,6 +220,9 @@ type PodVolumeInfo struct {
 	// The snapshot corresponding volume size.
 	Size int64 `json:"size,omitempty"`
 
+	// The incremental snapshot size.
+	IncrementalSize int64 `json:"incrementalSize,omitempty"`
+
 	// The type of the uploader that uploads the data. The valid values are `kopia` and `restic`.
 	UploaderType string `json:"uploaderType"`
 
@@ -240,14 +246,15 @@ type PodVolumeInfo struct {
 
 func newPodVolumeInfoFromPVB(pvb *velerov1api.PodVolumeBackup) *PodVolumeInfo {
 	return &PodVolumeInfo{
-		SnapshotHandle: pvb.Status.SnapshotID,
-		Size:           pvb.Status.Progress.TotalBytes,
-		UploaderType:   pvb.Spec.UploaderType,
-		VolumeName:     pvb.Spec.Volume,
-		PodName:        pvb.Spec.Pod.Name,
-		PodNamespace:   pvb.Spec.Pod.Namespace,
-		NodeName:       pvb.Spec.Node,
-		Phase:          pvb.Status.Phase,
+		SnapshotHandle:  pvb.Status.SnapshotID,
+		Size:            pvb.Status.Progress.TotalBytes,
+		IncrementalSize: pvb.Status.IncrementalBytes,
+		UploaderType:    pvb.Spec.UploaderType,
+		VolumeName:      pvb.Spec.Volume,
+		PodName:         pvb.Spec.Pod.Name,
+		PodNamespace:    pvb.Spec.Pod.Namespace,
+		NodeName:        pvb.Spec.Node,
+		Phase:           pvb.Status.Phase,
 	}
 }
 

@@ -57,34 +57,34 @@ func TestGetVolumesRepositoryType(t *testing.T) {
 		{
 			name: "empty repository type, first one",
 			volumes: map[string]volumeBackupInfo{
-				"volume1": {"fake-snapshot-id-1", "fake-uploader-1", ""},
-				"volume2": {"", "", "fake-type"},
+				"volume1": {"fake-snapshot-id-1", 0, "fake-uploader-1", ""},
+				"volume2": {"", 0, "", "fake-type"},
 			},
 			expectedErr: "empty repository type found among volume snapshots, snapshot ID fake-snapshot-id-1, uploader fake-uploader-1",
 		},
 		{
 			name: "empty repository type, last one",
 			volumes: map[string]volumeBackupInfo{
-				"volume1": {"", "", "fake-type"},
-				"volume2": {"", "", "fake-type"},
-				"volume3": {"fake-snapshot-id-3", "fake-uploader-3", ""},
+				"volume1": {"", 0, "", "fake-type"},
+				"volume2": {"", 0, "", "fake-type"},
+				"volume3": {"fake-snapshot-id-3", 0, "fake-uploader-3", ""},
 			},
 			expectedErr: "empty repository type found among volume snapshots, snapshot ID fake-snapshot-id-3, uploader fake-uploader-3",
 		},
 		{
 			name: "empty repository type, middle one",
 			volumes: map[string]volumeBackupInfo{
-				"volume1": {"", "", "fake-type"},
-				"volume2": {"fake-snapshot-id-2", "fake-uploader-2", ""},
-				"volume3": {"", "", "fake-type"},
+				"volume1": {"", 0, "", "fake-type"},
+				"volume2": {"fake-snapshot-id-2", 0, "fake-uploader-2", ""},
+				"volume3": {"", 0, "", "fake-type"},
 			},
 			expectedErr: "empty repository type found among volume snapshots, snapshot ID fake-snapshot-id-2, uploader fake-uploader-2",
 		},
 		{
 			name: "mismatch repository type",
 			volumes: map[string]volumeBackupInfo{
-				"volume1": {"", "", "fake-type1"},
-				"volume2": {"fake-snapshot-id-2", "fake-uploader-2", "fake-type2"},
+				"volume1": {"", 0, "", "fake-type1"},
+				"volume2": {"fake-snapshot-id-2", 0, "fake-uploader-2", "fake-type2"},
 			},
 			prefixOnly:  true,
 			expectedErr: "multiple repository type in one backup",
@@ -92,9 +92,9 @@ func TestGetVolumesRepositoryType(t *testing.T) {
 		{
 			name: "success",
 			volumes: map[string]volumeBackupInfo{
-				"volume1": {"", "", "fake-type"},
-				"volume2": {"", "", "fake-type"},
-				"volume3": {"", "", "fake-type"},
+				"volume1": {"", 0, "", "fake-type"},
+				"volume2": {"", 0, "", "fake-type"},
+				"volume3": {"", 0, "", "fake-type"},
 			},
 			expected: "fake-type",
 		},

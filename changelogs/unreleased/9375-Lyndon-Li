@@ -1,0 +1,1 @@
+Fix issue #9365, prevent fake completion notification due to multiple update of single PVR

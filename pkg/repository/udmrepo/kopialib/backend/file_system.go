@@ -18,6 +18,7 @@ package backend
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 
 	"github.com/sirupsen/logrus"
@@ -62,6 +63,13 @@ func (c *FsBackend) Connect(ctx context.Context, isCreate bool, logger logrus.Fi
 	if !filepath.IsAbs(c.options.Path) {
 		return nil, errors.Errorf("filesystem repository path is not absolute, path: %s", c.options.Path)
 	}
+
+	if !isCreate {
+		if _, err := os.Stat(c.options.Path); err != nil {
+			return nil, ErrStoreNotExist
+		}
+	}
+
 	ctx = logging.WithLogger(ctx, logger)
 
 	return filesystem.New(ctx, &c.options, isCreate)

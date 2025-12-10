@@ -60,7 +60,19 @@ type Manager interface {
 	BatchForget(context.Context, *velerov1api.BackupRepository, []string) []error
 
 	// DefaultMaintenanceFrequency returns the default maintenance frequency from the specific repo
-	DefaultMaintenanceFrequency(repo *velerov1api.BackupRepository) (time.Duration, error)
+	DefaultMaintenanceFrequency(*velerov1api.BackupRepository) (time.Duration, error)
+
+	// ClientSideCacheLimit returns the max cache size required on client side
+	ClientSideCacheLimit(*velerov1api.BackupRepository) (int64, error)
+}
+
+// ConfigProvider defines the methods to get configurations of a backup repository
+type ConfigManager interface {
+	// DefaultMaintenanceFrequency returns the default maintenance frequency from the specific repo
+	DefaultMaintenanceFrequency(string) (time.Duration, error)
+
+	// ClientSideCacheLimit returns the max cache size required on client side
+	ClientSideCacheLimit(string, map[string]string) (int64, error)
 }
 
 type manager struct {
@@ -72,6 +84,11 @@ type manager struct {
 	repoLocker *repository.RepoLocker
 	fileSystem filesystem.Interface
 	log        logrus.FieldLogger
+}
+
+type configManager struct {
+	providers map[string]provider.ConfigProvider
+	log       logrus.FieldLogger
 }
 
 // NewManager create a new repository manager.
@@ -97,6 +114,20 @@ func NewManager(
 		FromFile:   credentialFileStore,
 		FromSecret: credentialSecretStore,
 	}, velerov1api.BackupRepositoryTypeKopia, mgr.log)
+
+	return mgr
+}
+
+// NewConfigManager create a new repository config manager.
+func NewConfigManager(
+	log logrus.FieldLogger,
+) ConfigManager {
+	mgr := &configManager{
+		providers: map[string]provider.ConfigProvider{},
+		log:       log,
+	}
+
+	mgr.providers[velerov1api.BackupRepositoryTypeKopia] = provider.NewUnifiedRepoConfigProvider(velerov1api.BackupRepositoryTypeKopia, mgr.log)
 
 	return mgr
 }
@@ -227,12 +258,16 @@ func (m *manager) DefaultMaintenanceFrequency(repo *velerov1api.BackupRepository
 		return 0, errors.WithStack(err)
 	}
 
-	param, err := m.assembleRepoParam(repo)
+	return prd.DefaultMaintenanceFrequency(), nil
+}
+
+func (m *manager) ClientSideCacheLimit(repo *velerov1api.BackupRepository) (int64, error) {
+	prd, err := m.getRepositoryProvider(repo)
 	if err != nil {
 		return 0, errors.WithStack(err)
 	}
 
-	return prd.DefaultMaintenanceFrequency(context.Background(), param), nil
+	return prd.ClientSideCacheLimit(repo.Spec.RepositoryConfig), nil
 }
 
 func (m *manager) getRepositoryProvider(repo *velerov1api.BackupRepository) (provider.Provider, error) {
@@ -255,4 +290,31 @@ func (m *manager) assembleRepoParam(repo *velerov1api.BackupRepository) (provide
 		BackupLocation: bsl,
 		BackupRepo:     repo,
 	}, nil
+}
+
+func (cm *configManager) DefaultMaintenanceFrequency(repoType string) (time.Duration, error) {
+	prd, err := cm.getRepositoryProvider(repoType)
+	if err != nil {
+		return 0, errors.WithStack(err)
+	}
+
+	return prd.DefaultMaintenanceFrequency(), nil
+}
+
+func (cm *configManager) ClientSideCacheLimit(repoType string, repoOption map[string]string) (int64, error) {
+	prd, err := cm.getRepositoryProvider(repoType)
+	if err != nil {
+		return 0, errors.WithStack(err)
+	}
+
+	return prd.ClientSideCacheLimit(repoOption), nil
+}
+
+func (cm *configManager) getRepositoryProvider(repoType string) (provider.ConfigProvider, error) {
+	switch repoType {
+	case velerov1api.BackupRepositoryTypeKopia:
+		return cm.providers[velerov1api.BackupRepositoryTypeKopia], nil
+	default:
+		return nil, fmt.Errorf("failed to get provider for repository %s", repoType)
+	}
 }

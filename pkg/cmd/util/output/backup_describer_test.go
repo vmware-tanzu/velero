@@ -597,11 +597,12 @@ func TestCSISnapshots(t *testing.T) {
 					Result:            volume.VolumeResultFailed,
 					SnapshotDataMoved: true,
 					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
-						UploaderType:   "fake-uploader",
-						SnapshotHandle: "fake-repo-id-5",
-						OperationID:    "fake-operation-5",
-						Size:           100,
-						Phase:          velerov2alpha1.DataUploadPhaseFailed,
+						UploaderType:    "fake-uploader",
+						SnapshotHandle:  "fake-repo-id-5",
+						OperationID:     "fake-operation-5",
+						Size:            100,
+						IncrementalSize: 50,
+						Phase:           velerov2alpha1.DataUploadPhaseFailed,
 					},
 				},
 			},
@@ -613,6 +614,7 @@ func TestCSISnapshots(t *testing.T) {
         Data Mover: velero
         Uploader Type: fake-uploader
         Moved data Size (bytes): 100
+        Incremental data Size (bytes): 50
         Result: failed
 `,
 		},

@@ -26,9 +26,10 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"

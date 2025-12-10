@@ -69,6 +69,7 @@ type itemBackupper struct {
 	kbClient                 kbClient.Client
 	discoveryHelper          discovery.Helper
 	podVolumeBackupper       podvolume.Backupper
+	podVolumeContext         context.Context
 	podVolumeSnapshotTracker *podvolume.Tracker
 	kubernetesBackupper      *kubernetesBackupper
 	volumeSnapshotterCache   *VolumeSnapshotterCache

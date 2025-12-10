@@ -99,7 +99,7 @@ func TestSetCommand_Execute(t *testing.T) {
 		return
 	}
 
-	cmd := exec.Command(os.Args[0], []string{"-test.run=TestSetCommand_Execute"}...)
+	cmd := exec.CommandContext(t.Context(), os.Args[0], []string{"-test.run=TestSetCommand_Execute"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
 	_, stderr, err := veleroexec.RunCommand(cmd)
 

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +41,7 @@ var (
 		{Name: "Created"},
 		{Name: "Expires"},
 		{Name: "Storage Location"},
+		{Name: "Queue Position"},
 		{Name: "Selector"},
 	}
 )
@@ -108,6 +110,7 @@ func printBackup(backup *velerov1api.Backup) []metav1.TableRow {
 		backup.Status.StartTimestamp,
 		humanReadableTimeFromNow(expiration),
 		backup.Spec.StorageLocation,
+		queuePosition(backup.Status.QueuePosition),
 		metav1.FormatLabelSelector(backup.Spec.LabelSelector),
 	)
 
@@ -125,5 +128,13 @@ func humanReadableTimeFromNow(when time.Time) string {
 		return duration.ShortHumanDuration(when.Sub(now))
 	default:
 		return fmt.Sprintf("%s ago", duration.ShortHumanDuration(now.Sub(when)))
+	}
+}
+
+func queuePosition(pos int) string {
+	if pos == 0 {
+		return ""
+	} else {
+		return strconv.Itoa(pos)
 	}
 }

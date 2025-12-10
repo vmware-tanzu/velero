@@ -617,7 +617,7 @@ func initPodVolumeRestoreReconcilerWithError(objects []runtime.Object, cliObj []
 
 	dataPathMgr := datapath.NewManager(1)
 
-	return NewPodVolumeRestoreReconciler(fakeClient, nil, fakeKubeClient, dataPathMgr, nil, "test-node", time.Minute*5, time.Minute, corev1api.ResourceRequirements{}, velerotest.NewLogger(), ""), nil
+	return NewPodVolumeRestoreReconciler(fakeClient, nil, fakeKubeClient, dataPathMgr, nil, "test-node", time.Minute*5, time.Minute, nil, nil, corev1api.ResourceRequirements{}, velerotest.NewLogger(), "", false, nil), nil
 }
 
 func TestPodVolumeRestoreReconcile(t *testing.T) {

@@ -90,6 +90,10 @@ func (r *resticRepositoryProvider) BatchForget(ctx context.Context, snapshotIDs 
 	return errs
 }
 
-func (r *resticRepositoryProvider) DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration {
+func (r *resticRepositoryProvider) DefaultMaintenanceFrequency() time.Duration {
 	return r.svc.DefaultMaintenanceFrequency()
+}
+
+func (r *resticRepositoryProvider) ClientSideCacheLimit(repoOption map[string]string) int64 {
+	return 0
 }

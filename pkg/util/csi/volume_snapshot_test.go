@@ -1699,6 +1699,7 @@ func TestDiagnoseVS(t *testing.T) {
 	testCases := []struct {
 		name     string
 		vs       *snapshotv1api.VolumeSnapshot
+		events   *corev1api.EventList
 		expected string
 	}{
 		{
@@ -1781,11 +1782,81 @@ func TestDiagnoseVS(t *testing.T) {
 			},
 			expected: "VS fake-ns/fake-vs, bind to fake-vsc, readyToUse true, errMessage fake-message\n",
 		},
+		{
+			name: "VS with VSC and empty event",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-vs",
+					Namespace: "fake-ns",
+				},
+				Status: &snapshotv1api.VolumeSnapshotStatus{
+					BoundVolumeSnapshotContentName: &vscName,
+					ReadyToUse:                     &readyToUse,
+					Error:                          &snapshotv1api.VolumeSnapshotError{},
+				},
+			},
+			events:   &corev1api.EventList{},
+			expected: "VS fake-ns/fake-vs, bind to fake-vsc, readyToUse true, errMessage \n",
+		},
+		{
+			name: "VS with VSC and events",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-vs",
+					Namespace: "fake-ns",
+					UID:       "fake-vs-uid",
+				},
+				Status: &snapshotv1api.VolumeSnapshotStatus{
+					BoundVolumeSnapshotContentName: &vscName,
+					ReadyToUse:                     &readyToUse,
+					Error:                          &snapshotv1api.VolumeSnapshotError{},
+				},
+			},
+			events: &corev1api.EventList{Items: []corev1api.Event{
+				{
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-uid-1"},
+					Type:           corev1api.EventTypeWarning,
+					Reason:         "reason-1",
+					Message:        "message-1",
+				},
+				{
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-uid-2"},
+					Type:           corev1api.EventTypeWarning,
+					Reason:         "reason-2",
+					Message:        "message-2",
+				},
+				{
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-vs-uid"},
+					Type:           corev1api.EventTypeWarning,
+					Reason:         "reason-3",
+					Message:        "message-3",
+				},
+				{
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-vs-uid"},
+					Type:           corev1api.EventTypeNormal,
+					Reason:         "reason-4",
+					Message:        "message-4",
+				},
+				{
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-vs-uid"},
+					Type:           corev1api.EventTypeNormal,
+					Reason:         "reason-5",
+					Message:        "message-5",
+				},
+				{
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-vs-uid"},
+					Type:           corev1api.EventTypeWarning,
+					Reason:         "reason-6",
+					Message:        "message-6",
+				},
+			}},
+			expected: "VS fake-ns/fake-vs, bind to fake-vsc, readyToUse true, errMessage \nVS event reason reason-3, message message-3\nVS event reason reason-6, message message-6\n",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			diag := DiagnoseVS(tc.vs)
+			diag := DiagnoseVS(tc.vs, tc.events)
 			assert.Equal(t, tc.expected, diag)
 		})
 	}

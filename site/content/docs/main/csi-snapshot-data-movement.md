@@ -116,10 +116,15 @@ velero backup create NAME --snapshot-move-data --data-mover DATA-MOVER-NAME OPTI
 When the backup starts, you will see the `VolumeSnapshot` and `VolumeSnapshotContent` objects created, but after the backup finishes, the objects will disappear.  
 After snapshots are created, you will see one or more `DataUpload` CRs created.  
 You may also see some intermediate objects (i.e., pods, PVCs, PVs) created in Velero namespace or the cluster scope, they are to help data movers to move data. And they will be removed after the backup completes.  
-The phase of a `DataUpload` CR changes several times during the backup process and finally goes to one of the terminal status, `Completed`, `Failed` or `Cancelled`. You can see the phase changes as well as the data upload progress by watching the `DataUpload` CRs:  
+The phase of a `DataUpload` CR changes several times during the backup process and finally goes to one of the terminal status, `Completed`, `Failed` or `Cancelled`. You can see the phase changes as well as the data upload progress by watching the `DataUpload` CRs. While the `DataUpload` is being processed, progress is shown with `BYTES DONE` representing the amount of volume data that has been processed so far and `TOTAL BYTES` representing the estimated total volume data. Upon completion, these two numbers will be the same. In addition, once the `DataUpload` is done, `INCREMENTAL BYTES` will be filled in with the amount of data which is new or changed since the last backup of this volume. Note that the actual uploaded content may be smaller than `INCREMENTAL BYTES` due to kopia deduplication, compression, etc.  
 
 ```bash
 kubectl -n velero get datauploads -l velero.io/backup-name=YOUR_BACKUP_NAME -w
+```
+
+By default, `INCREMENTAL BYTES` is not displayed in the `kubectl get` output. To see this extended field, the `-o wide` arg is needed:
+```bash
+kubectl -n velero get datauploads -o wide -l velero.io/backup-name=YOUR_BACKUP_NAME -w
 ```
 
 When the backup completes, you can view information about the backups:
@@ -308,6 +313,12 @@ kubectl -n velero get datauploads -l velero.io/backup-name=YOUR_BACKUP_NAME -w
 kubectl -n velero get datadownloads -l velero.io/restore-name=YOUR_RESTORE_NAME -w
 ```
 
+For each volume, the parallelism is like below:  
+- If it is a file system mode volume, files in the volume are processed in parallel. You can use `--parallel-files-upload` backup flag or `--parallel-files-download` restore flag to control how many files are processed in parallel. Otherwise, if they are not set, Velero by default refers to the number of CPU cores in the node (where the backup/restore is running) for the parallelism. That is to say, the parallelism is not affected by the CPU request/limit set to the data mover pods.  
+- If it is a block mode volume, there is no parallelism, the block data is processed sequentially.  
+
+Notice that Golang 1.25 and later respects the CPU limit set to the pods to decide the physical threads provisioned to the pod processes (see [Container-aware GOMAXPROCS][22] for more details), so for Velero 1.18 (which consumes Golang 1.25) and later, if you set a CPU limit to the data mover pods, you may not get the expected performance (e.g., backup/restore throughput) with the default parallelism. The outcome may or may not be obvious varying on your volume data. If it is required, you could customize `--parallel-files-upload` or `--parallel-files-download` according to the CPU limit set to the data mover pods.  
+
 ### Restart and resume
 When Velero server is restarted, if the resource backup/restore has completed, so the backup/restore has excceded `InProgress` status and is waiting for the completion of the data movements, Velero will recapture the status of the running data movements and resume the execution.  
 When node-agent is restarted, Velero tries to recapture the status of the running data movements and resume the execution; if the resume fails, the data movements are canceled.  
@@ -371,7 +382,10 @@ For Velero built-in data mover, Velero uses [BestEffort as the QoS][13] for data
 If you want to constraint the CPU/memory usage, you need to [Customize Data Mover Pod Resource Limits][11]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][12] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.  
 
 During the restore, the repository may also cache data/metadata so as to reduce the network footprint and speed up the restore. The repository uses its own policy to store and clean up the cache.  
-For Kopia repository, the cache is stored in the data mover pod's root file system. Velero allows you to configure a limit of the cache size so that the data mover pod won't be evicted due to running out of the ephemeral storage. For more details, check [Backup Repository Configuration][17]. 
+For Kopia repository, by default, the cache is stored in the data mover pod's root file system. If your root file system space is limited, the data mover pods may be evicted due to running out of the ephemeral storage, which causes the restore fails. To cope with this problem, Velero allows you:
+- configure a limit of the cache size per backup repository, for more details, check [Backup Repository Configuration][17].  
+- configure a dedicated volume for cache data, for more details, check [Data Movement Cache Volume][21].  
+
 
 ### Node Selection
 
@@ -411,4 +425,7 @@ Sometimes, `RestorePVC` needs to be configured to increase the performance of re
 [18]: https://github.com/vmware-tanzu/velero/pull/7576
 [19]: data-movement-restore-pvc-configuration.md
 [20]: node-agent-prepare-queue-length.md
+[21]: data-movement-cache-volume.md
+[22]: https://tip.golang.org/doc/go1.25#container-aware-gomaxprocs:~:text=Runtime%C2%B6-,Container%2Daware%20GOMAXPROCS,-%C2%B6
+
 

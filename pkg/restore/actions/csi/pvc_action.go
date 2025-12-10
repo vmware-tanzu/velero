@@ -431,6 +431,7 @@ func newDataDownload(
 			BackupStorageLocation: dataUploadResult.BackupStorageLocation,
 			DataMover:             dataUploadResult.DataMover,
 			SnapshotID:            dataUploadResult.SnapshotID,
+			SnapshotSize:          dataUploadResult.SnapshotSize,
 			SourceNamespace:       dataUploadResult.SourceNamespace,
 			OperationTimeout:      backup.Spec.CSISnapshotTimeout,
 			NodeOS:                dataUploadResult.NodeOS,

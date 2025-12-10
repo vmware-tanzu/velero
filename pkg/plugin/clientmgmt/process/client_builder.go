@@ -18,6 +18,7 @@ limitations under the License.
 package process
 
 import (
+	"context"
 	"os"
 	"os/exec"
 
@@ -78,7 +79,7 @@ func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 			string(common.PluginKindItemBlockAction):     ibav1.NewItemBlockActionPlugin(common.ClientLogger(b.clientLogger)),
 		},
 		Logger: b.pluginLogger,
-		Cmd:    exec.Command(b.commandName, b.commandArgs...), //nolint:gosec // Internal call. No need to check the command line.
+		Cmd:    exec.CommandContext(context.Background(), b.commandName, b.commandArgs...), //nolint:gosec // Internal call. No need to check the command line.
 	}
 }
 

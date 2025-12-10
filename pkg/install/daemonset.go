@@ -57,6 +57,10 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 		daemonSetArgs = append(daemonSetArgs, fmt.Sprintf("--node-agent-configmap=%s", c.nodeAgentConfigMap))
 	}
 
+	if len(c.backupRepoConfigMap) > 0 {
+		daemonSetArgs = append(daemonSetArgs, fmt.Sprintf("--backup-repository-configmap=%s", c.backupRepoConfigMap))
+	}
+
 	userID := int64(0)
 	mountPropagationMode := corev1api.MountPropagationHostToContainer
 

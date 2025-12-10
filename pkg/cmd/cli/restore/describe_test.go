@@ -63,7 +63,7 @@ func TestNewDescribeCommand(t *testing.T) {
 	if os.Getenv(cmdtest.CaptureFlag) == "1" {
 		return
 	}
-	cmd := exec.Command(os.Args[0], []string{"-test.run=TestNewDescribeCommand"}...)
+	cmd := exec.CommandContext(t.Context(), os.Args[0], []string{"-test.run=TestNewDescribeCommand"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
 	stdout, _, err := veleroexec.RunCommand(cmd)
 

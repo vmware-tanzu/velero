@@ -23,8 +23,9 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"

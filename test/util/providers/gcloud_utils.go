@@ -23,9 +23,10 @@ import (
 	"os"
 	"strings"
 
+	"context"
+
 	"cloud.google.com/go/storage"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/iterator"

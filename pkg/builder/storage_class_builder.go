@@ -17,6 +17,7 @@ limitations under the License.
 package builder
 
 import (
+	corev1api "k8s.io/api/core/v1"
 	storagev1api "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -85,5 +86,11 @@ func (b *StorageClassBuilder) SliceResult() []*storagev1api.StorageClass {
 // Provisioner sets StorageClass's provisioner.
 func (b *StorageClassBuilder) Provisioner(provisioner string) *StorageClassBuilder {
 	b.object.Provisioner = provisioner
+	return b
+}
+
+// ReclaimPolicy sets StorageClass's reclaimPolicy.
+func (b *StorageClassBuilder) ReclaimPolicy(policy corev1api.PersistentVolumeReclaimPolicy) *StorageClassBuilder {
+	b.object.ReclaimPolicy = &policy
 	return b
 }

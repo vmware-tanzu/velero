@@ -185,8 +185,8 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 			securityContextSet = true
 		}
 	}
-	// if first container in pod has a SecurityContext set, then copy this security context
-	if len(pod.Spec.Containers) != 0 && pod.Spec.Containers[0].SecurityContext != nil {
+	// if securityContext configmap is unavailable but first container in pod has a SecurityContext set, then copy this security context
+	if !securityContextSet && len(pod.Spec.Containers) != 0 && pod.Spec.Containers[0].SecurityContext != nil {
 		securityContext = *pod.Spec.Containers[0].SecurityContext.DeepCopy()
 		securityContextSet = true
 	}

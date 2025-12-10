@@ -58,6 +58,10 @@ type PodVolumeRestoreSpec struct {
 	// Cancel indicates request to cancel the ongoing PodVolumeRestore. It can be set
 	// when the PodVolumeRestore is in InProgress phase
 	Cancel bool `json:"cancel,omitempty"`
+
+	// SnapshotSize is the logical size in Bytes of the snapshot.
+	// +optional
+	SnapshotSize int64 `json:"snapshotSize,omitempty"`
 }
 
 // PodVolumeRestorePhase represents the lifecycle phase of a PodVolumeRestore.

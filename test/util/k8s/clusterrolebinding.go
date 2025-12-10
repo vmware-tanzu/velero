@@ -21,7 +21,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"golang.org/x/net/context"
+	"context"
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )

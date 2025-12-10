@@ -155,6 +155,10 @@ type DataUploadStatus struct {
 	// +optional
 	Progress shared.DataMoveOperationProgress `json:"progress,omitempty"`
 
+	// IncrementalBytes holds the number of bytes new or changed since the last backup
+	// +optional
+	IncrementalBytes int64 `json:"incrementalBytes,omitempty"`
+
 	// Node is name of the node where the DataUpload is processed.
 	// +optional
 	Node string `json:"node,omitempty"`
@@ -185,6 +189,7 @@ type DataUploadStatus struct {
 // +kubebuilder:printcolumn:name="Started",type="date",JSONPath=".status.startTimestamp",description="Time duration since this DataUpload was started"
 // +kubebuilder:printcolumn:name="Bytes Done",type="integer",format="int64",JSONPath=".status.progress.bytesDone",description="Completed bytes"
 // +kubebuilder:printcolumn:name="Total Bytes",type="integer",format="int64",JSONPath=".status.progress.totalBytes",description="Total bytes"
+// +kubebuilder:printcolumn:name="Incremental Bytes",type="integer",format="int64",JSONPath=".status.incrementalBytes",description="Incremental bytes",priority=10
 // +kubebuilder:printcolumn:name="Storage Location",type="string",JSONPath=".spec.backupStorageLocation",description="Name of the Backup Storage Location where this backup should be stored"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Time duration since this DataUpload was created"
 // +kubebuilder:printcolumn:name="Node",type="string",JSONPath=".status.node",description="Name of the node where the DataUpload is processed"
@@ -244,4 +249,8 @@ type DataUploadResult struct {
 	// NodeOS is OS of the node where the DataUpload is processed.
 	// +optional
 	NodeOS NodeOS `json:"nodeOS,omitempty"`
+
+	// SnapshotSize is the logical size in Bytes of the snapshot.
+	// +optional
+	SnapshotSize int64 `json:"snapshotSize,omitempty"`
 }

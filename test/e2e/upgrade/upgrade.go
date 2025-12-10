@@ -115,7 +115,10 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				//Download velero CLI if it's empty according to velero CLI version
 				By(fmt.Sprintf("Install the expected old version Velero CLI (%s) for installing Velero",
 					veleroCLI2Version.VeleroVersion), func() {
-					veleroCLI2Version.VeleroCLI, err = InstallVeleroCLI(veleroCLI2Version.VeleroVersion)
+					veleroCLI2Version.VeleroCLI, err = InstallVeleroCLI(
+						oneHourTimeout,
+						veleroCLI2Version.VeleroVersion,
+					)
 					Expect(err).To(Succeed())
 				})
 			}
