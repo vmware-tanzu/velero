@@ -493,6 +493,7 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 		du.Status.Path = result.Backup.Source.ByPath
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseCompleted
 		du.Status.SnapshotID = result.Backup.SnapshotID
+		du.Status.IncrementalBytes = result.Backup.IncrementalBytes
 		du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if result.Backup.EmptySnapshot {
 			du.Status.Message = "volume was empty so no data was upload"
@@ -916,6 +917,13 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			return nil, errors.Wrapf(err, "failed to get PVC %s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC)
 		}
 
+		pv := &corev1api.PersistentVolume{}
+		if err := r.client.Get(context.Background(), types.NamespacedName{
+			Name: pvc.Spec.VolumeName,
+		}, pv); err != nil {
+			return nil, errors.Wrapf(err, "failed to get source PV %s", pvc.Spec.VolumeName)
+		}
+
 		nodeOS := kube.GetPVCAttachingNodeOS(pvc, r.kubeClient.CoreV1(), r.kubeClient.StorageV1(), log)
 
 		if err := kube.HasNodeWithOS(context.Background(), nodeOS, r.kubeClient.CoreV1()); err != nil {
@@ -963,6 +971,8 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 		return &exposer.CSISnapshotExposeParam{
 			SnapshotName:          du.Spec.CSISnapshot.VolumeSnapshot,
 			SourceNamespace:       du.Spec.SourceNamespace,
+			SourcePVCName:         pvc.Name,
+			SourcePVName:          pv.Name,
 			StorageClass:          du.Spec.CSISnapshot.StorageClass,
 			HostingPodLabels:      hostingPodLabels,
 			HostingPodAnnotations: hostingPodAnnotation,

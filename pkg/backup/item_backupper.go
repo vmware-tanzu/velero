@@ -69,14 +69,13 @@ type itemBackupper struct {
 	kbClient                 kbClient.Client
 	discoveryHelper          discovery.Helper
 	podVolumeBackupper       podvolume.Backupper
+	podVolumeContext         context.Context
 	podVolumeSnapshotTracker *podvolume.Tracker
-	volumeSnapshotterGetter  VolumeSnapshotterGetter
 	kubernetesBackupper      *kubernetesBackupper
-
-	itemHookHandler                    hook.ItemHookHandler
-	snapshotLocationVolumeSnapshotters map[string]vsv1.VolumeSnapshotter
-	hookTracker                        *hook.HookTracker
-	volumeHelperImpl                   volumehelper.VolumeHelper
+	volumeSnapshotterCache   *VolumeSnapshotterCache
+	itemHookHandler          hook.ItemHookHandler
+	hookTracker              *hook.HookTracker
+	volumeHelperImpl         volumehelper.VolumeHelper
 }
 
 type FileForArchive struct {
@@ -502,30 +501,6 @@ func (ib *itemBackupper) executeActions(
 	return obj, itemFiles, nil
 }
 
-// volumeSnapshotter instantiates and initializes a VolumeSnapshotter given a VolumeSnapshotLocation,
-// or returns an existing one if one's already been initialized for the location.
-func (ib *itemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeSnapshotLocation) (vsv1.VolumeSnapshotter, error) {
-	if bs, ok := ib.snapshotLocationVolumeSnapshotters[snapshotLocation.Name]; ok {
-		return bs, nil
-	}
-
-	bs, err := ib.volumeSnapshotterGetter.GetVolumeSnapshotter(snapshotLocation.Spec.Provider)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := bs.Init(snapshotLocation.Spec.Config); err != nil {
-		return nil, err
-	}
-
-	if ib.snapshotLocationVolumeSnapshotters == nil {
-		ib.snapshotLocationVolumeSnapshotters = make(map[string]vsv1.VolumeSnapshotter)
-	}
-	ib.snapshotLocationVolumeSnapshotters[snapshotLocation.Name] = bs
-
-	return bs, nil
-}
-
 // zoneLabelDeprecated is the label that stores availability-zone info
 // on PVs this is deprecated on Kubernetes >= 1.17.0
 // zoneLabel is the label that stores availability-zone info
@@ -641,7 +616,7 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	for _, snapshotLocation := range ib.backupRequest.SnapshotLocations {
 		log := log.WithField("volumeSnapshotLocation", snapshotLocation.Name)
 
-		bs, err := ib.volumeSnapshotter(snapshotLocation)
+		bs, err := ib.volumeSnapshotterCache.SetNX(snapshotLocation)
 		if err != nil {
 			log.WithError(err).Error("Error getting volume snapshotter for volume snapshot location")
 			continue
@@ -699,7 +674,7 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 		snapshot.Status.Phase = volume.SnapshotPhaseCompleted
 		snapshot.Status.ProviderSnapshotID = snapshotID
 	}
-	ib.backupRequest.VolumeSnapshots = append(ib.backupRequest.VolumeSnapshots, snapshot)
+	ib.backupRequest.VolumeSnapshots.Add(snapshot)
 
 	// nil errors are automatically removed
 	return kubeerrs.NewAggregate(errs)

@@ -89,6 +89,7 @@ type Options struct {
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
+	ConcurrentBackups               int
 	NodeAgentDisableHostPath        bool
 	kubeletRootDir                  string
 	ServerPriorityClassName         string
@@ -195,6 +196,12 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		"item-block-worker-count",
 		o.ItemBlockWorkerCount,
 		"Number of worker threads to process ItemBlocks. Default is one. Optional.",
+	)
+	flags.IntVar(
+		&o.ConcurrentBackups,
+		"concurrent-backups",
+		o.ConcurrentBackups,
+		"Number of backups to process concurrently. Default is one. Optional.",
 	)
 	flags.StringVar(
 		&o.ServerPriorityClassName,
@@ -313,6 +320,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		RepoMaintenanceJobConfigMap:     o.RepoMaintenanceJobConfigMap,
 		NodeAgentConfigMap:              o.NodeAgentConfigMap,
 		ItemBlockWorkerCount:            o.ItemBlockWorkerCount,
+		ConcurrentBackups:               o.ConcurrentBackups,
 		KubeletRootDir:                  o.kubeletRootDir,
 		NodeAgentDisableHostPath:        o.NodeAgentDisableHostPath,
 		ServerPriorityClassName:         o.ServerPriorityClassName,
@@ -545,24 +553,22 @@ func (o *Options) Validate(c *cobra.Command, args []string, f client.Factory) er
 		return fmt.Errorf("fail to create go-client %w", err)
 	}
 
-	// If either Linux or Windows node-agent is installed, and the node-agent-configmap
-	// is specified, need to validate the ConfigMap.
-	if (o.UseNodeAgent || o.UseNodeAgentWindows) && len(o.NodeAgentConfigMap) > 0 {
+	if len(o.NodeAgentConfigMap) > 0 {
 		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.NodeAgentConfigMap, &velerotypes.NodeAgentConfigs{}); err != nil {
-			return fmt.Errorf("--node-agent-configmap specified ConfigMap %s is invalid", o.NodeAgentConfigMap)
+			return fmt.Errorf("--node-agent-configmap specified ConfigMap %s is invalid: %w", o.NodeAgentConfigMap, err)
 		}
 	}
 
 	if len(o.RepoMaintenanceJobConfigMap) > 0 {
 		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.RepoMaintenanceJobConfigMap, &velerotypes.JobConfigs{}); err != nil {
-			return fmt.Errorf("--repo-maintenance-job-configmap specified ConfigMap %s is invalid", o.RepoMaintenanceJobConfigMap)
+			return fmt.Errorf("--repo-maintenance-job-configmap specified ConfigMap %s is invalid: %w", o.RepoMaintenanceJobConfigMap, err)
 		}
 	}
 
 	if len(o.BackupRepoConfigMap) > 0 {
 		config := make(map[string]any)
 		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.BackupRepoConfigMap, &config); err != nil {
-			return fmt.Errorf("--backup-repository-configmap specified ConfigMap %s is invalid", o.BackupRepoConfigMap)
+			return fmt.Errorf("--backup-repository-configmap specified ConfigMap %s is invalid: %w", o.BackupRepoConfigMap, err)
 		}
 	}
 

@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -32,6 +34,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/repository/maintenance"
 	repomaintenance "github.com/vmware-tanzu/velero/pkg/repository/maintenance"
@@ -64,6 +67,7 @@ func mockBackupRepoReconciler(t *testing.T, mockOn string, arg any, ret ...any) 
 		"fake-repo-config",
 		"",
 		logrus.InfoLevel,
+		nil,
 		nil,
 	)
 }
@@ -584,6 +588,7 @@ func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
 				"",
 				logrus.InfoLevel,
 				nil,
+				nil,
 			)
 
 			freq := reconciler.getRepositoryMaintenanceFrequency(test.repo)
@@ -715,6 +720,7 @@ func TestNeedInvalidBackupRepo(t *testing.T) {
 				"",
 				"",
 				logrus.InfoLevel,
+				nil,
 				nil,
 			)
 
@@ -1047,7 +1053,7 @@ func TestRecallMaintenance(t *testing.T) {
 		{
 			name:          "wait completion error",
 			runtimeScheme: schemeFail,
-			expectedErr:   "error waiting incomplete repo maintenance job for repo repo: error listing maintenance job for repo repo: no kind is registered for the type v1.JobList in scheme \"pkg/runtime/scheme.go:100\"",
+			expectedErr:   "error waiting incomplete repo maintenance job for repo repo: error listing maintenance job for repo repo: no kind is registered for the type v1.JobList in scheme",
 		},
 		{
 			name:          "no consolidate result",
@@ -1105,7 +1111,7 @@ func TestRecallMaintenance(t *testing.T) {
 
 			err := r.recallMaintenance(t.Context(), backupRepo, velerotest.NewLogger())
 			if test.expectedErr != "" {
-				assert.EqualError(t, err, test.expectedErr)
+				assert.ErrorContains(t, err, test.expectedErr)
 			} else {
 				assert.NoError(t, err)
 
@@ -1581,6 +1587,7 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 				repoMaintenanceConfigName,
 				logrus.InfoLevel,
 				nil,
+				nil,
 			)
 
 			_, err := reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: "repo"}})
@@ -1638,6 +1645,7 @@ func TestInitializeRepoWithRepositoryTypes(t *testing.T) {
 			"",
 			logrus.InfoLevel,
 			nil,
+			nil,
 		)
 
 		err := reconciler.initializeRepo(t.Context(), rr, location, reconciler.logger)
@@ -1689,6 +1697,7 @@ func TestInitializeRepoWithRepositoryTypes(t *testing.T) {
 			"",
 			logrus.InfoLevel,
 			nil,
+			nil,
 		)
 
 		err := reconciler.initializeRepo(t.Context(), rr, location, reconciler.logger)
@@ -1739,6 +1748,7 @@ func TestInitializeRepoWithRepositoryTypes(t *testing.T) {
 			"",
 			logrus.InfoLevel,
 			nil,
+			nil,
 		)
 
 		err := reconciler.initializeRepo(t.Context(), rr, location, reconciler.logger)
@@ -1749,4 +1759,190 @@ func TestInitializeRepoWithRepositoryTypes(t *testing.T) {
 		assert.Contains(t, rr.Spec.ResticIdentifier, "volume-ns-1")
 		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 	})
+}
+
+func TestRepoMaintenanceMetricsRecording(t *testing.T) {
+	now := time.Now().Round(time.Second)
+
+	tests := []struct {
+		name           string
+		repo           *velerov1api.BackupRepository
+		startJobFunc   func(client.Client, context.Context, *velerov1api.BackupRepository, string, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error)
+		waitJobFunc    func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error)
+		expectSuccess  bool
+		expectFailure  bool
+		expectDuration bool
+	}{
+		{
+			name: "metrics recorded on successful maintenance",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "test-repo-success",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					LastMaintenanceTime: &metav1.Time{Time: now.Add(-2 * time.Hour)},
+				},
+			},
+			startJobFunc:   startMaintenanceJobSucceed,
+			waitJobFunc:    waitMaintenanceJobCompleteFunc(now, velerov1api.BackupRepositoryMaintenanceSucceeded, ""),
+			expectSuccess:  true,
+			expectFailure:  false,
+			expectDuration: true,
+		},
+		{
+			name: "metrics recorded on failed maintenance",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "test-repo-failure",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					LastMaintenanceTime: &metav1.Time{Time: now.Add(-2 * time.Hour)},
+				},
+			},
+			startJobFunc: startMaintenanceJobSucceed,
+			waitJobFunc: func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
+				return velerov1api.BackupRepositoryMaintenanceStatus{
+					StartTimestamp:    &metav1.Time{Time: now},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Minute)}, // Job ran for 1 minute then failed
+					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					Message:           "test error",
+				}, nil
+			},
+			expectSuccess:  false,
+			expectFailure:  true,
+			expectDuration: true,
+		},
+		{
+			name: "metrics recorded on job start failure",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "test-repo-start-fail",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					LastMaintenanceTime: &metav1.Time{Time: now.Add(-2 * time.Hour)},
+				},
+			},
+			startJobFunc:   startMaintenanceJobFail,
+			expectSuccess:  false,
+			expectFailure:  true,
+			expectDuration: false, // No duration when job fails to start
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create metrics instance
+			m := metrics.NewServerMetrics()
+
+			// Create reconciler with metrics
+			reconciler := mockBackupRepoReconciler(t, "", test.repo, nil)
+			reconciler.metrics = m
+			reconciler.clock = &fakeClock{now}
+
+			err := reconciler.Client.Create(t.Context(), test.repo)
+			require.NoError(t, err)
+
+			// Set up job functions
+			funcStartMaintenanceJob = test.startJobFunc
+			funcWaitMaintenanceJobComplete = test.waitJobFunc
+
+			// Run maintenance
+			_ = reconciler.runMaintenanceIfDue(t.Context(), test.repo, velerotest.NewLogger())
+
+			// Verify metrics were recorded
+			successCount := getMaintenanceMetricValue(t, m, "repo_maintenance_success_total", test.repo.Name)
+			failureCount := getMaintenanceMetricValue(t, m, "repo_maintenance_failure_total", test.repo.Name)
+			durationCount := getMaintenanceDurationCount(t, m, test.repo.Name)
+
+			if test.expectSuccess {
+				assert.Equal(t, float64(1), successCount, "Success metric should be recorded")
+			} else {
+				assert.Equal(t, float64(0), successCount, "Success metric should not be recorded")
+			}
+
+			if test.expectFailure {
+				assert.Equal(t, float64(1), failureCount, "Failure metric should be recorded")
+			} else {
+				assert.Equal(t, float64(0), failureCount, "Failure metric should not be recorded")
+			}
+
+			if test.expectDuration {
+				assert.Equal(t, uint64(1), durationCount, "Duration metric should be recorded")
+			} else {
+				assert.Equal(t, uint64(0), durationCount, "Duration metric should not be recorded")
+			}
+		})
+	}
+}
+
+// Helper to get maintenance metric value from ServerMetrics
+func getMaintenanceMetricValue(t *testing.T, m *metrics.ServerMetrics, metricName, repoName string) float64 {
+	t.Helper()
+
+	metricMap := m.Metrics()
+	collector, ok := metricMap[metricName]
+	if !ok {
+		return 0
+	}
+
+	ch := make(chan prometheus.Metric, 1)
+	collector.Collect(ch)
+	close(ch)
+
+	for metric := range ch {
+		dto := &dto.Metric{}
+		err := metric.Write(dto)
+		require.NoError(t, err)
+
+		for _, label := range dto.Label {
+			if *label.Name == "repository_name" && *label.Value == repoName {
+				if dto.Counter != nil {
+					return *dto.Counter.Value
+				}
+			}
+		}
+	}
+	return 0
+}
+
+// Helper to get maintenance duration histogram count
+func getMaintenanceDurationCount(t *testing.T, m *metrics.ServerMetrics, repoName string) uint64 {
+	t.Helper()
+
+	metricMap := m.Metrics()
+	collector, ok := metricMap["repo_maintenance_duration_seconds"]
+	if !ok {
+		return 0
+	}
+
+	ch := make(chan prometheus.Metric, 1)
+	collector.Collect(ch)
+	close(ch)
+
+	for metric := range ch {
+		dto := &dto.Metric{}
+		err := metric.Write(dto)
+		require.NoError(t, err)
+
+		for _, label := range dto.Label {
+			if *label.Name == "repository_name" && *label.Value == repoName {
+				if dto.Histogram != nil {
+					return *dto.Histogram.SampleCount
+				}
+			}
+		}
+	}
+	return 0
 }

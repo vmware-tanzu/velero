@@ -95,7 +95,11 @@ func (b *fakeBackupper) FinalizeBackup(
 }
 
 func defaultBackup() *builder.BackupBuilder {
-	return builder.ForBackup(velerov1api.DefaultNamespace, "backup-1")
+	return builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").Phase(velerov1api.BackupPhaseReadyToStart)
+}
+
+func namedBackup(name string) *builder.BackupBuilder {
+	return builder.ForBackup(velerov1api.DefaultNamespace, name).Phase(velerov1api.BackupPhaseReadyToStart)
 }
 
 func TestProcessBackupNonProcessedItems(t *testing.T) {
@@ -104,6 +108,16 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 		key    string
 		backup *velerov1api.Backup
 	}{
+		{
+			name:   "New backup is not processed",
+			key:    "velero/backup-1",
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).Result(),
+		},
+		{
+			name:   "Queued backup is not processed",
+			key:    "velero/backup-1",
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseQueued).Result(),
+		},
 		{
 			name:   "FailedValidation backup is not processed",
 			key:    "velero/backup-1",
@@ -135,9 +149,7 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 				kbClient:   velerotest.NewFakeControllerRuntimeClient(t),
 				formatFlag: formatFlag,
 				logger:     logger,
-				workerPool: pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
-			defer c.workerPool.Stop()
 			if test.backup != nil {
 				require.NoError(t, c.kbClient.Create(t.Context(), test.backup))
 			}
@@ -234,9 +246,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				clock:                 &clock.RealClock{},
 				formatFlag:            formatFlag,
 				metrics:               metrics.NewServerMetrics(),
-				workerPool:            pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
-			defer c.workerPool.Stop()
 
 			require.NotNil(t, test.backup)
 			require.NoError(t, c.kbClient.Create(t.Context(), test.backup))
@@ -299,11 +309,10 @@ func TestBackupLocationLabel(t *testing.T) {
 				defaultBackupLocation: test.backupLocation.Name,
 				clock:                 &clock.RealClock{},
 				formatFlag:            formatFlag,
-				workerPool:            pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
-			defer c.workerPool.Stop()
 
-			res := c.prepareBackupRequest(test.backup, logger)
+			res := c.prepareBackupRequest(ctx, test.backup, logger)
+			defer res.WorkerPool.Stop()
 			assert.NotNil(t, res)
 			assert.Equal(t, test.expectedBackupLocation, res.Labels[velerov1api.StorageLocationLabel])
 		})
@@ -331,7 +340,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 	}{
 		{
 			name:                             "BackupLocation is specified in backup CR'spec and it can be found in ApiServer",
-			backup:                           builder.ForBackup("velero", "backup-1").Result(),
+			backup:                           defaultBackup().Result(),
 			backupLocationNameInBackup:       "test-backup-location",
 			backupLocationInAPIServer:        builder.ForBackupStorageLocation("velero", "test-backup-location").Result(),
 			defaultBackupLocationInAPIServer: builder.ForBackupStorageLocation("velero", "default-location").Result(),
@@ -340,7 +349,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 		},
 		{
 			name:                             "BackupLocation is specified in backup CR'spec and it can't be found in ApiServer",
-			backup:                           builder.ForBackup("velero", "backup-1").Result(),
+			backup:                           defaultBackup().Result(),
 			backupLocationNameInBackup:       "test-backup-location",
 			backupLocationInAPIServer:        nil,
 			defaultBackupLocationInAPIServer: nil,
@@ -349,7 +358,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 		},
 		{
 			name:                             "Using default BackupLocation and it can be found in ApiServer",
-			backup:                           builder.ForBackup("velero", "backup-1").Result(),
+			backup:                           defaultBackup().Result(),
 			backupLocationNameInBackup:       "",
 			backupLocationInAPIServer:        builder.ForBackupStorageLocation("velero", "test-backup-location").Result(),
 			defaultBackupLocationInAPIServer: builder.ForBackupStorageLocation("velero", "default-location").Result(),
@@ -358,7 +367,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 		},
 		{
 			name:                             "Using default BackupLocation and it can't be found in ApiServer",
-			backup:                           builder.ForBackup("velero", "backup-1").Result(),
+			backup:                           defaultBackup().Result(),
 			backupLocationNameInBackup:       "",
 			backupLocationInAPIServer:        nil,
 			defaultBackupLocationInAPIServer: nil,
@@ -396,14 +405,13 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 				defaultBackupTTL:      defaultBackupTTL.Duration,
 				clock:                 testclocks.NewFakeClock(now),
 				formatFlag:            formatFlag,
-				workerPool:            pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
-			defer c.workerPool.Stop()
 
 			test.backup.Spec.StorageLocation = test.backupLocationNameInBackup
 
 			// Run
-			res := c.prepareBackupRequest(test.backup, logger)
+			res := c.prepareBackupRequest(ctx, test.backup, logger)
+			defer res.WorkerPool.Stop()
 
 			// Assert
 			if test.expectedSuccess {
@@ -472,11 +480,10 @@ func TestDefaultBackupTTL(t *testing.T) {
 				defaultBackupTTL: defaultBackupTTL.Duration,
 				clock:            testclocks.NewFakeClock(now),
 				formatFlag:       formatFlag,
-				workerPool:       pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
-			defer c.workerPool.Stop()
 
-			res := c.prepareBackupRequest(test.backup, logger)
+			res := c.prepareBackupRequest(ctx, test.backup, logger)
+			defer res.WorkerPool.Stop()
 			assert.NotNil(t, res)
 			assert.Equal(t, test.expectedTTL, res.Spec.TTL)
 			assert.Equal(t, test.expectedExpiration, *res.Status.Expiration)
@@ -497,7 +504,7 @@ func TestPrepareBackupRequest_SetsVGSLabelKey(t *testing.T) {
 	}{
 		{
 			name: "backup with spec label key set",
-			backup: builder.ForBackup("velero", "backup-1").
+			backup: defaultBackup().
 				VolumeGroupSnapshotLabelKey("spec-key").
 				Result(),
 			serverFlagKey:    "server-key",
@@ -505,13 +512,13 @@ func TestPrepareBackupRequest_SetsVGSLabelKey(t *testing.T) {
 		},
 		{
 			name:             "backup with no spec key, uses server flag",
-			backup:           builder.ForBackup("velero", "backup-2").Result(),
+			backup:           namedBackup("backup-2").Result(),
 			serverFlagKey:    "server-key",
 			expectedLabelKey: "server-key",
 		},
 		{
 			name:             "backup with no spec or server flag, uses default",
-			backup:           builder.ForBackup("velero", "backup-3").Result(),
+			backup:           namedBackup("backup-3").Result(),
 			serverFlagKey:    velerov1api.DefaultVGSLabelKey,
 			expectedLabelKey: velerov1api.DefaultVGSLabelKey,
 		},
@@ -533,11 +540,10 @@ func TestPrepareBackupRequest_SetsVGSLabelKey(t *testing.T) {
 				defaultVGSLabelKey: test.serverFlagKey,
 				discoveryHelper:    discoveryHelper,
 				clock:              testclocks.NewFakeClock(now),
-				workerPool:         pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
-			defer c.workerPool.Stop()
 
-			res := c.prepareBackupRequest(test.backup, logger)
+			res := c.prepareBackupRequest(ctx, test.backup, logger)
+			defer res.WorkerPool.Stop()
 			assert.NotNil(t, res)
 
 			assert.Equal(t, test.expectedLabelKey, res.Spec.VolumeGroupSnapshotLabelKey)
@@ -635,11 +641,10 @@ func TestDefaultVolumesToResticDeprecation(t *testing.T) {
 				clock:                    &clock.RealClock{},
 				formatFlag:               formatFlag,
 				defaultVolumesToFsBackup: test.globalVal,
-				workerPool:               pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
-			defer c.workerPool.Stop()
 
-			res := c.prepareBackupRequest(test.backup, logger)
+			res := c.prepareBackupRequest(ctx, test.backup, logger)
+			defer res.WorkerPool.Stop()
 			assert.NotNil(t, res)
 			assert.NotNil(t, res.Spec.DefaultVolumesToFsBackup)
 			if test.expectRemap {
@@ -1390,7 +1395,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		},
 		{
 			name: "backup with namespace-scoped and cluster-scoped resource filters",
-			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").
+			backup: defaultBackup().
 				ExcludedClusterScopedResources("clusterroles").
 				IncludedClusterScopedResources("storageclasses").
 				ExcludedNamespaceScopedResources("secrets").
@@ -1439,7 +1444,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		},
 		{
 			name: "backup's include filter overlap with default exclude resources",
-			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").
+			backup: defaultBackup().
 				ExcludedClusterScopedResources("clusterroles").
 				IncludedClusterScopedResources("storageclasses", "volumesnapshotcontents.snapshot.storage.k8s.io").
 				ExcludedNamespaceScopedResources("secrets").
@@ -1555,9 +1560,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				backupper:                backupper,
 				formatFlag:               formatFlag,
 				globalCRClient:           fakeGlobalClient,
-				workerPool:               pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
-			defer c.workerPool.Stop()
 
 			pluginManager.On("GetBackupItemActionsV2").Return(nil, nil)
 			pluginManager.On("GetItemBlockActions").Return(nil, nil)
@@ -1763,9 +1766,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 				logger:                   logger,
 				defaultSnapshotLocations: test.defaultLocations,
 				kbClient:                 velerotest.NewFakeControllerRuntimeClient(t),
-				workerPool:               pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
-			defer c.workerPool.Stop()
 
 			// set up a Backup object to represent what we expect to be passed to backupper.Backup()
 			backup := test.backup.DeepCopy()

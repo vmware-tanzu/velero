@@ -229,7 +229,7 @@ func (c *scheduleReconciler) checkIfBackupInNewOrProgress(schedule *velerov1.Sch
 	}
 
 	for _, backup := range backupList.Items {
-		if backup.Status.Phase == velerov1.BackupPhaseNew || backup.Status.Phase == velerov1.BackupPhaseInProgress {
+		if backup.Status.Phase == "" || backup.Status.Phase == velerov1.BackupPhaseNew || backup.Status.Phase == velerov1.BackupPhaseInProgress {
 			log.Debugf("%s/%s still has backups that are in InProgress or New...", schedule.Namespace, schedule.Name)
 			return true
 		}

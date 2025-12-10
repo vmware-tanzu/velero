@@ -58,6 +58,10 @@ type DataDownloadSpec struct {
 	// NodeOS is OS of the node where the DataDownload is processed.
 	// +optional
 	NodeOS NodeOS `json:"nodeOS,omitempty"`
+
+	// SnapshotSize is the logical size in Bytes of the snapshot.
+	// +optional
+	SnapshotSize int64 `json:"snapshotSize,omitempty"`
 }
 
 // TargetVolumeSpec is the specification for a target PVC.

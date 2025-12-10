@@ -915,12 +915,12 @@ func CheckVeleroVersion(ctx context.Context, veleroCLI string, expectedVer strin
 	return nil
 }
 
-func InstallVeleroCLI(version string) (string, error) {
+func InstallVeleroCLI(ctx context.Context, version string) (string, error) {
 	var tempVeleroCliDir string
 	name := "velero-" + version + "-" + runtime.GOOS + "-" + runtime.GOARCH
 	postfix := ".tar.gz"
 	tarball := name + postfix
-	err := wait.PollImmediate(time.Second*5, time.Minute*5, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, time.Second*5, time.Minute*5, true, func(ctx context.Context) (bool, error) {
 		tempFile, err := getVeleroCliTarball("https://github.com/vmware-tanzu/velero/releases/download/" + version + "/" + tarball)
 		if err != nil {
 			return false, errors.WithMessagef(err, "failed to get Velero CLI tarball")
@@ -930,7 +930,7 @@ func InstallVeleroCLI(version string) (string, error) {
 			return false, errors.WithMessagef(err, "failed to create temp dir for tarball extraction")
 		}
 
-		cmd := exec.Command("tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir)
+		cmd := exec.CommandContext(ctx, "tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir)
 		defer os.Remove(tempFile.Name())
 
 		if _, err := cmd.Output(); err != nil {

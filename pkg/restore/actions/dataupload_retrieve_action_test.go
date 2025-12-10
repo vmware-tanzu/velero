@@ -58,13 +58,13 @@ func TestDataUploadRetrieveActionExectue(t *testing.T) {
 		},
 		{
 			name:          "DataUploadRetrieve Action test",
-			dataUpload:    builder.ForDataUpload("velero", "testDU").SourceNamespace("testNamespace").SourcePVC("testPVC").Result(),
+			dataUpload:    builder.ForDataUpload("velero", "testDU").SourceNamespace("testNamespace").SourcePVC("testPVC").SnapshotID("fake-id").TotalBytes(1000).Result(),
 			restore:       builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("testingUID")).Backup("testBackup").Result(),
 			runtimeScheme: scheme,
 			veleroObjs: []runtime.Object{
 				builder.ForBackup("velero", "testBackup").StorageLocation("testLocation").Result(),
 			},
-			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "testNamespace.testPVC", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"testLocation","sourceNamespace":"testNamespace"}`).Result(),
+			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "testNamespace.testPVC", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"testLocation","snapshotID":"fake-id","sourceNamespace":"testNamespace","snapshotSize":1000}`).Result(),
 		},
 		{
 			name:          "Long source namespace and PVC name should also work",

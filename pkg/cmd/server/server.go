@@ -581,6 +581,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		constant.ControllerSchedule:            {},
 		constant.ControllerServerStatusRequest: {},
 		constant.ControllerRestoreFinalizer:    {},
+		constant.ControllerBackupQueue:         {},
 	}
 
 	if s.config.RestoreOnly {
@@ -668,6 +669,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.MaxConcurrentK8SConnections,
 			s.config.DefaultSnapshotMoveData,
 			s.config.ItemBlockWorkerCount,
+			s.config.ConcurrentBackups,
 			s.crClient,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackup)
@@ -756,6 +758,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.RepoMaintenanceJobConfig,
 			s.logLevel,
 			s.config.LogFormat,
+			s.metrics,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupRepo)
 		}
@@ -906,6 +909,18 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.ResourceTimeout,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerRestoreFinalizer)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[constant.ControllerBackupQueue]; ok {
+		if err := controller.NewBackupQueueReconciler(
+			s.mgr.GetClient(),
+			s.mgr.GetScheme(),
+			s.logger,
+			s.config.ConcurrentBackups,
+			backupTracker,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupQueue)
 		}
 	}
 

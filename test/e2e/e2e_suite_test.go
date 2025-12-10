@@ -441,12 +441,6 @@ var _ = Describe(
 )
 
 var _ = Describe(
-	"Node selectors of persistent volume claims can be changed during restores",
-	Label("Basic", "SelectedNode", "SKIP_KIND"),
-	PVCSelectedNodeChangingTest,
-)
-
-var _ = Describe(
 	"Backup/restore of 2500 namespaces",
 	Label("Scale", "LongTime"),
 	MultiNSBackupRestore,

@@ -1,0 +1,33 @@
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "The target branch's ref"
+        required: true
+        type: string
+    outputs:
+      version: 
+        description: "The expected Go version"
+        value: ${{ jobs.extract.outputs.version }}
+
+jobs:
+  extract:
+      runs-on: ubuntu-latest
+      outputs:
+        version: ${{ steps.pick-version.outputs.version }}
+      steps:
+        - name: Check out the code
+          uses: actions/checkout@v6
+
+        - id: pick-version
+          run: |
+            if [ "${{ inputs.ref }}" == "main" ]; then
+              version=$(grep '^go ' go.mod | awk '{print $2}' | cut -d. -f1-2)
+            else
+              goDirectiveVersion=$(grep '^go ' go.mod | awk '{print $2}')
+              toolChainVersion=$(grep '^toolchain ' go.mod | awk '{print $2}')
+              version=$(printf "%s\n%s\n" "$goDirectiveVersion" "$toolChainVersion" | sort -V | tail -n1)
+            fi
+
+            echo "version=$version"
+            echo "version=$version" >> $GITHUB_OUTPUT

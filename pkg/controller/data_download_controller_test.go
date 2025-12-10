@@ -129,7 +129,7 @@ func initDataDownloadReconcilerWithError(t *testing.T, objects []any, needError 
 
 	dataPathMgr := datapath.NewManager(1)
 
-	return NewDataDownloadReconciler(&fakeClient, nil, fakeKubeClient, dataPathMgr, nil, nil, velerotypes.RestorePVC{}, corev1api.ResourceRequirements{}, "test-node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics(), ""), nil
+	return NewDataDownloadReconciler(&fakeClient, nil, fakeKubeClient, dataPathMgr, nil, nil, velerotypes.RestorePVC{}, nil, nil, corev1api.ResourceRequirements{}, "test-node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics(), "", nil), nil
 }
 
 func TestDataDownloadReconcile(t *testing.T) {
