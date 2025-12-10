@@ -315,6 +315,14 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, nil
 		}
 
+		// Check if we can accept a new task BEFORE doing expensive GetExposed operation
+		// This prevents race condition where multiple tasks waste time on GetExposed
+		// when the concurrent limit is already reached
+		if !r.dataPathMgr.CanAcceptNewTask(false) {
+			log.Debug("Data path concurrent limit reached, requeue later")
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
+		}
+
 		result, err := r.restoreExposer.GetExposed(ctx, getDataDownloadOwnerObject(dd), r.client, r.nodeName, dd.Spec.OperationTimeout.Duration)
 		if err != nil {
 			return r.errorOut(ctx, dd, err, "restore exposer is not ready", log)

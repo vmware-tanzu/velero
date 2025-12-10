@@ -269,6 +269,14 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, nil
 		}
 
+		// Check if we can accept a new task BEFORE doing expensive GetExposed operation
+		// This prevents race condition where multiple tasks waste time on GetExposed
+		// when the concurrent limit is already reached
+		if !r.dataPathMgr.CanAcceptNewTask(false) {
+			log.Debug("Data path concurrent limit reached, requeue later")
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
+		}
+
 		res, err := r.exposer.GetExposed(ctx, getPVBOwnerObject(pvb), r.client, r.nodeName, r.resourceTimeout)
 		if err != nil {
 			return r.errorOut(ctx, pvb, err, "exposed PVB is not ready", log)

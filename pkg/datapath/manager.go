@@ -95,3 +95,16 @@ func (m *Manager) GetAsyncBR(jobName string) AsyncBR {
 		return nil
 	}
 }
+
+// CanAcceptNewTask checks if a new task can be accepted based on the concurrent limit.
+// This is a lightweight check that doesn't create any resources.
+func (m *Manager) CanAcceptNewTask(resume bool) bool {
+	m.trackerLock.Lock()
+	defer m.trackerLock.Unlock()
+
+	if resume {
+		return true
+	}
+
+	return len(m.tracker) < m.cocurrentNum
+}

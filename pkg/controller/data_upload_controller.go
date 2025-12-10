@@ -319,6 +319,15 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			log.Info("Cancellable data path is already started")
 			return ctrl.Result{}, nil
 		}
+
+		// Check if we can accept a new task BEFORE doing expensive GetExposed operation
+		// This prevents race condition where multiple tasks waste time on GetExposed
+		// when the concurrent limit is already reached
+		if !r.dataPathMgr.CanAcceptNewTask(false) {
+			log.Debug("Data path concurrent limit reached, requeue later")
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
+		}
+
 		waitExposePara := r.setupWaitExposePara(du)
 		res, err := ep.GetExposed(ctx, getOwnerObject(du), du.Spec.OperationTimeout.Duration, waitExposePara)
 		if err != nil {
