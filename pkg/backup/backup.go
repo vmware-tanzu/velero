@@ -413,8 +413,11 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	// This avoids O(N*M) complexity when there are many PVCs and pods.
 	// See issue #9179 for details.
 	pvcPodCache := podvolumeutil.NewPVCPodCache()
-	namespaces := backupRequest.NamespaceIncludesExcludes.GetIncludes()
-	if len(namespaces) > 0 {
+	namespaces, err := backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList()
+	if err != nil {
+		log.WithError(err).Warn("Failed to resolve namespace list for PVC-to-Pod cache, falling back to direct lookups")
+		pvcPodCache = nil
+	} else if len(namespaces) > 0 {
 		if err := pvcPodCache.BuildCacheForNamespaces(context.Background(), namespaces, kb.kbClient); err != nil {
 			// Log warning but continue - the cache will fall back to direct lookups
 			log.WithError(err).Warn("Failed to build PVC-to-Pod cache, falling back to direct lookups")
