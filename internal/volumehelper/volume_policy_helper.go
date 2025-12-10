@@ -46,15 +46,15 @@ func NewVolumeHelperImpl(
 	defaultVolumesToFSBackup bool,
 	backupExcludePVC bool,
 ) VolumeHelper {
-	return &volumeHelperImpl{
-		volumePolicy:             volumePolicy,
-		snapshotVolumes:          snapshotVolumes,
-		logger:                   logger,
-		client:                   client,
-		defaultVolumesToFSBackup: defaultVolumesToFSBackup,
-		backupExcludePVC:         backupExcludePVC,
-		pvcPodCache:              nil, // Cache will be nil by default for backward compatibility
-	}
+	return NewVolumeHelperImplWithCache(
+		volumePolicy,
+		snapshotVolumes,
+		logger,
+		client,
+		defaultVolumesToFSBackup,
+		backupExcludePVC,
+		nil,
+	)
 }
 
 // NewVolumeHelperImplWithCache creates a VolumeHelper with a PVC-to-Pod cache for improved performance.
