@@ -270,13 +270,13 @@ func TestEnsureContainerExists(t *testing.T) {
 	require.EqualError(t, err, `no such container: "bar"`)
 
 	err = ensureContainerExists(pod, "foo")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = ensureContainerExists(pod, "baz")
 	require.EqualError(t, err, `no such container: "baz"`)
 
 	err = ensureContainerExists(pod, "qux")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestPodCompeted(t *testing.T) {
