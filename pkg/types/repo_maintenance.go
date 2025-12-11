@@ -31,4 +31,10 @@ type JobConfigs struct {
 	// PriorityClassName is the priority class name for the maintenance job pod
 	// Note: This is only read from the global configuration, not per-repository
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// PodAnnotations are annotations to be added to maintenance job pods.
+	PodAnnotations map[string]string `json:"podAnnotations,omitempty"`
+
+	// PodLabels are labels to be added to maintenance job pods.
+	PodLabels map[string]string `json:"podLabels,omitempty"`
 }
