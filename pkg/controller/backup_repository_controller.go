@@ -55,6 +55,10 @@ const (
 	repoSyncPeriod                      = 5 * time.Minute
 	defaultMaintainFrequency            = 7 * 24 * time.Hour
 	defaultMaintenanceStatusQueueLength = 3
+
+	// Error messages for repository invalidation
+	msgBSLChangedOnStartup = "BSL configuration changed while Velero was not running, re-establishing connection"
+	msgBSLChanged          = "re-establish on BSL change, create or delete"
 )
 
 type BackupRepoReconciler struct {
@@ -160,7 +164,7 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(ctx context.Context, 
 	requests := []reconcile.Request{}
 	for i := range list.Items {
 		r.logger.WithField("BSL", bsl.Name).Infof("Invalidating Backup Repository %s", list.Items[i].Name)
-		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change, create or delete")); err != nil {
+		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady(msgBSLChanged)); err != nil {
 			r.logger.WithField("BSL", bsl.Name).WithError(err).Errorf("fail to patch BackupRepository %s", list.Items[i].Name)
 			continue
 		}
@@ -227,7 +231,7 @@ func (r *BackupRepoReconciler) validateBackupRepositoriesOnStartup(ctx context.C
 				"bsl":  bsl.Name,
 			}).Info("Invalidating backup repository due to BSL configuration change detected on startup")
 
-			if err := r.patchBackupRepository(ctx, repo, repoNotReady("BSL configuration changed while Velero was not running, re-establishing connection")); err != nil {
+			if err := r.patchBackupRepository(ctx, repo, repoNotReady(msgBSLChangedOnStartup)); err != nil {
 				r.logger.WithField("repo", repo.Name).WithError(err).Error("Failed to invalidate backup repository")
 				continue
 			}
@@ -774,6 +778,14 @@ func dueForMaintenance(req *velerov1api.BackupRepository, now time.Time) bool {
 
 func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *velerov1api.BackupRepository, bsl *velerov1api.BackupStorageLocation, log logrus.FieldLogger) (bool, error) {
 	log.Info("Checking backup repository for readiness")
+
+	// If the repository was invalidated due to BSL configuration changes,
+	// don't try to reconnect until those changes are resolved. The BSL must
+	// be corrected first before the repository can be re-established.
+	if req.Status.Message == msgBSLChangedOnStartup || req.Status.Message == msgBSLChanged {
+		log.WithField("message", req.Status.Message).Info("Repository invalidated due to BSL change, waiting for BSL to be corrected")
+		return false, nil
+	}
 
 	// Only check and update restic identifier for restic repositories
 	if req.Spec.RepositoryType == "" || req.Spec.RepositoryType == velerov1api.BackupRepositoryTypeRestic {
