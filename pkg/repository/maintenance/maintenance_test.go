@@ -118,12 +118,14 @@ func TestDeleteOldJobs(t *testing.T) {
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	// Call the function
-	err := DeleteOldJobs(cli, repo, keep, velerotest.NewLogger())
+	err := DeleteOldJobs(cli, "default", repo, keep, velerotest.NewLogger())
 	require.NoError(t, err)
 
 	// Get the remaining jobs
 	jobList := &batchv1api.JobList{}
-	err = cli.List(t.Context(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
+	err = cli.List(context.TODO(), jobList, &client.ListOptions{
+		Namespace: "default",
+	}, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
 	require.NoError(t, err)
 
 	// We expect the number of jobs to be equal to 'keep'

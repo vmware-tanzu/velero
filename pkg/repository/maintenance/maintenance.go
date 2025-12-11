@@ -68,11 +68,13 @@ func GenerateJobName(repo string) string {
 }
 
 // DeleteOldJobs deletes old maintenance jobs and keeps the latest N jobs
-func DeleteOldJobs(cli client.Client, repo string, keep int, logger logrus.FieldLogger) error {
+func DeleteOldJobs(cli client.Client, namespace string, repo string, keep int, logger logrus.FieldLogger) error {
 	logger.Infof("Start to delete old maintenance jobs. %d jobs will be kept.", keep)
 	// Get the maintenance job list by label
 	jobList := &batchv1api.JobList{}
-	err := cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
+	err := cli.List(context.TODO(), jobList, &client.ListOptions{
+		Namespace: namespace,
+	}, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
 	if err != nil {
 		return err
 	}
