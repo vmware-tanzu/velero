@@ -354,16 +354,62 @@ func (s *nodeAgentServer) run() {
 		s.logger.Infof("Using customized cachePVC config %v", cachePVCConfig)
 	}
 
+	var podLabels map[string]string
+	if s.dataPathConfigs != nil && len(s.dataPathConfigs.PodLabels) > 0 {
+		podLabels = s.dataPathConfigs.PodLabels
+		s.logger.Infof("Using customized pod labels %+v", podLabels)
+	}
+
+	var podAnnotations map[string]string
+	if s.dataPathConfigs != nil && len(s.dataPathConfigs.PodAnnotations) > 0 {
+		podAnnotations = s.dataPathConfigs.PodAnnotations
+		s.logger.Infof("Using customized pod annotations %+v", podAnnotations)
+	}
+
 	if s.backupRepoConfigs != nil {
 		s.logger.Infof("Using backup repo config %v", s.backupRepoConfigs)
 	}
 
-	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger, dataMovePriorityClass, privilegedFsBackup)
+	pvbReconciler := controller.NewPodVolumeBackupReconciler(
+		s.mgr.GetClient(),
+		s.mgr,
+		s.kubeClient,
+		s.dataPathMgr,
+		s.vgdpCounter,
+		s.nodeName,
+		s.config.dataMoverPrepareTimeout,
+		s.config.resourceTimeout,
+		podResources,
+		s.metrics,
+		s.logger,
+		dataMovePriorityClass,
+		privilegedFsBackup,
+		podLabels,
+		podAnnotations,
+	)
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
 	}
 
-	pvrReconciler := controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, s.backupRepoConfigs, cachePVCConfig, podResources, s.logger, dataMovePriorityClass, privilegedFsBackup, s.repoConfigMgr)
+	pvrReconciler := controller.NewPodVolumeRestoreReconciler(
+		s.mgr.GetClient(),
+		s.mgr,
+		s.kubeClient,
+		s.dataPathMgr,
+		s.vgdpCounter,
+		s.nodeName,
+		s.config.dataMoverPrepareTimeout,
+		s.config.resourceTimeout,
+		s.backupRepoConfigs,
+		cachePVCConfig,
+		podResources,
+		s.logger,
+		dataMovePriorityClass,
+		privilegedFsBackup,
+		s.repoConfigMgr,
+		podLabels,
+		podAnnotations,
+	)
 	if err := pvrReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
@@ -388,6 +434,8 @@ func (s *nodeAgentServer) run() {
 		s.logger,
 		s.metrics,
 		dataMovePriorityClass,
+		podLabels,
+		podAnnotations,
 	)
 	if err := dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
@@ -416,6 +464,8 @@ func (s *nodeAgentServer) run() {
 		s.metrics,
 		dataMovePriorityClass,
 		s.repoConfigMgr,
+		podLabels,
+		podAnnotations,
 	)
 
 	if err := dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
