@@ -206,6 +206,8 @@ func IsPVCDefaultToFSBackup(pvcNamespace, pvcName string, crClient crclient.Clie
 
 // IsPVCDefaultToFSBackupWithCache is the cached version of IsPVCDefaultToFSBackup.
 // If cache is nil or not built, it falls back to the non-cached version.
+// Note: In the main backup path, the cache is always built (via NewVolumeHelperImplWithNamespaces),
+// so the fallback is only used by plugins that don't need cache optimization.
 func IsPVCDefaultToFSBackupWithCache(
 	pvcNamespace, pvcName string,
 	crClient crclient.Client,
@@ -287,6 +289,8 @@ func GetPodsUsingPVC(
 // GetPodsUsingPVCWithCache returns all pods that use the specified PVC.
 // If cache is available and built, it uses the cache for O(1) lookup.
 // Otherwise, it falls back to the original GetPodsUsingPVC function.
+// Note: In the main backup path, the cache is always built (via NewVolumeHelperImplWithNamespaces),
+// so the fallback is only used by plugins that don't need cache optimization.
 func GetPodsUsingPVCWithCache(
 	pvcNamespace, pvcName string,
 	crClient crclient.Client,

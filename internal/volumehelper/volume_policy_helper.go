@@ -1,6 +1,7 @@
 package volumehelper
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -46,7 +47,9 @@ func NewVolumeHelperImpl(
 	defaultVolumesToFSBackup bool,
 	backupExcludePVC bool,
 ) VolumeHelper {
-	return NewVolumeHelperImplWithCache(
+	// Pass nil namespaces - no cache will be built, so this never fails.
+	// This is used by plugins that don't need the cache optimization.
+	vh, _ := NewVolumeHelperImplWithNamespaces(
 		volumePolicy,
 		snapshotVolumes,
 		logger,
@@ -55,19 +58,32 @@ func NewVolumeHelperImpl(
 		backupExcludePVC,
 		nil,
 	)
+	return vh
 }
 
-// NewVolumeHelperImplWithCache creates a VolumeHelper with a PVC-to-Pod cache for improved performance.
-// The cache should be built before backup processing begins.
-func NewVolumeHelperImplWithCache(
+// NewVolumeHelperImplWithNamespaces creates a VolumeHelper with a PVC-to-Pod cache for improved performance.
+// The cache is built internally from the provided namespaces list.
+// This avoids O(N*M) complexity when there are many PVCs and pods.
+// See issue #9179 for details.
+// Returns an error if cache building fails - callers should not proceed with backup in this case.
+func NewVolumeHelperImplWithNamespaces(
 	volumePolicy *resourcepolicies.Policies,
 	snapshotVolumes *bool,
 	logger logrus.FieldLogger,
 	client crclient.Client,
 	defaultVolumesToFSBackup bool,
 	backupExcludePVC bool,
-	pvcPodCache *podvolumeutil.PVCPodCache,
-) VolumeHelper {
+	namespaces []string,
+) (VolumeHelper, error) {
+	var pvcPodCache *podvolumeutil.PVCPodCache
+	if len(namespaces) > 0 {
+		pvcPodCache = podvolumeutil.NewPVCPodCache()
+		if err := pvcPodCache.BuildCacheForNamespaces(context.Background(), namespaces, client); err != nil {
+			return nil, err
+		}
+		logger.Infof("Built PVC-to-Pod cache for %d namespaces", len(namespaces))
+	}
+
 	return &volumeHelperImpl{
 		volumePolicy:             volumePolicy,
 		snapshotVolumes:          snapshotVolumes,
@@ -76,7 +92,7 @@ func NewVolumeHelperImplWithCache(
 		defaultVolumesToFSBackup: defaultVolumesToFSBackup,
 		backupExcludePVC:         backupExcludePVC,
 		pvcPodCache:              pvcPodCache,
-	}
+	}, nil
 }
 
 func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, groupResource schema.GroupResource) (bool, error) {

@@ -34,7 +34,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	podvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
 )
 
 func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
@@ -876,22 +875,21 @@ func TestVolumeHelperImplWithCache_ShouldPerformSnapshot(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			var cache *podvolumeutil.PVCPodCache
+			var namespaces []string
 			if tc.buildCache {
-				cache = podvolumeutil.NewPVCPodCache()
-				err := cache.BuildCacheForNamespaces(t.Context(), []string{"ns"}, fakeClient)
-				require.NoError(t, err)
+				namespaces = []string{"ns"}
 			}
 
-			vh := NewVolumeHelperImplWithCache(
+			vh, err := NewVolumeHelperImplWithNamespaces(
 				p,
 				tc.snapshotVolumesFlag,
 				logrus.StandardLogger(),
 				fakeClient,
 				tc.defaultVolumesToFSBackup,
 				false,
-				cache,
+				namespaces,
 			)
+			require.NoError(t, err)
 
 			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.inputObj)
 			require.NoError(t, err)
@@ -1029,22 +1027,21 @@ func TestVolumeHelperImplWithCache_ShouldPerformFSBackup(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			var cache *podvolumeutil.PVCPodCache
+			var namespaces []string
 			if tc.buildCache {
-				cache = podvolumeutil.NewPVCPodCache()
-				err := cache.BuildCacheForNamespaces(t.Context(), []string{"ns"}, fakeClient)
-				require.NoError(t, err)
+				namespaces = []string{"ns"}
 			}
 
-			vh := NewVolumeHelperImplWithCache(
+			vh, err := NewVolumeHelperImplWithNamespaces(
 				p,
 				tc.snapshotVolumesFlag,
 				logrus.StandardLogger(),
 				fakeClient,
 				tc.defaultVolumesToFSBackup,
 				false,
-				cache,
+				namespaces,
 			)
+			require.NoError(t, err)
 
 			actualShouldFSBackup, actualError := vh.ShouldPerformFSBackup(tc.pod.Spec.Volumes[0], *tc.pod)
 			if tc.expectedErr {

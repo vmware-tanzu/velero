@@ -64,7 +64,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	podvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
 )
 
 // BackupVersion is the current backup major version for Velero.
@@ -409,22 +408,26 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(items)}
 
-	// Build PVC-to-Pod cache for improved volume policy lookup performance.
-	// This avoids O(N*M) complexity when there are many PVCs and pods.
+	// Resolve namespaces for PVC-to-Pod cache building in volumehelper.
 	// See issue #9179 for details.
-	pvcPodCache := podvolumeutil.NewPVCPodCache()
 	namespaces, err := backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList()
 	if err != nil {
-		log.WithError(err).Warn("Failed to resolve namespace list for PVC-to-Pod cache, falling back to direct lookups")
-		pvcPodCache = nil
-	} else if len(namespaces) > 0 {
-		if err := pvcPodCache.BuildCacheForNamespaces(context.Background(), namespaces, kb.kbClient); err != nil {
-			// Log warning but continue - the cache will fall back to direct lookups
-			log.WithError(err).Warn("Failed to build PVC-to-Pod cache, falling back to direct lookups")
-			pvcPodCache = nil
-		} else {
-			log.Infof("Built PVC-to-Pod cache for %d namespaces", len(namespaces))
-		}
+		log.WithError(err).Error("Failed to resolve namespace list for PVC-to-Pod cache")
+		return err
+	}
+
+	volumeHelperImpl, err := volumehelper.NewVolumeHelperImplWithNamespaces(
+		backupRequest.ResPolicies,
+		backupRequest.Spec.SnapshotVolumes,
+		log,
+		kb.kbClient,
+		boolptr.IsSetToTrue(backupRequest.Spec.DefaultVolumesToFsBackup),
+		!backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()),
+		namespaces,
+	)
+	if err != nil {
+		log.WithError(err).Error("Failed to build PVC-to-Pod cache for volume policy lookups")
+		return err
 	}
 
 	itemBackupper := &itemBackupper{
@@ -440,16 +443,8 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		itemHookHandler: &hook.DefaultItemHookHandler{
 			PodCommandExecutor: kb.podCommandExecutor,
 		},
-		hookTracker: hook.NewHookTracker(),
-		volumeHelperImpl: volumehelper.NewVolumeHelperImplWithCache(
-			backupRequest.ResPolicies,
-			backupRequest.Spec.SnapshotVolumes,
-			log,
-			kb.kbClient,
-			boolptr.IsSetToTrue(backupRequest.Spec.DefaultVolumesToFsBackup),
-			!backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()),
-			pvcPodCache,
-		),
+		hookTracker:         hook.NewHookTracker(),
+		volumeHelperImpl:    volumeHelperImpl,
 		kubernetesBackupper: kb,
 	}
 
