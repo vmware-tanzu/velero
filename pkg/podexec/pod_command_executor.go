@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -184,10 +185,22 @@ func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, it
 }
 
 func ensureContainerExists(pod *corev1api.Pod, container string) error {
-	for _, c := range pod.Spec.Containers {
-		if c.Name == container {
-			return nil
-		}
+	existsAsMainContainer := slices.ContainsFunc(pod.Spec.Containers, func(c corev1api.Container) bool {
+		return c.Name == container
+	})
+
+	if existsAsMainContainer {
+		return nil
+	}
+
+	existsAsSidecar := slices.ContainsFunc(pod.Spec.InitContainers, func(c corev1api.Container) bool {
+		return c.RestartPolicy != nil &&
+			*c.RestartPolicy == corev1api.ContainerRestartPolicyAlways &&
+			c.Name == container
+	})
+
+	if existsAsSidecar {
+		return nil
 	}
 
 	return errors.Errorf("no such container: %q", container)
