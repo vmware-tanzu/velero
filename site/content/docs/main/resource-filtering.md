@@ -278,6 +278,9 @@ The policies YAML config file would look like this:
         storageClass:
           - gp2
           - standard
+        # pvc matches specific phase(s)
+        pvcPhase:
+          - Pending
       action:
         type: skip
     - conditions:
@@ -370,6 +373,7 @@ Currently, Velero supports the volume attributes listed below:
   - "5Gi" which is not supported and will be failed in validating the configuration
 - storageClass: matching volumes those with specified `storageClass`, such as `gp2`, `ebs-sc` in eks
 - volume sources: matching volumes that used specified volume sources. Currently we support nfs or csi backend volume source
+- pvcPhase: matching volumes based on the phase of their associated PVCs (Pending, Bound, Lost)
 
 Velero supported conditions and format listed below:
 - capacity
@@ -462,9 +466,60 @@ Velero supported conditions and format listed below:
           type: skip
       ```
 
-#### VolumePolicies rules
-- Velero already has lots of include or exclude filters. the volume policies are the final filters after others include or exclude filters in one backup processing workflow. So if use a defined similar filter like the opt-in approach to backup one pod volume but skip backup of the same pod volume in volume policies, as volume policies are the final filters that are applied, the volume will not be backed up.
-- If volume policies conflict with themselves the first matched policy will be respected when many policies are defined.
+- pvc Phase
+
+  This condition filters volumes based on the phase of their associated PVCs. The condition is specified as a list of phases to match. The volume matches this condition if the PVC's phase matches any of the phases in the list. Supported phases are: `Pending`, `Bound`, and `Lost`.
+    ```yaml
+    pvcPhase:
+      - Pending
+    ```
+
+    Some examples:
+  - Skip Pending PVCs: Skip backup of volumes whose associated PVC is in `Pending` phase (useful for PVCs that haven't been bound to a PV yet).
+      ```yaml
+      volumePolicies:
+      - conditions:
+          pvcPhase:
+            - Pending
+        action:
+          type: skip
+      ```
+  - Skip multiple phases: Skip backup of volumes whose associated PVC is either in `Pending` or `Lost` phase.
+      ```yaml
+      volumePolicies:
+      - conditions:
+          pvcPhase:
+            - Pending
+            - Lost
+        action:
+          type: skip
+      ```
+  - Backup only Bound PVCs: Only backup volumes whose associated PVC is in `Bound` phase.
+      ```yaml
+      volumePolicies:
+      - conditions:
+          pvcPhase:
+            - Bound
+        action:
+          type: snapshot
+      ```
+  - Combine with other conditions: You can combine PVC phase conditions with other conditions like storage class or labels.
+      ```yaml
+      volumePolicies:
+      - conditions:
+          pvcPhase:
+            - Pending
+          storageClass:
+            - gp2
+        action:
+          type: skip
+      ```
+
+
+
+### Resource policies rules
+- Velero already has lots of include or exclude filters. the resource policies are the final filters after others include or exclude filters in one backup processing workflow. So if use a defined similar filter like the opt-in approach to backup one pod volume but skip backup of the same pod volume in resource policies, as resource policies are the final filters that are applied, the volume will not be backed up.
+- If volume resource policies conflict with themselves the first matched policy will be respected when many policies are defined.
 
 #### VolumePolicy priority with existing filters
 * [Includes filters](#includes) and [Excludes filters](#excludes) have the highest priority. The filtered-out resources by them cannot reach to the VolumePolicy.
