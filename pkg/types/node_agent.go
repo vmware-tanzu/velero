@@ -98,4 +98,10 @@ type NodeAgentConfigs struct {
 
 	// CachePVCConfig is the config for cachePVC
 	CachePVCConfig *CachePVC `json:"cachePVC,omitempty"`
+
+	// PodAnnotations are annotations to be added to pods created by node-agent, i.e., data mover pods.
+	PodAnnotations map[string]string `json:"podAnnotations,omitempty"`
+
+	// PodLabels are labels to be added to pods created by node-agent, i.e., data mover pods.
+	PodLabels map[string]string `json:"podLabels,omitempty"`
 }
