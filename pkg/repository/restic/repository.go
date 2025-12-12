@@ -113,6 +113,11 @@ func (r *RepositoryService) exec(cmd *restic.Command, bsl *velerov1api.BackupSto
 	}
 	cmd.CACertFile = caCertFile
 
+	// CmdEnv uses credGetter.FromFile (not FromSecret) to get cloud provider credentials.
+	// FromFile materializes the BSL's Credential secret to a file path that cloud SDKs
+	// can read (e.g., AWS_SHARED_CREDENTIALS_FILE). This is different from caCertRef above,
+	// which uses FromSecret to read the CA certificate data directly into memory, then
+	// writes it to a temp file because restic CLI only accepts file paths (--cacert flag).
 	env, err := restic.CmdEnv(bsl, r.credGetter.FromFile)
 	if err != nil {
 		return err
