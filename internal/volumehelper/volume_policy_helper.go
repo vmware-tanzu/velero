@@ -1,6 +1,7 @@
 package volumehelper
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -33,6 +34,9 @@ type volumeHelperImpl struct {
 	// to the volume policy check, but fs-backup is based on the pod resource,
 	// the resource filter on PVC and PV doesn't work on this scenario.
 	backupExcludePVC bool
+	// pvcPodCache provides cached PVC to Pod mappings for improved performance.
+	// When there are many PVCs and pods, using this cache avoids O(N*M) lookups.
+	pvcPodCache *podvolumeutil.PVCPodCache
 }
 
 func NewVolumeHelperImpl(
@@ -43,6 +47,43 @@ func NewVolumeHelperImpl(
 	defaultVolumesToFSBackup bool,
 	backupExcludePVC bool,
 ) VolumeHelper {
+	// Pass nil namespaces - no cache will be built, so this never fails.
+	// This is used by plugins that don't need the cache optimization.
+	vh, _ := NewVolumeHelperImplWithNamespaces(
+		volumePolicy,
+		snapshotVolumes,
+		logger,
+		client,
+		defaultVolumesToFSBackup,
+		backupExcludePVC,
+		nil,
+	)
+	return vh
+}
+
+// NewVolumeHelperImplWithNamespaces creates a VolumeHelper with a PVC-to-Pod cache for improved performance.
+// The cache is built internally from the provided namespaces list.
+// This avoids O(N*M) complexity when there are many PVCs and pods.
+// See issue #9179 for details.
+// Returns an error if cache building fails - callers should not proceed with backup in this case.
+func NewVolumeHelperImplWithNamespaces(
+	volumePolicy *resourcepolicies.Policies,
+	snapshotVolumes *bool,
+	logger logrus.FieldLogger,
+	client crclient.Client,
+	defaultVolumesToFSBackup bool,
+	backupExcludePVC bool,
+	namespaces []string,
+) (VolumeHelper, error) {
+	var pvcPodCache *podvolumeutil.PVCPodCache
+	if len(namespaces) > 0 {
+		pvcPodCache = podvolumeutil.NewPVCPodCache()
+		if err := pvcPodCache.BuildCacheForNamespaces(context.Background(), namespaces, client); err != nil {
+			return nil, err
+		}
+		logger.Infof("Built PVC-to-Pod cache for %d namespaces", len(namespaces))
+	}
+
 	return &volumeHelperImpl{
 		volumePolicy:             volumePolicy,
 		snapshotVolumes:          snapshotVolumes,
@@ -50,7 +91,8 @@ func NewVolumeHelperImpl(
 		client:                   client,
 		defaultVolumesToFSBackup: defaultVolumesToFSBackup,
 		backupExcludePVC:         backupExcludePVC,
-	}
+		pvcPodCache:              pvcPodCache,
+	}, nil
 }
 
 func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, groupResource schema.GroupResource) (bool, error) {
@@ -105,10 +147,12 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 	// If this PV is claimed, see if we've already taken a (pod volume backup)
 	// snapshot of the contents of this PV. If so, don't take a snapshot.
 	if pv.Spec.ClaimRef != nil {
-		pods, err := podvolumeutil.GetPodsUsingPVC(
+		// Use cached lookup if available for better performance with many PVCs/pods
+		pods, err := podvolumeutil.GetPodsUsingPVCWithCache(
 			pv.Spec.ClaimRef.Namespace,
 			pv.Spec.ClaimRef.Name,
 			v.client,
+			v.pvcPodCache,
 		)
 		if err != nil {
 			v.logger.WithError(err).Errorf("fail to get pod for PV %s", pv.Name)

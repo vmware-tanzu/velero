@@ -408,6 +408,28 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(items)}
 
+	// Resolve namespaces for PVC-to-Pod cache building in volumehelper.
+	// See issue #9179 for details.
+	namespaces, err := backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList()
+	if err != nil {
+		log.WithError(err).Error("Failed to resolve namespace list for PVC-to-Pod cache")
+		return err
+	}
+
+	volumeHelperImpl, err := volumehelper.NewVolumeHelperImplWithNamespaces(
+		backupRequest.ResPolicies,
+		backupRequest.Spec.SnapshotVolumes,
+		log,
+		kb.kbClient,
+		boolptr.IsSetToTrue(backupRequest.Spec.DefaultVolumesToFsBackup),
+		!backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()),
+		namespaces,
+	)
+	if err != nil {
+		log.WithError(err).Error("Failed to build PVC-to-Pod cache for volume policy lookups")
+		return err
+	}
+
 	itemBackupper := &itemBackupper{
 		backupRequest:            backupRequest,
 		tarWriter:                tw,
@@ -421,15 +443,8 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		itemHookHandler: &hook.DefaultItemHookHandler{
 			PodCommandExecutor: kb.podCommandExecutor,
 		},
-		hookTracker: hook.NewHookTracker(),
-		volumeHelperImpl: volumehelper.NewVolumeHelperImpl(
-			backupRequest.ResPolicies,
-			backupRequest.Spec.SnapshotVolumes,
-			log,
-			kb.kbClient,
-			boolptr.IsSetToTrue(backupRequest.Spec.DefaultVolumesToFsBackup),
-			!backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()),
-		),
+		hookTracker:         hook.NewHookTracker(),
+		volumeHelperImpl:    volumeHelperImpl,
 		kubernetesBackupper: kb,
 	}
 
