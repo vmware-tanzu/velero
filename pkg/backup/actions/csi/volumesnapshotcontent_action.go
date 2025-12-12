@@ -97,6 +97,10 @@ func (p *volumeSnapshotContentBackupItemAction) Execute(
 		})
 	}
 
+	// Because async operation will update VolumeSnapshotContent during finalizing phase.
+	// No matter what we do, VolumeSnapshotClass cannot be deleted. So skip it.
+	// Just deleting VolumeSnapshotClass during restore and delete is enough.
+
 	snapContMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&snapCont)
 	if err != nil {
 		return nil, nil, "", nil, errors.WithStack(err)
