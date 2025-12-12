@@ -17,12 +17,41 @@ limitations under the License.
 package builder
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"strings"
 
 	corev1api "k8s.io/api/core/v1"
 	apimachineryRuntime "k8s.io/apimachinery/pkg/runtime"
 )
+
+// maxContainerNameLen is the maximum allowed length for Kubernetes container names
+// to satisfy DNS-1123 label constraints (RFC-1123)
+const maxContainerNameLen = 63
+
+// hashString generates a SHA256 hash of the input string for creating unique identifiers
+func hashString(s string) string {
+	hash := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(hash[:])
+}
+
+// ensureValidNameLength ensures the container name fits DNS-1123 label constraints (max 63 chars).
+// If the name exceeds the limit, it truncates and appends an 8-character hash suffix to maintain uniqueness.
+func ensureValidNameLength(base string) string {
+	if len(base) <= maxContainerNameLen {
+		return base
+	}
+
+	// Use 8 character hash suffix to maintain uniqueness while staying within DNS-1123 limits
+	const hashLen = 8
+	suffix := "-" + hashString(base)[:hashLen]
+	maxPrefix := maxContainerNameLen - len(suffix)
+	if maxPrefix < 0 {
+		maxPrefix = 0
+	}
+	return base[:maxPrefix] + suffix
+}
 
 // ContainerBuilder builds Container objects
 type ContainerBuilder struct {
@@ -45,9 +74,9 @@ func ForPluginContainer(image string, pullPolicy corev1api.PullPolicy) *Containe
 	return ForContainer(getName(image), image).PullPolicy(pullPolicy).VolumeMounts(volumeMount)
 }
 
-// getName returns the 'name' component of a docker
-// image that includes the entire string except the registry name, and transforms the combined
-// string into a RFC-1123 compatible name.
+// getName returns the 'name' component of a docker image that includes the entire string
+// except the registry name, and transforms the combined string into a DNS-1123 compatible name
+// that fits within the 63-character limit for Kubernetes container names.
 func getName(image string) string {
 	slashIndex := strings.Index(image, "/")
 	slashCount := 0
@@ -83,7 +112,10 @@ func getName(image string) string {
 	re := strings.NewReplacer("/", "-",
 		"_", "-",
 		".", "-")
-	return re.Replace(image[start:end])
+	name := re.Replace(image[start:end])
+
+	// Ensure the name doesn't exceed Kubernetes container name length limit
+	return ensureValidNameLength(name)
 }
 
 // Result returns the built Container.
