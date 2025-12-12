@@ -20,7 +20,9 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -52,6 +54,7 @@ func GetCACertFromRestore(ctx context.Context, client kbclient.Client, namespace
 }
 
 // GetCACertFromBSL fetches a BackupStorageLocation directly and returns its cacert
+// Priority order: caCertRef (from Secret) > caCert (inline, deprecated)
 func GetCACertFromBSL(ctx context.Context, client kbclient.Client, namespace, bslName string) (string, error) {
 	if bslName == "" {
 		return "", nil
@@ -71,7 +74,44 @@ func GetCACertFromBSL(ctx context.Context, client kbclient.Client, namespace, bs
 		return "", errors.Wrapf(err, "error getting backup storage location %s", bslName)
 	}
 
-	if bsl.Spec.ObjectStorage != nil && len(bsl.Spec.ObjectStorage.CACert) > 0 {
+	if bsl.Spec.ObjectStorage == nil {
+		return "", nil
+	}
+
+	// Prefer caCertRef over inline caCert
+	if bsl.Spec.ObjectStorage.CACertRef != nil {
+		// Fetch certificate from Secret
+		secret := &corev1api.Secret{}
+		secretKey := types.NamespacedName{
+			Name:      bsl.Spec.ObjectStorage.CACertRef.Name,
+			Namespace: namespace,
+		}
+
+		if err := client.Get(ctx, secretKey, secret); err != nil {
+			if apierrors.IsNotFound(err) {
+				return "", errors.Errorf("certificate secret %s not found in namespace %s",
+					bsl.Spec.ObjectStorage.CACertRef.Name, namespace)
+			}
+			return "", errors.Wrapf(err, "error getting certificate secret %s",
+				bsl.Spec.ObjectStorage.CACertRef.Name)
+		}
+
+		keyName := bsl.Spec.ObjectStorage.CACertRef.Key
+		if keyName == "" {
+			return "", errors.New("caCertRef key is empty")
+		}
+
+		certData, ok := secret.Data[keyName]
+		if !ok {
+			return "", errors.Errorf("key %s not found in secret %s",
+				keyName, bsl.Spec.ObjectStorage.CACertRef.Name)
+		}
+
+		return string(certData), nil
+	}
+
+	// Fall back to inline caCert (deprecated)
+	if len(bsl.Spec.ObjectStorage.CACert) > 0 {
 		return string(bsl.Spec.ObjectStorage.CACert), nil
 	}
 

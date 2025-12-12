@@ -93,6 +93,15 @@ func (b *BackupStorageLocationBuilder) CACert(val []byte) *BackupStorageLocation
 	return b
 }
 
+// CACertRef sets the BackupStorageLocation's object storage CACertRef (Secret reference).
+func (b *BackupStorageLocationBuilder) CACertRef(selector *corev1api.SecretKeySelector) *BackupStorageLocationBuilder {
+	if b.object.Spec.StorageType.ObjectStorage == nil {
+		b.object.Spec.StorageType.ObjectStorage = new(velerov1api.ObjectStorageLocation)
+	}
+	b.object.Spec.ObjectStorage.CACertRef = selector
+	return b
+}
+
 // Default sets the BackupStorageLocation's is default or not
 func (b *BackupStorageLocationBuilder) Default(isDefault bool) *BackupStorageLocationBuilder {
 	b.object.Spec.Default = isDefault

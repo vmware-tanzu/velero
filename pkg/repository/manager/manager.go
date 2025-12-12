@@ -109,7 +109,10 @@ func NewManager(
 		log:        log,
 	}
 
-	mgr.providers[velerov1api.BackupRepositoryTypeRestic] = provider.NewResticRepositoryProvider(credentialFileStore, mgr.fileSystem, mgr.log)
+	mgr.providers[velerov1api.BackupRepositoryTypeRestic] = provider.NewResticRepositoryProvider(credentials.CredentialGetter{
+		FromFile:   credentialFileStore,
+		FromSecret: credentialSecretStore,
+	}, mgr.fileSystem, mgr.log)
 	mgr.providers[velerov1api.BackupRepositoryTypeKopia] = provider.NewUnifiedRepoProvider(credentials.CredentialGetter{
 		FromFile:   credentialFileStore,
 		FromSecret: credentialSecretStore,

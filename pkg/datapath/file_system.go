@@ -252,7 +252,7 @@ func (fs *fileSystemBR) boostRepoConnect(ctx context.Context, repositoryType str
 			return err
 		}
 	} else {
-		if err := repoProvider.NewResticRepositoryProvider(credentialGetter.FromFile, filesystem.NewFileSystem(), fs.log).BoostRepoConnect(ctx, repoProvider.RepoParam{BackupLocation: fs.backupLocation, BackupRepo: fs.backupRepo}); err != nil {
+		if err := repoProvider.NewResticRepositoryProvider(*credentialGetter, filesystem.NewFileSystem(), fs.log).BoostRepoConnect(ctx, repoProvider.RepoParam{BackupLocation: fs.backupLocation, BackupRepo: fs.backupRepo}); err != nil {
 			return err
 		}
 	}

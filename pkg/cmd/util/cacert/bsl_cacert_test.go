@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -286,6 +287,271 @@ func TestGetCACertFromBSL(t *testing.T) {
 
 			if tc.expectedError {
 				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.expectedCACert, cacert)
+			}
+		})
+	}
+}
+
+// TestGetCACertFromBSL_WithCACertRef tests the new caCertRef functionality
+func TestGetCACertFromBSL_WithCACertRef(t *testing.T) {
+	testCases := []struct {
+		name           string
+		bslName        string
+		bsl            *velerov1api.BackupStorageLocation
+		secret         *corev1api.Secret
+		expectedCACert string
+		expectedError  bool
+		errorContains  string
+	}{
+		{
+			name:    "BSL with caCertRef pointing to valid secret",
+			bslName: "test-bsl",
+			bsl: &velerov1api.BackupStorageLocation{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns",
+					Name:      "test-bsl",
+				},
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "test-bucket",
+							CACertRef: &corev1api.SecretKeySelector{
+								LocalObjectReference: corev1api.LocalObjectReference{
+									Name: "test-secret",
+								},
+								Key: "ca-bundle.crt",
+							},
+						},
+					},
+				},
+			},
+			secret: &corev1api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"ca-bundle.crt": []byte("test-cacert-from-secret"),
+				},
+			},
+			expectedCACert: "test-cacert-from-secret",
+			expectedError:  false,
+		},
+		{
+			name:    "BSL with both caCertRef and caCert - caCertRef takes precedence",
+			bslName: "test-bsl",
+			bsl: &velerov1api.BackupStorageLocation{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns",
+					Name:      "test-bsl",
+				},
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "test-bucket",
+							CACert: []byte("inline-cacert-deprecated"),
+							CACertRef: &corev1api.SecretKeySelector{
+								LocalObjectReference: corev1api.LocalObjectReference{
+									Name: "test-secret",
+								},
+								Key: "ca-bundle.crt",
+							},
+						},
+					},
+				},
+			},
+			secret: &corev1api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"ca-bundle.crt": []byte("cacert-from-secret-takes-precedence"),
+				},
+			},
+			expectedCACert: "cacert-from-secret-takes-precedence",
+			expectedError:  false,
+		},
+		{
+			name:    "BSL with caCertRef but secret not found",
+			bslName: "test-bsl",
+			bsl: &velerov1api.BackupStorageLocation{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns",
+					Name:      "test-bsl",
+				},
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "test-bucket",
+							CACertRef: &corev1api.SecretKeySelector{
+								LocalObjectReference: corev1api.LocalObjectReference{
+									Name: "missing-secret",
+								},
+								Key: "ca-bundle.crt",
+							},
+						},
+					},
+				},
+			},
+			secret:         nil,
+			expectedCACert: "",
+			expectedError:  true,
+			errorContains:  "certificate secret missing-secret not found",
+		},
+		{
+			name:    "BSL with caCertRef but key not found in secret",
+			bslName: "test-bsl",
+			bsl: &velerov1api.BackupStorageLocation{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns",
+					Name:      "test-bsl",
+				},
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "test-bucket",
+							CACertRef: &corev1api.SecretKeySelector{
+								LocalObjectReference: corev1api.LocalObjectReference{
+									Name: "test-secret",
+								},
+								Key: "missing-key",
+							},
+						},
+					},
+				},
+			},
+			secret: &corev1api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"ca-bundle.crt": []byte("test-cacert"),
+				},
+			},
+			expectedCACert: "",
+			expectedError:  true,
+			errorContains:  "key missing-key not found in secret test-secret",
+		},
+		{
+			name:    "BSL with caCertRef but empty key",
+			bslName: "test-bsl",
+			bsl: &velerov1api.BackupStorageLocation{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns",
+					Name:      "test-bsl",
+				},
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "test-bucket",
+							CACertRef: &corev1api.SecretKeySelector{
+								LocalObjectReference: corev1api.LocalObjectReference{
+									Name: "test-secret",
+								},
+								Key: "",
+							},
+						},
+					},
+				},
+			},
+			secret: &corev1api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"ca-bundle.crt": []byte("test-cacert"),
+				},
+			},
+			expectedCACert: "",
+			expectedError:  true,
+			errorContains:  "caCertRef key is empty",
+		},
+		{
+			name:    "BSL with caCertRef containing multi-line PEM certificate",
+			bslName: "test-bsl",
+			bsl: &velerov1api.BackupStorageLocation{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns",
+					Name:      "test-bsl",
+				},
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "test-bucket",
+							CACertRef: &corev1api.SecretKeySelector{
+								LocalObjectReference: corev1api.LocalObjectReference{
+									Name: "test-secret",
+								},
+								Key: "ca.pem",
+							},
+						},
+					},
+				},
+			},
+			secret: &corev1api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"ca.pem": []byte("-----BEGIN CERTIFICATE-----\nMIIDETC...\n-----END CERTIFICATE-----\n"),
+				},
+			},
+			expectedCACert: "-----BEGIN CERTIFICATE-----\nMIIDETC...\n-----END CERTIFICATE-----\n",
+			expectedError:  false,
+		},
+		{
+			name:    "BSL falls back to inline caCert when caCertRef is nil",
+			bslName: "test-bsl",
+			bsl: builder.ForBackupStorageLocation("test-ns", "test-bsl").
+				Provider("aws").
+				Bucket("test-bucket").
+				CACert([]byte("fallback-inline-cacert")).
+				Result(),
+			secret:         nil,
+			expectedCACert: "fallback-inline-cacert",
+			expectedError:  false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var objs []runtime.Object
+			if tc.bsl != nil {
+				objs = append(objs, tc.bsl)
+			}
+			if tc.secret != nil {
+				objs = append(objs, tc.secret)
+			}
+
+			scheme := runtime.NewScheme()
+			_ = velerov1api.AddToScheme(scheme)
+			_ = corev1api.AddToScheme(scheme)
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithRuntimeObjects(objs...).
+				Build()
+
+			cacert, err := GetCACertFromBSL(t.Context(), fakeClient, "test-ns", tc.bslName)
+
+			if tc.expectedError {
+				require.Error(t, err)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tc.expectedCACert, cacert)

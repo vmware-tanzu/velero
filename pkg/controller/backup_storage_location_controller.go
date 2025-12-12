@@ -237,6 +237,12 @@ func (r *backupStorageLocationReconciler) Reconcile(ctx context.Context, req ctr
 			}
 		}()
 
+		// Validate the BackupStorageLocation spec
+		if err = location.Validate(); err != nil {
+			log.WithError(err).Error("BackupStorageLocation spec is invalid")
+			return
+		}
+
 		backupStore, err := r.backupStoreGetter.Get(&location, pluginManager, log)
 		if err != nil {
 			log.WithError(err).Error("Error getting a backup store")
