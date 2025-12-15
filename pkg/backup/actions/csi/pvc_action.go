@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"k8s.io/client-go/util/retry"
@@ -44,6 +45,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	internalvolumehelper "github.com/vmware-tanzu/velero/internal/volumehelper"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
@@ -72,6 +74,16 @@ const (
 type pvcBackupItemAction struct {
 	log      logrus.FieldLogger
 	crClient crclient.Client
+
+	// volumeHelper caches the VolumeHelper instance for the current backup.
+	// This avoids the O(N*M) performance issue when there are many PVCs and pods.
+	// See issue #9179 for details.
+	volumeHelper internalvolumehelper.VolumeHelper
+	// cachedForBackup tracks which backup the volumeHelper was built for.
+	// If the backup UID changes, we need to rebuild the cache.
+	cachedForBackup types.UID
+	// mu protects volumeHelper and cachedForBackup for concurrent access.
+	mu sync.Mutex
 }
 
 // AppliesTo returns information indicating that the PVCBackupItemAction
@@ -95,6 +107,31 @@ func (p *pvcBackupItemAction) validateBackup(backup velerov1api.Backup) (valid b
 	}
 
 	return true
+}
+
+// getOrCreateVolumeHelper returns a cached VolumeHelper for the given backup.
+// If the backup UID has changed or no VolumeHelper exists, a new one is created.
+// This avoids the O(N*M) performance issue when there are many PVCs and pods.
+// See issue #9179 for details.
+func (p *pvcBackupItemAction) getOrCreateVolumeHelper(backup *velerov1api.Backup) (internalvolumehelper.VolumeHelper, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Check if we already have a VolumeHelper for this backup
+	if p.volumeHelper != nil && p.cachedForBackup == backup.UID {
+		return p.volumeHelper, nil
+	}
+
+	// Build a new VolumeHelper with cache for this backup
+	p.log.Infof("Building VolumeHelper with PVC-to-Pod cache for backup %s/%s", backup.Namespace, backup.Name)
+	vh, err := volumehelper.NewVolumeHelperForBackup(*backup, p.crClient, p.log, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create VolumeHelper for backup")
+	}
+
+	p.volumeHelper = vh
+	p.cachedForBackup = backup.UID
+	return vh, nil
 }
 
 func (p *pvcBackupItemAction) validatePVCandPV(
@@ -248,12 +285,19 @@ func (p *pvcBackupItemAction) Execute(
 		return item, nil, "", nil, nil
 	}
 
-	shouldSnapshot, err := volumehelper.ShouldPerformSnapshotWithBackup(
+	// Get or create the cached VolumeHelper for this backup
+	vh, err := p.getOrCreateVolumeHelper(backup)
+	if err != nil {
+		return nil, nil, "", nil, err
+	}
+
+	shouldSnapshot, err := volumehelper.ShouldPerformSnapshotWithVolumeHelper(
 		item,
 		kuberesource.PersistentVolumeClaims,
 		*backup,
 		p.crClient,
 		p.log,
+		vh,
 	)
 	if err != nil {
 		return nil, nil, "", nil, err
@@ -621,8 +665,14 @@ func (p *pvcBackupItemAction) getVolumeSnapshotReference(
 			return nil, errors.Wrapf(err, "failed to list PVCs in VolumeGroupSnapshot group %q in namespace %q", group, pvc.Namespace)
 		}
 
+		// Get the cached VolumeHelper for filtering PVCs by volume policy
+		vh, err := p.getOrCreateVolumeHelper(backup)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get VolumeHelper for filtering PVCs in group %q", group)
+		}
+
 		// Filter PVCs by volume policy
-		filteredPVCs, err := p.filterPVCsByVolumePolicy(groupedPVCs, backup)
+		filteredPVCs, err := p.filterPVCsByVolumePolicy(groupedPVCs, backup, vh)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to filter PVCs by volume policy for VolumeGroupSnapshot group %q", group)
 		}
@@ -759,11 +809,12 @@ func (p *pvcBackupItemAction) listGroupedPVCs(ctx context.Context, namespace, la
 func (p *pvcBackupItemAction) filterPVCsByVolumePolicy(
 	pvcs []corev1api.PersistentVolumeClaim,
 	backup *velerov1api.Backup,
+	vh internalvolumehelper.VolumeHelper,
 ) ([]corev1api.PersistentVolumeClaim, error) {
 	var filteredPVCs []corev1api.PersistentVolumeClaim
 
 	for _, pvc := range pvcs {
-		// Convert PVC to unstructured for ShouldPerformSnapshotWithBackup
+		// Convert PVC to unstructured for ShouldPerformSnapshotWithVolumeHelper
 		pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pvc)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to convert PVC %s/%s to unstructured", pvc.Namespace, pvc.Name)
@@ -771,12 +822,14 @@ func (p *pvcBackupItemAction) filterPVCsByVolumePolicy(
 		unstructuredPVC := &unstructured.Unstructured{Object: pvcMap}
 
 		// Check if this PVC should be snapshotted according to volume policies
-		shouldSnapshot, err := volumehelper.ShouldPerformSnapshotWithBackup(
+		// Uses the cached VolumeHelper for better performance with many PVCs/pods
+		shouldSnapshot, err := volumehelper.ShouldPerformSnapshotWithVolumeHelper(
 			unstructuredPVC,
 			kuberesource.PersistentVolumeClaims,
 			*backup,
 			p.crClient,
 			p.log,
+			vh,
 		)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to check volume policy for PVC %s/%s", pvc.Namespace, pvc.Name)

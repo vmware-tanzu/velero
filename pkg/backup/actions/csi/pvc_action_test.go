@@ -842,7 +842,9 @@ volumePolicies:
 				crClient: client,
 			}
 
-			result, err := action.filterPVCsByVolumePolicy(tt.pvcs, backup)
+			// Pass nil for VolumeHelper in tests - it will fall back to creating a new one per call
+			// This is the expected behavior for testing and third-party plugins
+			result, err := action.filterPVCsByVolumePolicy(tt.pvcs, backup, nil)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
@@ -858,6 +860,111 @@ volumePolicies:
 			}
 		})
 	}
+}
+
+// TestFilterPVCsByVolumePolicyWithVolumeHelper tests filterPVCsByVolumePolicy when a
+// pre-created VolumeHelper is passed (non-nil). This exercises the cached path used
+// by the CSI PVC BIA plugin for better performance.
+func TestFilterPVCsByVolumePolicyWithVolumeHelper(t *testing.T) {
+	// Create test PVCs and PVs
+	pvcs := []corev1api.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pvc-csi", Namespace: "ns-1"},
+			Spec: corev1api.PersistentVolumeClaimSpec{
+				VolumeName:       "pv-csi",
+				StorageClassName: pointer.String("sc-csi"),
+			},
+			Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pvc-nfs", Namespace: "ns-1"},
+			Spec: corev1api.PersistentVolumeClaimSpec{
+				VolumeName:       "pv-nfs",
+				StorageClassName: pointer.String("sc-nfs"),
+			},
+			Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+		},
+	}
+
+	pvs := []corev1api.PersistentVolume{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pv-csi"},
+			Spec: corev1api.PersistentVolumeSpec{
+				PersistentVolumeSource: corev1api.PersistentVolumeSource{
+					CSI: &corev1api.CSIPersistentVolumeSource{Driver: "csi-driver"},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pv-nfs"},
+			Spec: corev1api.PersistentVolumeSpec{
+				PersistentVolumeSource: corev1api.PersistentVolumeSource{
+					NFS: &corev1api.NFSVolumeSource{
+						Server: "nfs-server",
+						Path:   "/export",
+					},
+				},
+			},
+		},
+	}
+
+	// Create fake client with PVs
+	objs := []runtime.Object{}
+	for i := range pvs {
+		objs = append(objs, &pvs[i])
+	}
+	client := velerotest.NewFakeControllerRuntimeClient(t, objs...)
+
+	// Create backup with volume policy that skips NFS volumes
+	volumePolicyStr := `
+version: v1
+volumePolicies:
+- conditions:
+    nfs: {}
+  action:
+    type: skip
+`
+	cm := &corev1api.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "volume-policy",
+			Namespace: "velero",
+		},
+		Data: map[string]string{
+			"volume-policy": volumePolicyStr,
+		},
+	}
+	require.NoError(t, client.Create(t.Context(), cm))
+
+	backup := &velerov1api.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-backup",
+			Namespace: "velero",
+		},
+		Spec: velerov1api.BackupSpec{
+			ResourcePolicy: &corev1api.TypedLocalObjectReference{
+				Kind: "ConfigMap",
+				Name: "volume-policy",
+			},
+		},
+	}
+
+	action := &pvcBackupItemAction{
+		log:      velerotest.NewLogger(),
+		crClient: client,
+	}
+
+	// Create a VolumeHelper using the same method the plugin would use
+	vh, err := action.getOrCreateVolumeHelper(backup)
+	require.NoError(t, err)
+	require.NotNil(t, vh)
+
+	// Test with the pre-created VolumeHelper (non-nil path)
+	result, err := action.filterPVCsByVolumePolicy(pvcs, backup, vh)
+	require.NoError(t, err)
+
+	// Should filter out the NFS PVC, leaving only the CSI PVC
+	require.Len(t, result, 1)
+	require.Equal(t, "pvc-csi", result[0].Name)
 }
 
 func TestDetermineCSIDriver(t *testing.T) {
@@ -1957,5 +2064,134 @@ func TestPVCRequestSize(t *testing.T) {
 			// Corrected line below:
 			require.Equal(t, 0, expected.Cmp(updatedSize), "Expected size %s, but got %s", expected.String(), updatedSize.String())
 		})
+	}
+}
+
+// TestGetOrCreateVolumeHelper tests the VolumeHelper caching behavior
+func TestGetOrCreateVolumeHelper(t *testing.T) {
+	tests := []struct {
+		name          string
+		setup         func() (*pvcBackupItemAction, *velerov1api.Backup, *velerov1api.Backup)
+		wantSameCache bool
+	}{
+		{
+			name: "Returns same VolumeHelper for same backup UID",
+			setup: func() (*pvcBackupItemAction, *velerov1api.Backup, *velerov1api.Backup) {
+				client := velerotest.NewFakeControllerRuntimeClient(t)
+				action := &pvcBackupItemAction{
+					log:      velerotest.NewLogger(),
+					crClient: client,
+				}
+				backup := &velerov1api.Backup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-backup",
+						Namespace: "velero",
+						UID:       types.UID("test-uid-1"),
+					},
+				}
+				return action, backup, backup // Same backup instance
+			},
+			wantSameCache: true,
+		},
+		{
+			name: "Returns new VolumeHelper for different backup UID",
+			setup: func() (*pvcBackupItemAction, *velerov1api.Backup, *velerov1api.Backup) {
+				client := velerotest.NewFakeControllerRuntimeClient(t)
+				action := &pvcBackupItemAction{
+					log:      velerotest.NewLogger(),
+					crClient: client,
+				}
+				backup1 := &velerov1api.Backup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-backup-1",
+						Namespace: "velero",
+						UID:       types.UID("test-uid-1"),
+					},
+				}
+				backup2 := &velerov1api.Backup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-backup-2",
+						Namespace: "velero",
+						UID:       types.UID("test-uid-2"),
+					},
+				}
+				return action, backup1, backup2 // Different backup instances
+			},
+			wantSameCache: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			action, backup1, backup2 := tt.setup()
+
+			// Get VolumeHelper for first backup
+			vh1, err := action.getOrCreateVolumeHelper(backup1)
+			require.NoError(t, err)
+			require.NotNil(t, vh1)
+
+			// Get VolumeHelper for second backup
+			vh2, err := action.getOrCreateVolumeHelper(backup2)
+			require.NoError(t, err)
+			require.NotNil(t, vh2)
+
+			if tt.wantSameCache {
+				// Same backup UID should return same VolumeHelper pointer
+				require.Same(t, vh1, vh2, "Expected same VolumeHelper instance for same backup UID")
+			} else {
+				// Different backup UID should return different VolumeHelper pointer
+				require.NotSame(t, vh1, vh2, "Expected different VolumeHelper instance for different backup UID")
+			}
+		})
+	}
+}
+
+// TestGetOrCreateVolumeHelperConcurrency tests thread-safety of VolumeHelper caching
+func TestGetOrCreateVolumeHelperConcurrency(t *testing.T) {
+	client := velerotest.NewFakeControllerRuntimeClient(t)
+	action := &pvcBackupItemAction{
+		log:      velerotest.NewLogger(),
+		crClient: client,
+	}
+	backup := &velerov1api.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-backup",
+			Namespace: "velero",
+			UID:       types.UID("test-uid"),
+		},
+	}
+
+	// Run multiple goroutines concurrently to get VolumeHelper
+	const numGoroutines = 10
+	results := make(chan interface{}, numGoroutines)
+	errors := make(chan error, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			vh, err := action.getOrCreateVolumeHelper(backup)
+			if err != nil {
+				errors <- err
+				return
+			}
+			results <- vh
+		}()
+	}
+
+	// Collect all results
+	var volumeHelpers []interface{}
+	for i := 0; i < numGoroutines; i++ {
+		select {
+		case vh := <-results:
+			volumeHelpers = append(volumeHelpers, vh)
+		case err := <-errors:
+			t.Fatalf("Unexpected error: %v", err)
+		}
+	}
+
+	// All goroutines should get the same VolumeHelper instance
+	require.Len(t, volumeHelpers, numGoroutines)
+	firstVH := volumeHelpers[0]
+	for i := 1; i < len(volumeHelpers); i++ {
+		require.Same(t, firstVH, volumeHelpers[i], "All goroutines should get the same VolumeHelper instance")
 	}
 }
