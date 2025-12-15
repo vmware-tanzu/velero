@@ -860,16 +860,32 @@ func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolume
 	nodeOS, err := kube.GetNodeOS(context.Background(), pvr.Status.Node, r.kubeClient.CoreV1())
 	if err != nil {
 		log.WithError(err).Warnf("Failed to get nodeOS for node %s, use linux node-agent for hosting pod labels, annotations and tolerations", pvr.Status.Node)
+		nodeOS = kube.NodeOSLinux // Default to Linux if detection fails
 	}
 
 	hostingPodLabels := map[string]string{velerov1api.PVRLabel: pvr.Name}
+
+	// Get all labels from node-agent DaemonSet
+	if labels, err := nodeagent.GetAllLabelsFromNodeAgent(context.Background(), r.kubeClient, pvr.Namespace, nodeOS); err != nil {
+		log.WithError(err).Warn("Failed to get node-agent labels")
+	} else {
+		for k, v := range labels {
+			hostingPodLabels[k] = v
+		}
+	}
+
+	// Still copy specific third-party labels for backward compatibility
+	// This ensures known labels are always copied even if DaemonSet lookup fails
 	for _, k := range util.ThirdPartyLabels {
 		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvr.Namespace, k, nodeOS); err != nil {
 			if err != nodeagent.ErrNodeAgentLabelNotFound {
 				log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
 			}
 		} else {
-			hostingPodLabels[k] = v
+			// Only add if not already present (from above loop)
+			if _, exists := hostingPodLabels[k]; !exists {
+				hostingPodLabels[k] = v
+			}
 		}
 	}
 
