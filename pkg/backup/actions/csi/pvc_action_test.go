@@ -2163,7 +2163,7 @@ func TestGetOrCreateVolumeHelperConcurrency(t *testing.T) {
 
 	// Run multiple goroutines concurrently to get VolumeHelper
 	const numGoroutines = 10
-	results := make(chan interface{}, numGoroutines)
+	results := make(chan any, numGoroutines)
 	errors := make(chan error, numGoroutines)
 
 	for i := 0; i < numGoroutines; i++ {
@@ -2178,7 +2178,7 @@ func TestGetOrCreateVolumeHelperConcurrency(t *testing.T) {
 	}
 
 	// Collect all results
-	var volumeHelpers []interface{}
+	var volumeHelpers []any
 	for i := 0; i < numGoroutines; i++ {
 		select {
 		case vh := <-results:
