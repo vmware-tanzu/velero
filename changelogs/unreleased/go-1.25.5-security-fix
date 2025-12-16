@@ -1,0 +1,1 @@
+Update Dockerfile to use Go 1.25.5 to fix CVE-2025-61729 (HIGH severity crypto/x509 vulnerability)
