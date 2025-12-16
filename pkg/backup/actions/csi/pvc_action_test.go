@@ -2067,87 +2067,11 @@ func TestPVCRequestSize(t *testing.T) {
 	}
 }
 
-// TestGetOrCreateVolumeHelper tests the VolumeHelper caching behavior
+// TestGetOrCreateVolumeHelper tests the VolumeHelper and PVC-to-Pod cache behavior.
+// Since plugin instances are unique per backup (created via newPluginManager and
+// cleaned up via CleanupClients at backup completion), we verify that the pvcPodCache
+// is properly initialized and reused across calls.
 func TestGetOrCreateVolumeHelper(t *testing.T) {
-	tests := []struct {
-		name          string
-		setup         func() (*pvcBackupItemAction, *velerov1api.Backup, *velerov1api.Backup)
-		wantSameCache bool
-	}{
-		{
-			name: "Returns same VolumeHelper for same backup UID",
-			setup: func() (*pvcBackupItemAction, *velerov1api.Backup, *velerov1api.Backup) {
-				client := velerotest.NewFakeControllerRuntimeClient(t)
-				action := &pvcBackupItemAction{
-					log:      velerotest.NewLogger(),
-					crClient: client,
-				}
-				backup := &velerov1api.Backup{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-backup",
-						Namespace: "velero",
-						UID:       types.UID("test-uid-1"),
-					},
-				}
-				return action, backup, backup // Same backup instance
-			},
-			wantSameCache: true,
-		},
-		{
-			name: "Returns new VolumeHelper for different backup UID",
-			setup: func() (*pvcBackupItemAction, *velerov1api.Backup, *velerov1api.Backup) {
-				client := velerotest.NewFakeControllerRuntimeClient(t)
-				action := &pvcBackupItemAction{
-					log:      velerotest.NewLogger(),
-					crClient: client,
-				}
-				backup1 := &velerov1api.Backup{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-backup-1",
-						Namespace: "velero",
-						UID:       types.UID("test-uid-1"),
-					},
-				}
-				backup2 := &velerov1api.Backup{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-backup-2",
-						Namespace: "velero",
-						UID:       types.UID("test-uid-2"),
-					},
-				}
-				return action, backup1, backup2 // Different backup instances
-			},
-			wantSameCache: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			action, backup1, backup2 := tt.setup()
-
-			// Get VolumeHelper for first backup
-			vh1, err := action.getOrCreateVolumeHelper(backup1)
-			require.NoError(t, err)
-			require.NotNil(t, vh1)
-
-			// Get VolumeHelper for second backup
-			vh2, err := action.getOrCreateVolumeHelper(backup2)
-			require.NoError(t, err)
-			require.NotNil(t, vh2)
-
-			if tt.wantSameCache {
-				// Same backup UID should return same VolumeHelper pointer
-				require.Same(t, vh1, vh2, "Expected same VolumeHelper instance for same backup UID")
-			} else {
-				// Different backup UID should return different VolumeHelper pointer
-				require.NotSame(t, vh1, vh2, "Expected different VolumeHelper instance for different backup UID")
-			}
-		})
-	}
-}
-
-// TestGetOrCreateVolumeHelperConcurrency tests thread-safety of VolumeHelper caching
-func TestGetOrCreateVolumeHelperConcurrency(t *testing.T) {
 	client := velerotest.NewFakeControllerRuntimeClient(t)
 	action := &pvcBackupItemAction{
 		log:      velerotest.NewLogger(),
@@ -2157,41 +2081,27 @@ func TestGetOrCreateVolumeHelperConcurrency(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-backup",
 			Namespace: "velero",
-			UID:       types.UID("test-uid"),
+			UID:       types.UID("test-uid-1"),
 		},
 	}
 
-	// Run multiple goroutines concurrently to get VolumeHelper
-	const numGoroutines = 10
-	results := make(chan any, numGoroutines)
-	errors := make(chan error, numGoroutines)
+	// Initially, pvcPodCache should be nil
+	require.Nil(t, action.pvcPodCache, "pvcPodCache should be nil initially")
 
-	for i := 0; i < numGoroutines; i++ {
-		go func() {
-			vh, err := action.getOrCreateVolumeHelper(backup)
-			if err != nil {
-				errors <- err
-				return
-			}
-			results <- vh
-		}()
-	}
+	// Get VolumeHelper first time - should create new cache and VolumeHelper
+	vh1, err := action.getOrCreateVolumeHelper(backup)
+	require.NoError(t, err)
+	require.NotNil(t, vh1)
 
-	// Collect all results
-	var volumeHelpers []any
-	for i := 0; i < numGoroutines; i++ {
-		select {
-		case vh := <-results:
-			volumeHelpers = append(volumeHelpers, vh)
-		case err := <-errors:
-			t.Fatalf("Unexpected error: %v", err)
-		}
-	}
+	// pvcPodCache should now be initialized
+	require.NotNil(t, action.pvcPodCache, "pvcPodCache should be initialized after first call")
+	cache1 := action.pvcPodCache
 
-	// All goroutines should get the same VolumeHelper instance
-	require.Len(t, volumeHelpers, numGoroutines)
-	firstVH := volumeHelpers[0]
-	for i := 1; i < len(volumeHelpers); i++ {
-		require.Same(t, firstVH, volumeHelpers[i], "All goroutines should get the same VolumeHelper instance")
-	}
+	// Get VolumeHelper second time - should reuse the same cache
+	vh2, err := action.getOrCreateVolumeHelper(backup)
+	require.NoError(t, err)
+	require.NotNil(t, vh2)
+
+	// The pvcPodCache should be the same instance
+	require.Same(t, cache1, action.pvcPodCache, "Expected same pvcPodCache instance on repeated calls")
 }

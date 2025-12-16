@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"sync"
 	"time"
 
 	"k8s.io/client-go/util/retry"
@@ -59,6 +58,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/csi"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
+	podvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
 )
 
 // TODO: Replace hardcoded VolumeSnapshot finalizer strings with constants from
@@ -75,15 +75,13 @@ type pvcBackupItemAction struct {
 	log      logrus.FieldLogger
 	crClient crclient.Client
 
-	// volumeHelper caches the VolumeHelper instance for the current backup.
+	// pvcPodCache provides lazy per-namespace caching of PVC-to-Pod mappings.
+	// Since plugin instances are unique per backup (created via newPluginManager and
+	// cleaned up via CleanupClients at backup completion), we can safely cache this
+	// without mutex or backup UID tracking.
 	// This avoids the O(N*M) performance issue when there are many PVCs and pods.
-	// See issue #9179 for details.
-	volumeHelper internalvolumehelper.VolumeHelper
-	// cachedForBackup tracks which backup the volumeHelper was built for.
-	// If the backup UID changes, we need to rebuild the cache.
-	cachedForBackup types.UID
-	// mu protects volumeHelper and cachedForBackup for concurrent access.
-	mu sync.Mutex
+	// See issue #9179 and PR #9226 for details.
+	pvcPodCache *podvolumeutil.PVCPodCache
 }
 
 // AppliesTo returns information indicating that the PVCBackupItemAction
@@ -109,29 +107,57 @@ func (p *pvcBackupItemAction) validateBackup(backup velerov1api.Backup) (valid b
 	return true
 }
 
-// getOrCreateVolumeHelper returns a cached VolumeHelper for the given backup.
-// If the backup UID has changed or no VolumeHelper exists, a new one is created.
-// This avoids the O(N*M) performance issue when there are many PVCs and pods.
-// See issue #9179 for details.
-func (p *pvcBackupItemAction) getOrCreateVolumeHelper(backup *velerov1api.Backup) (internalvolumehelper.VolumeHelper, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	// Check if we already have a VolumeHelper for this backup
-	if p.volumeHelper != nil && p.cachedForBackup == backup.UID {
-		return p.volumeHelper, nil
+// ensurePVCPodCacheForNamespace ensures the PVC-to-Pod cache is built for the given namespace.
+// This uses lazy per-namespace caching following the pattern from PR #9226.
+// Since plugin instances are unique per backup, we can safely cache without mutex or backup UID tracking.
+func (p *pvcBackupItemAction) ensurePVCPodCacheForNamespace(ctx context.Context, namespace string) error {
+	// Initialize cache if needed
+	if p.pvcPodCache == nil {
+		p.pvcPodCache = podvolumeutil.NewPVCPodCache()
 	}
 
-	// Build a new VolumeHelper with cache for this backup
-	p.log.Infof("Building VolumeHelper with PVC-to-Pod cache for backup %s/%s", backup.Namespace, backup.Name)
-	vh, err := volumehelper.NewVolumeHelperForBackup(*backup, p.crClient, p.log, nil)
+	// Build cache for namespace if not already done
+	if !p.pvcPodCache.IsNamespaceBuilt(namespace) {
+		p.log.Debugf("Building PVC-to-Pod cache for namespace %s", namespace)
+		if err := p.pvcPodCache.BuildCacheForNamespace(ctx, namespace, p.crClient); err != nil {
+			return errors.Wrapf(err, "failed to build PVC-to-Pod cache for namespace %s", namespace)
+		}
+	}
+	return nil
+}
+
+// getVolumeHelperWithCache creates a VolumeHelper using the pre-built PVC-to-Pod cache.
+// The cache should be ensured for the relevant namespace(s) before calling this.
+func (p *pvcBackupItemAction) getVolumeHelperWithCache(backup *velerov1api.Backup) (internalvolumehelper.VolumeHelper, error) {
+	// Create VolumeHelper with our lazy-built cache
+	vh, err := internalvolumehelper.NewVolumeHelperImplWithCache(
+		*backup,
+		p.crClient,
+		p.log,
+		p.pvcPodCache,
+	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create VolumeHelper for backup")
+		return nil, errors.Wrap(err, "failed to create VolumeHelper")
+	}
+	return vh, nil
+}
+
+// getOrCreateVolumeHelper returns a VolumeHelper with lazy per-namespace caching.
+// The VolumeHelper uses the pvcPodCache which is populated lazily as namespaces are encountered.
+// Callers should use ensurePVCPodCacheForNamespace before calling methods that need
+// PVC-to-Pod lookups for a specific namespace.
+// Since plugin instances are unique per backup (created via newPluginManager and
+// cleaned up via CleanupClients at backup completion), we can safely cache this.
+// See issue #9179 and PR #9226 for details.
+func (p *pvcBackupItemAction) getOrCreateVolumeHelper(backup *velerov1api.Backup) (internalvolumehelper.VolumeHelper, error) {
+	// Initialize the PVC-to-Pod cache if needed
+	if p.pvcPodCache == nil {
+		p.pvcPodCache = podvolumeutil.NewPVCPodCache()
 	}
 
-	p.volumeHelper = vh
-	p.cachedForBackup = backup.UID
-	return vh, nil
+	// Return the VolumeHelper with our lazily-built cache
+	// The cache will be populated incrementally as namespaces are encountered
+	return p.getVolumeHelperWithCache(backup)
 }
 
 func (p *pvcBackupItemAction) validatePVCandPV(
@@ -283,6 +309,11 @@ func (p *pvcBackupItemAction) Execute(
 			return nil, nil, "", nil, err
 		}
 		return item, nil, "", nil, nil
+	}
+
+	// Ensure PVC-to-Pod cache is built for this namespace (lazy per-namespace caching)
+	if err := p.ensurePVCPodCacheForNamespace(context.TODO(), pvc.Namespace); err != nil {
+		return nil, nil, "", nil, err
 	}
 
 	// Get or create the cached VolumeHelper for this backup
@@ -663,6 +694,11 @@ func (p *pvcBackupItemAction) getVolumeSnapshotReference(
 		groupedPVCs, err := p.listGroupedPVCs(ctx, pvc.Namespace, vgsLabelKey, group)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to list PVCs in VolumeGroupSnapshot group %q in namespace %q", group, pvc.Namespace)
+		}
+
+		// Ensure PVC-to-Pod cache is built for this namespace (lazy per-namespace caching)
+		if err := p.ensurePVCPodCacheForNamespace(ctx, pvc.Namespace); err != nil {
+			return nil, errors.Wrapf(err, "failed to build PVC-to-Pod cache for namespace %s", pvc.Namespace)
 		}
 
 		// Get the cached VolumeHelper for filtering PVCs by volume policy

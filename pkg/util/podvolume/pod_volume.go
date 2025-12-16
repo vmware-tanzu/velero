@@ -113,6 +113,66 @@ func (c *PVCPodCache) IsBuilt() bool {
 	return c.built
 }
 
+// IsNamespaceBuilt returns true if the cache has been built for the given namespace.
+func (c *PVCPodCache) IsNamespaceBuilt(namespace string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	_, ok := c.cache[namespace]
+	return ok
+}
+
+// BuildCacheForNamespace builds the cache for a single namespace lazily.
+// This is used by plugins where namespaces are encountered one at a time.
+// If the namespace is already cached, this is a no-op.
+func (c *PVCPodCache) BuildCacheForNamespace(
+	ctx context.Context,
+	namespace string,
+	crClient crclient.Client,
+) error {
+	// Check if already built (read lock first for performance)
+	c.mu.RLock()
+	if _, ok := c.cache[namespace]; ok {
+		c.mu.RUnlock()
+		return nil
+	}
+	c.mu.RUnlock()
+
+	// Need to build - acquire write lock
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Double-check after acquiring write lock
+	if _, ok := c.cache[namespace]; ok {
+		return nil
+	}
+
+	podList := new(corev1api.PodList)
+	if err := crClient.List(
+		ctx,
+		podList,
+		&crclient.ListOptions{Namespace: namespace},
+	); err != nil {
+		return errors.Wrapf(err, "failed to list pods in namespace %s", namespace)
+	}
+
+	c.cache[namespace] = make(map[string][]corev1api.Pod)
+
+	// Build mapping from PVC name to pods
+	for i := range podList.Items {
+		pod := podList.Items[i]
+		for _, v := range pod.Spec.Volumes {
+			if v.PersistentVolumeClaim != nil {
+				pvcName := v.PersistentVolumeClaim.ClaimName
+				c.cache[namespace][pvcName] = append(c.cache[namespace][pvcName], pod)
+			}
+		}
+	}
+
+	// Mark as built for GetPodsUsingPVCWithCache fallback logic
+	c.built = true
+	return nil
+}
+
 // GetVolumesByPod returns a list of volume names to backup for the provided pod.
 func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup, backupExcludePVC bool, volsToProcessByLegacyApproach []string) ([]string, []string) {
 	// tracks the volumes that have been explicitly opted out of backup via the annotation in the pod

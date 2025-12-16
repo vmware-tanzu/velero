@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -12,6 +13,7 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -91,6 +93,31 @@ func NewVolumeHelperImplWithNamespaces(
 		client:                   client,
 		defaultVolumesToFSBackup: defaultVolumesToFSBackup,
 		backupExcludePVC:         backupExcludePVC,
+		pvcPodCache:              pvcPodCache,
+	}, nil
+}
+
+// NewVolumeHelperImplWithCache creates a VolumeHelper using an externally managed PVC-to-Pod cache.
+// This is used by plugins that build the cache lazily per-namespace (following the pattern from PR #9226).
+// The cache can be nil, in which case PVC-to-Pod lookups will fall back to direct API calls.
+func NewVolumeHelperImplWithCache(
+	backup velerov1api.Backup,
+	client crclient.Client,
+	logger logrus.FieldLogger,
+	pvcPodCache *podvolumeutil.PVCPodCache,
+) (VolumeHelper, error) {
+	resourcePolicies, err := resourcepolicies.GetResourcePoliciesFromBackup(backup, client, logger)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get volume policies from backup")
+	}
+
+	return &volumeHelperImpl{
+		volumePolicy:             resourcePolicies,
+		snapshotVolumes:          backup.Spec.SnapshotVolumes,
+		logger:                   logger,
+		client:                   client,
+		defaultVolumesToFSBackup: boolptr.IsSetToTrue(backup.Spec.DefaultVolumesToFsBackup),
+		backupExcludePVC:         boolptr.IsSetToTrue(backup.Spec.SnapshotMoveData),
 		pvcPodCache:              pvcPodCache,
 	}, nil
 }

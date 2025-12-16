@@ -1252,3 +1252,224 @@ func TestIsPVCDefaultToFSBackupWithCache(t *testing.T) {
 		})
 	}
 }
+
+// TestIsNamespaceBuilt tests the IsNamespaceBuilt method for lazy per-namespace caching.
+func TestIsNamespaceBuilt(t *testing.T) {
+	cache := NewPVCPodCache()
+
+	// Initially no namespace should be built
+	assert.False(t, cache.IsNamespaceBuilt("ns1"), "namespace should not be built initially")
+	assert.False(t, cache.IsNamespaceBuilt("ns2"), "namespace should not be built initially")
+
+	// Create a fake client with a pod in ns1
+	pod := &corev1api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "ns1",
+		},
+		Spec: corev1api.PodSpec{
+			Volumes: []corev1api.Volume{
+				{
+					Name: "vol1",
+					VolumeSource: corev1api.VolumeSource{
+						PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc1",
+						},
+					},
+				},
+			},
+		},
+	}
+	fakeClient := velerotest.NewFakeControllerRuntimeClient(t, pod)
+
+	// Build cache for ns1
+	err := cache.BuildCacheForNamespace(t.Context(), "ns1", fakeClient)
+	require.NoError(t, err)
+
+	// ns1 should be built, ns2 should not
+	assert.True(t, cache.IsNamespaceBuilt("ns1"), "namespace ns1 should be built")
+	assert.False(t, cache.IsNamespaceBuilt("ns2"), "namespace ns2 should not be built")
+
+	// Build cache for ns2 (empty namespace)
+	err = cache.BuildCacheForNamespace(t.Context(), "ns2", fakeClient)
+	require.NoError(t, err)
+
+	// Both should now be built
+	assert.True(t, cache.IsNamespaceBuilt("ns1"), "namespace ns1 should still be built")
+	assert.True(t, cache.IsNamespaceBuilt("ns2"), "namespace ns2 should now be built")
+}
+
+// TestBuildCacheForNamespace tests the lazy per-namespace cache building.
+func TestBuildCacheForNamespace(t *testing.T) {
+	tests := []struct {
+		name           string
+		pods           []runtime.Object
+		namespace      string
+		expectedPVCs   map[string]int // pvcName -> expected pod count
+		expectError    bool
+	}{
+		{
+			name:      "build cache for namespace with pods using PVCs",
+			namespace: "ns1",
+			pods: []runtime.Object{
+				&corev1api.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "ns1"},
+					Spec: corev1api.PodSpec{
+						Volumes: []corev1api.Volume{
+							{
+								Name: "vol1",
+								VolumeSource: corev1api.VolumeSource{
+									PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+										ClaimName: "pvc1",
+									},
+								},
+							},
+						},
+					},
+				},
+				&corev1api.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod2", Namespace: "ns1"},
+					Spec: corev1api.PodSpec{
+						Volumes: []corev1api.Volume{
+							{
+								Name: "vol1",
+								VolumeSource: corev1api.VolumeSource{
+									PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+										ClaimName: "pvc1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedPVCs: map[string]int{"pvc1": 2},
+		},
+		{
+			name:         "build cache for empty namespace",
+			namespace:    "empty-ns",
+			pods:         []runtime.Object{},
+			expectedPVCs: map[string]int{},
+		},
+		{
+			name:      "build cache ignores pods without PVCs",
+			namespace: "ns1",
+			pods: []runtime.Object{
+				&corev1api.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "ns1"},
+					Spec: corev1api.PodSpec{
+						Volumes: []corev1api.Volume{
+							{
+								Name: "config-vol",
+								VolumeSource: corev1api.VolumeSource{
+									ConfigMap: &corev1api.ConfigMapVolumeSource{
+										LocalObjectReference: corev1api.LocalObjectReference{
+											Name: "my-config",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedPVCs: map[string]int{},
+		},
+		{
+			name:      "build cache only for specified namespace",
+			namespace: "ns1",
+			pods: []runtime.Object{
+				&corev1api.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "ns1"},
+					Spec: corev1api.PodSpec{
+						Volumes: []corev1api.Volume{
+							{
+								Name: "vol1",
+								VolumeSource: corev1api.VolumeSource{
+									PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+										ClaimName: "pvc1",
+									},
+								},
+							},
+						},
+					},
+				},
+				&corev1api.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod2", Namespace: "ns2"},
+					Spec: corev1api.PodSpec{
+						Volumes: []corev1api.Volume{
+							{
+								Name: "vol1",
+								VolumeSource: corev1api.VolumeSource{
+									PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+										ClaimName: "pvc2",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedPVCs: map[string]int{"pvc1": 1},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, tc.pods...)
+			cache := NewPVCPodCache()
+
+			// Build cache for the namespace
+			err := cache.BuildCacheForNamespace(t.Context(), tc.namespace, fakeClient)
+			if tc.expectError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			// Verify namespace is marked as built
+			assert.True(t, cache.IsNamespaceBuilt(tc.namespace))
+
+			// Verify PVC to pod mappings
+			for pvcName, expectedCount := range tc.expectedPVCs {
+				pods := cache.GetPodsUsingPVC(tc.namespace, pvcName)
+				assert.Len(t, pods, expectedCount, "unexpected pod count for PVC %s", pvcName)
+			}
+
+			// Calling BuildCacheForNamespace again should be a no-op
+			err = cache.BuildCacheForNamespace(t.Context(), tc.namespace, fakeClient)
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestBuildCacheForNamespaceIdempotent verifies that building cache multiple times is safe.
+func TestBuildCacheForNamespaceIdempotent(t *testing.T) {
+	pod := &corev1api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "ns1"},
+		Spec: corev1api.PodSpec{
+			Volumes: []corev1api.Volume{
+				{
+					Name: "vol1",
+					VolumeSource: corev1api.VolumeSource{
+						PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc1",
+						},
+					},
+				},
+			},
+		},
+	}
+	fakeClient := velerotest.NewFakeControllerRuntimeClient(t, pod)
+	cache := NewPVCPodCache()
+
+	// Build cache multiple times - should be idempotent
+	for i := 0; i < 3; i++ {
+		err := cache.BuildCacheForNamespace(t.Context(), "ns1", fakeClient)
+		require.NoError(t, err)
+		assert.True(t, cache.IsNamespaceBuilt("ns1"))
+
+		pods := cache.GetPodsUsingPVC("ns1", "pvc1")
+		assert.Len(t, pods, 1, "should have exactly 1 pod using pvc1")
+	}
+}

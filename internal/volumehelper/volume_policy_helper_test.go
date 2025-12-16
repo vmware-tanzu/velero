@@ -34,6 +34,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	podvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
 )
 
 func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
@@ -1052,4 +1053,184 @@ func TestVolumeHelperImplWithCache_ShouldPerformFSBackup(t *testing.T) {
 			require.Equalf(t, tc.shouldFSBackup, actualShouldFSBackup, "Want shouldFSBackup as %t; Got shouldFSBackup as %t", tc.shouldFSBackup, actualShouldFSBackup)
 		})
 	}
+}
+
+// TestNewVolumeHelperImplWithCache tests the NewVolumeHelperImplWithCache constructor
+// which is used by plugins that build the cache lazily per-namespace.
+func TestNewVolumeHelperImplWithCache(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		backup                   velerov1api.Backup
+		resourcePolicyConfigMap  *corev1api.ConfigMap
+		pvcPodCache              bool // whether to pass a cache
+		expectError              bool
+	}{
+		{
+			name: "creates VolumeHelper with nil cache",
+			backup: velerov1api.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-backup",
+					Namespace: "velero",
+				},
+				Spec: velerov1api.BackupSpec{
+					SnapshotVolumes:          ptr.To(true),
+					DefaultVolumesToFsBackup: ptr.To(false),
+				},
+			},
+			pvcPodCache: false,
+			expectError: false,
+		},
+		{
+			name: "creates VolumeHelper with non-nil cache",
+			backup: velerov1api.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-backup",
+					Namespace: "velero",
+				},
+				Spec: velerov1api.BackupSpec{
+					SnapshotVolumes:          ptr.To(true),
+					DefaultVolumesToFsBackup: ptr.To(true),
+					SnapshotMoveData:         ptr.To(true),
+				},
+			},
+			pvcPodCache: true,
+			expectError: false,
+		},
+		{
+			name: "creates VolumeHelper with resource policies",
+			backup: velerov1api.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-backup",
+					Namespace: "velero",
+				},
+				Spec: velerov1api.BackupSpec{
+					SnapshotVolumes: ptr.To(true),
+					ResourcePolicy: &corev1api.TypedLocalObjectReference{
+						Kind: "ConfigMap",
+						Name: "resource-policy",
+					},
+				},
+			},
+			resourcePolicyConfigMap: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "resource-policy",
+					Namespace: "velero",
+				},
+				Data: map[string]string{
+					"policy": `version: v1
+volumePolicies:
+- conditions:
+    storageClass:
+    - gp2-csi
+  action:
+    type: snapshot`,
+				},
+			},
+			pvcPodCache: true,
+			expectError: false,
+		},
+		{
+			name: "fails when resource policy ConfigMap not found",
+			backup: velerov1api.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-backup",
+					Namespace: "velero",
+				},
+				Spec: velerov1api.BackupSpec{
+					ResourcePolicy: &corev1api.TypedLocalObjectReference{
+						Kind: "ConfigMap",
+						Name: "non-existent-policy",
+					},
+				},
+			},
+			pvcPodCache: false,
+			expectError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var objs []runtime.Object
+			if tc.resourcePolicyConfigMap != nil {
+				objs = append(objs, tc.resourcePolicyConfigMap)
+			}
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
+
+			var cache *podvolumeutil.PVCPodCache
+			if tc.pvcPodCache {
+				cache = podvolumeutil.NewPVCPodCache()
+			}
+
+			vh, err := NewVolumeHelperImplWithCache(
+				tc.backup,
+				fakeClient,
+				logrus.StandardLogger(),
+				cache,
+			)
+
+			if tc.expectError {
+				require.Error(t, err)
+				require.Nil(t, vh)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, vh)
+			}
+		})
+	}
+}
+
+// TestNewVolumeHelperImplWithCache_UsesCache verifies that the VolumeHelper created
+// via NewVolumeHelperImplWithCache actually uses the provided cache for lookups.
+func TestNewVolumeHelperImplWithCache_UsesCache(t *testing.T) {
+	// Create a pod that uses a PVC via opt-out (defaultVolumesToFsBackup=true)
+	pod := builder.ForPod("ns", "pod-1").Volumes(
+		&corev1api.Volume{
+			Name: "volume",
+			VolumeSource: corev1api.VolumeSource{
+				PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+					ClaimName: "pvc-1",
+				},
+			},
+		},
+	).Result()
+
+	pvc := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns",
+			Name:      "pvc-1",
+		},
+	}
+
+	pv := builder.ForPersistentVolume("example-pv").StorageClass("gp2-csi").ClaimRef("ns", "pvc-1").Result()
+
+	fakeClient := velerotest.NewFakeControllerRuntimeClient(t, pvc, pv, pod)
+
+	// Build cache for the namespace
+	cache := podvolumeutil.NewPVCPodCache()
+	err := cache.BuildCacheForNamespace(t.Context(), "ns", fakeClient)
+	require.NoError(t, err)
+
+	backup := velerov1api.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-backup",
+			Namespace: "velero",
+		},
+		Spec: velerov1api.BackupSpec{
+			SnapshotVolumes:          ptr.To(true),
+			DefaultVolumesToFsBackup: ptr.To(true), // opt-out mode
+		},
+	}
+
+	vh, err := NewVolumeHelperImplWithCache(backup, fakeClient, logrus.StandardLogger(), cache)
+	require.NoError(t, err)
+
+	// Convert PV to unstructured
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pv)
+	require.NoError(t, err)
+
+	// ShouldPerformSnapshot should return false because the volume is selected for fs-backup
+	// This relies on the cache to find the pod using the PVC
+	shouldSnapshot, err := vh.ShouldPerformSnapshot(&unstructured.Unstructured{Object: obj}, kuberesource.PersistentVolumes)
+	require.NoError(t, err)
+	require.False(t, shouldSnapshot, "Expected snapshot to be skipped due to fs-backup selection via cache")
 }
