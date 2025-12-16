@@ -1059,11 +1059,11 @@ func TestVolumeHelperImplWithCache_ShouldPerformFSBackup(t *testing.T) {
 // which is used by plugins that build the cache lazily per-namespace.
 func TestNewVolumeHelperImplWithCache(t *testing.T) {
 	testCases := []struct {
-		name                     string
-		backup                   velerov1api.Backup
-		resourcePolicyConfigMap  *corev1api.ConfigMap
-		pvcPodCache              bool // whether to pass a cache
-		expectError              bool
+		name                    string
+		backup                  velerov1api.Backup
+		resourcePolicyConfigMap *corev1api.ConfigMap
+		pvcPodCache             bool // whether to pass a cache
+		expectError             bool
 	}{
 		{
 			name: "creates VolumeHelper with nil cache",

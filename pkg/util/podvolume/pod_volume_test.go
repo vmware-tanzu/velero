@@ -1302,11 +1302,11 @@ func TestIsNamespaceBuilt(t *testing.T) {
 // TestBuildCacheForNamespace tests the lazy per-namespace cache building.
 func TestBuildCacheForNamespace(t *testing.T) {
 	tests := []struct {
-		name           string
-		pods           []runtime.Object
-		namespace      string
-		expectedPVCs   map[string]int // pvcName -> expected pod count
-		expectError    bool
+		name         string
+		pods         []runtime.Object
+		namespace    string
+		expectedPVCs map[string]int // pvcName -> expected pod count
+		expectError  bool
 	}{
 		{
 			name:      "build cache for namespace with pods using PVCs",
