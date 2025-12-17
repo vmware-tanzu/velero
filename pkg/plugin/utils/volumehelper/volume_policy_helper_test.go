@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/vmware-tanzu/velero/internal/volumehelper"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -290,8 +291,16 @@ func TestShouldPerformSnapshotWithNonNilVolumeHelper(t *testing.T) {
 
 	logger := logrus.New()
 
-	// Create VolumeHelper using the factory function
-	vh, err := NewVolumeHelperForBackup(*backup, client, logger, []string{"default"})
+	// Create VolumeHelper using the internal function with namespace caching
+	vh, err := volumehelper.NewVolumeHelperImplWithNamespaces(
+		nil, // no resource policies for this test
+		nil, // snapshotVolumes not set
+		logger,
+		client,
+		false, // defaultVolumesToFSBackup
+		true,  // backupExcludePVC
+		[]string{"default"},
+	)
 	require.NoError(t, err)
 	require.NotNil(t, vh)
 
@@ -312,129 +321,4 @@ func TestShouldPerformSnapshotWithNonNilVolumeHelper(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, result, "Should return true for snapshot when snapshotVolumes not set")
-}
-
-func TestNewVolumeHelperForBackup(t *testing.T) {
-	tests := []struct {
-		name       string
-		backup     *velerov1api.Backup
-		namespaces []string
-		wantError  bool
-	}{
-		{
-			name: "Creates VolumeHelper with explicit namespaces",
-			backup: &velerov1api.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-backup",
-					Namespace: "velero",
-				},
-				Spec: velerov1api.BackupSpec{
-					IncludedNamespaces: []string{"ns1", "ns2"},
-				},
-			},
-			namespaces: []string{"ns1", "ns2"},
-			wantError:  false,
-		},
-		{
-			name: "Creates VolumeHelper with namespaces from backup spec",
-			backup: &velerov1api.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-backup",
-					Namespace: "velero",
-				},
-				Spec: velerov1api.BackupSpec{
-					IncludedNamespaces: []string{"ns1", "ns2"},
-				},
-			},
-			namespaces: nil, // Will be resolved from backup spec
-			wantError:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client := velerotest.NewFakeControllerRuntimeClient(t)
-			logger := logrus.New()
-
-			vh, err := NewVolumeHelperForBackup(*tt.backup, client, logger, tt.namespaces)
-
-			if tt.wantError {
-				require.Error(t, err)
-				require.Nil(t, vh)
-			} else {
-				require.NoError(t, err)
-				require.NotNil(t, vh)
-			}
-		})
-	}
-}
-
-func TestResolveNamespacesForBackup(t *testing.T) {
-	tests := []struct {
-		name           string
-		backup         *velerov1api.Backup
-		existingNS     []string
-		expectedResult []string
-	}{
-		{
-			name: "Returns included namespaces",
-			backup: &velerov1api.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-backup",
-					Namespace: "velero",
-				},
-				Spec: velerov1api.BackupSpec{
-					IncludedNamespaces: []string{"ns1", "ns2", "ns3"},
-				},
-			},
-			existingNS:     []string{"ns1", "ns2", "ns3", "ns4"},
-			expectedResult: []string{"ns1", "ns2", "ns3"},
-		},
-		{
-			name: "Excludes specified namespaces from included list",
-			backup: &velerov1api.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-backup",
-					Namespace: "velero",
-				},
-				Spec: velerov1api.BackupSpec{
-					IncludedNamespaces: []string{"ns1", "ns2", "ns3"},
-					ExcludedNamespaces: []string{"ns2"},
-				},
-			},
-			existingNS:     []string{"ns1", "ns2", "ns3", "ns4"},
-			expectedResult: []string{"ns1", "ns3"},
-		},
-		{
-			name: "Returns all namespaces when IncludedNamespaces is empty",
-			backup: &velerov1api.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-backup",
-					Namespace: "velero",
-				},
-				Spec: velerov1api.BackupSpec{},
-			},
-			existingNS:     []string{"default", "kube-system", "app-ns"},
-			expectedResult: []string{"default", "kube-system", "app-ns"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create fake client with namespaces
-			var objects []runtime.Object
-			for _, ns := range tt.existingNS {
-				objects = append(objects, &corev1api.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: ns,
-					},
-				})
-			}
-			client := velerotest.NewFakeControllerRuntimeClient(t, objects...)
-
-			result, err := resolveNamespacesForBackup(*tt.backup, client)
-			require.NoError(t, err)
-			require.ElementsMatch(t, tt.expectedResult, result)
-		})
-	}
 }

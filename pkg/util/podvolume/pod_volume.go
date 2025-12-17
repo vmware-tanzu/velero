@@ -253,19 +253,8 @@ func GetVolumesToExclude(obj metav1.Object) []string {
 	return strings.Split(annotations[velerov1api.VolumesToExcludeAnnotation], ",")
 }
 
-// IsPVCDefaultToFSBackup checks if a PVC should default to fs-backup based on pod annotations.
-// Deprecated: Use IsPVCDefaultToFSBackupWithCache for better performance.
-func IsPVCDefaultToFSBackup(pvcNamespace, pvcName string, crClient crclient.Client, defaultVolumesToFsBackup bool) (bool, error) {
-	pods, err := GetPodsUsingPVC(pvcNamespace, pvcName, crClient)
-	if err != nil {
-		return false, errors.WithStack(err)
-	}
-
-	return checkPodsForFSBackup(pods, pvcName, defaultVolumesToFsBackup)
-}
-
-// IsPVCDefaultToFSBackupWithCache is the cached version of IsPVCDefaultToFSBackup.
-// If cache is nil or not built, it falls back to the non-cached version.
+// IsPVCDefaultToFSBackupWithCache checks if a PVC should default to fs-backup based on pod annotations.
+// If cache is nil or not built, it falls back to listing pods directly.
 // Note: In the main backup path, the cache is always built (via NewVolumeHelperImplWithNamespaces),
 // so the fallback is only used by plugins that don't need cache optimization.
 func IsPVCDefaultToFSBackupWithCache(
@@ -281,7 +270,7 @@ func IsPVCDefaultToFSBackupWithCache(
 	if cache != nil && cache.IsBuilt() {
 		pods = cache.GetPodsUsingPVC(pvcNamespace, pvcName)
 	} else {
-		pods, err = GetPodsUsingPVC(pvcNamespace, pvcName, crClient)
+		pods, err = getPodsUsingPVCDirect(pvcNamespace, pvcName, crClient)
 		if err != nil {
 			return false, errors.WithStack(err)
 		}
@@ -318,10 +307,32 @@ func getPodVolumeNameForPVC(pod corev1api.Pod, pvcName string) (string, error) {
 	return "", errors.Errorf("Pod %s/%s does not use PVC %s/%s", pod.Namespace, pod.Name, pod.Namespace, pvcName)
 }
 
-// GetPodsUsingPVC returns all pods in the given namespace that use the specified PVC.
-// This function lists all pods in the namespace and filters them, which can be slow
-// when there are many pods. Consider using GetPodsUsingPVCWithCache for better performance.
-func GetPodsUsingPVC(
+// GetPodsUsingPVCWithCache returns all pods that use the specified PVC.
+// If cache is available and built, it uses the cache for O(1) lookup.
+// Otherwise, it falls back to listing pods directly.
+// Note: In the main backup path, the cache is always built (via NewVolumeHelperImplWithNamespaces),
+// so the fallback is only used by plugins that don't need cache optimization.
+func GetPodsUsingPVCWithCache(
+	pvcNamespace, pvcName string,
+	crClient crclient.Client,
+	cache *PVCPodCache,
+) ([]corev1api.Pod, error) {
+	// Use cache if available
+	if cache != nil && cache.IsBuilt() {
+		pods := cache.GetPodsUsingPVC(pvcNamespace, pvcName)
+		if pods == nil {
+			return []corev1api.Pod{}, nil
+		}
+		return pods, nil
+	}
+
+	// Fall back to direct lookup (for plugins without cache)
+	return getPodsUsingPVCDirect(pvcNamespace, pvcName, crClient)
+}
+
+// getPodsUsingPVCDirect returns all pods in the given namespace that use the specified PVC.
+// This is an internal function that lists all pods in the namespace and filters them.
+func getPodsUsingPVCDirect(
 	pvcNamespace, pvcName string,
 	crClient crclient.Client,
 ) ([]corev1api.Pod, error) {
@@ -344,29 +355,6 @@ func GetPodsUsingPVC(
 	}
 
 	return podsUsingPVC, nil
-}
-
-// GetPodsUsingPVCWithCache returns all pods that use the specified PVC.
-// If cache is available and built, it uses the cache for O(1) lookup.
-// Otherwise, it falls back to the original GetPodsUsingPVC function.
-// Note: In the main backup path, the cache is always built (via NewVolumeHelperImplWithNamespaces),
-// so the fallback is only used by plugins that don't need cache optimization.
-func GetPodsUsingPVCWithCache(
-	pvcNamespace, pvcName string,
-	crClient crclient.Client,
-	cache *PVCPodCache,
-) ([]corev1api.Pod, error) {
-	// Use cache if available
-	if cache != nil && cache.IsBuilt() {
-		pods := cache.GetPodsUsingPVC(pvcNamespace, pvcName)
-		if pods == nil {
-			return []corev1api.Pod{}, nil
-		}
-		return pods, nil
-	}
-
-	// Fall back to direct lookup
-	return GetPodsUsingPVC(pvcNamespace, pvcName, crClient)
 }
 
 func GetVolumesToProcess(volumes []corev1api.Volume, volsToProcessByLegacyApproach []string) []corev1api.Volume {

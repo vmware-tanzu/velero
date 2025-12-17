@@ -41,6 +41,11 @@ type volumeHelperImpl struct {
 	pvcPodCache *podvolumeutil.PVCPodCache
 }
 
+// NewVolumeHelperImpl creates a VolumeHelper without PVC-to-Pod caching.
+//
+// Deprecated: Use NewVolumeHelperImplWithNamespaces or NewVolumeHelperImplWithCache instead
+// for better performance. These functions provide PVC-to-Pod caching which avoids O(N*M)
+// complexity when there are many PVCs and pods. See issue #9179 for details.
 func NewVolumeHelperImpl(
 	volumePolicy *resourcepolicies.Policies,
 	snapshotVolumes *bool,
