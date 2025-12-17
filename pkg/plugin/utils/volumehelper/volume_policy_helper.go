@@ -83,6 +83,7 @@ func ShouldPerformSnapshotWithVolumeHelper(
 		return false, err
 	}
 
+	//nolint:staticcheck // Intentional use of deprecated function for backwards compatibility
 	volumeHelperImpl := volumehelper.NewVolumeHelperImpl(
 		resourcePolicies,
 		backup.Spec.SnapshotVolumes,

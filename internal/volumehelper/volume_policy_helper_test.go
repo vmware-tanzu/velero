@@ -322,6 +322,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 					t.Fatalf("failed to build policy with error %v", err)
 				}
 			}
+			//nolint:staticcheck // Testing deprecated function for backwards compatibility
 			vh := NewVolumeHelperImpl(
 				p,
 				tc.snapshotVolumesFlag,
@@ -687,6 +688,7 @@ func TestVolumeHelperImpl_ShouldPerformFSBackup(t *testing.T) {
 					t.Fatalf("failed to build policy with error %v", err)
 				}
 			}
+			//nolint:staticcheck // Testing deprecated function for backwards compatibility
 			vh := NewVolumeHelperImpl(
 				p,
 				tc.snapshotVolumesFlag,
