@@ -538,6 +538,45 @@ func TestGetJobConfig(t *testing.T) {
 			},
 			expectedError: nil,
 		},
+		{
+			name: "Configs only exist in global section should supersede specific config",
+			repoJobConfig: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: veleroNamespace,
+					Name:      repoMaintenanceJobConfig,
+				},
+				Data: map[string]string{
+					GlobalKeyForRepoMaintenanceJobCM: "{\"keepLatestMaintenanceJobs\":1,\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}],\"priorityClassName\":\"global-priority\",\"podAnnotations\":{\"global-key\":\"global-value\"},\"podLabels\":{\"global-key\":\"global-value\"}}",
+					"test-default-kopia":             "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}],\"priorityClassName\":\"specific-priority\",\"podAnnotations\":{\"specific-key\":\"specific-value\"},\"podLabels\":{\"specific-key\":\"specific-value\"}}",
+				},
+			},
+			expectedConfig: &velerotypes.JobConfigs{
+				KeepLatestMaintenanceJobs: &keepLatestMaintenanceJobs,
+				PodResources: &kube.PodResources{
+					CPURequest:    "100m",
+					CPULimit:      "200m",
+					MemoryRequest: "100Mi",
+					MemoryLimit:   "200Mi",
+				},
+				LoadAffinities: []*kube.LoadAffinity{
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "cloud.google.com/machine-family",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"e2"},
+								},
+							},
+						},
+					},
+				},
+				PriorityClassName: "global-priority",
+				PodAnnotations:    map[string]string{"global-key": "global-value"},
+				PodLabels:         map[string]string{"global-key": "global-value"},
+			},
+			expectedError: nil,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -938,12 +977,12 @@ func TestBuildJob(t *testing.T) {
 		deploy                     *appsv1api.Deployment
 		logLevel                   logrus.Level
 		logFormat                  *logging.FormatFlag
-		thirdPartyLabel            map[string]string
 		expectedJobName            string
 		expectedError              bool
 		expectedEnv                []corev1api.EnvVar
 		expectedEnvFrom            []corev1api.EnvFromSource
 		expectedPodLabel           map[string]string
+		expectedPodAnnotation      map[string]string
 		expectedSecurityContext    *corev1api.SecurityContext
 		expectedPodSecurityContext *corev1api.PodSecurityContext
 		expectedImagePullSecrets   []corev1api.LocalObjectReference
@@ -1064,6 +1103,68 @@ func TestBuildJob(t *testing.T) {
 			logFormat:       logging.NewFormatFlag(),
 			expectedJobName: "",
 			expectedError:   true,
+		},
+		{
+			name: "Valid maintenance job customized labels and annotations",
+			m: &velerotypes.JobConfigs{
+				PodResources: &kube.PodResources{
+					CPURequest:    "100m",
+					MemoryRequest: "128Mi",
+					CPULimit:      "200m",
+					MemoryLimit:   "256Mi",
+				},
+				PodLabels: map[string]string{
+					"global-label-1": "global-label-value-1",
+					"global-label-2": "global-label-value-2",
+				},
+				PodAnnotations: map[string]string{
+					"global-annotation-1": "global-annotation-value-1",
+					"global-annotation-2": "global-annotation-value-2",
+				},
+			},
+			deploy:          deploy2,
+			logLevel:        logrus.InfoLevel,
+			logFormat:       logging.NewFormatFlag(),
+			expectedError:   false,
+			expectedJobName: "test-123-maintain-job",
+			expectedEnv: []corev1api.EnvVar{
+				{
+					Name:  "test-name",
+					Value: "test-value",
+				},
+			},
+			expectedEnvFrom: []corev1api.EnvFromSource{
+				{
+					ConfigMapRef: &corev1api.ConfigMapEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
+							Name: "test-configmap",
+						},
+					},
+				},
+				{
+					SecretRef: &corev1api.SecretEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
+							Name: "test-secret",
+						},
+					},
+				},
+			},
+			expectedPodLabel: map[string]string{
+				"global-label-1":    "global-label-value-1",
+				"global-label-2":    "global-label-value-2",
+				RepositoryNameLabel: "test-123",
+			},
+			expectedPodAnnotation: map[string]string{
+				"global-annotation-1": "global-annotation-value-1",
+				"global-annotation-2": "global-annotation-value-2",
+			},
+			expectedSecurityContext:    nil,
+			expectedPodSecurityContext: nil,
+			expectedImagePullSecrets: []corev1api.LocalObjectReference{
+				{
+					Name: "imagePullSecret1",
+				},
+			},
 		},
 		{
 			name: "Valid maintenance job with third party labels and BackupRepository name longer than 63",

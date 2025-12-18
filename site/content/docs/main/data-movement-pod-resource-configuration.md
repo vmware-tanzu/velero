@@ -18,7 +18,7 @@ Velero introduces a new section in the node-agent configMap, called ```podResour
 If it is not there, a configMap should be created manually. The configMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one configMap in each namespace which applies to node-agent in that namespace only. The name of the configMap should be specified in the node-agent server parameter ```--node-agent-configmap```.  
 Node-agent server checks these configurations at startup time. Therefore, you could edit this configMap any time, but in order to make the changes effective, node-agent server needs to be restarted.  
 
-### Sample
+### Pod Resources
 Here is a sample of the configMap with ```podResources```:  
 ```json
 {
@@ -27,8 +27,7 @@ Here is a sample of the configMap with ```podResources```:
         "cpuLimit": "1000m",
         "memoryRequest": "512Mi",
         "memoryLimit": "1Gi"        
-    },
-    "priorityClassName": "high-priority"
+    }
 }
 ```
 
@@ -93,12 +92,6 @@ To configure priority class for data mover pods, include it in your node-agent c
 
 ```json
 {
-    "podResources": {
-        "cpuRequest": "1000m",
-        "cpuLimit": "2000m",
-        "memoryRequest": "1Gi",
-        "memoryLimit": "4Gi"
-    },
     "priorityClassName": "backup-priority"
 }
 ```
@@ -122,6 +115,47 @@ kubectl create cm node-agent-config -n velero --from-file=node-agent-config.json
 ```
 
 **Note**: If the specified priority class doesn't exist in the cluster when data mover pods are created, the pods will fail to schedule. Velero validates the priority class at startup and logs a warning if it doesn't exist, but the pods will still attempt to use it.
+
+### Pod Labels
+Add customized labels for data mover pods to support third-party integrations and environment-specific requirements.
+
+If `podLabels` is configured, it supersedes Velero's [in-tree third-party labels](https://github.com/vmware-tanzu/velero/blob/94f64639cee09c5caaa65b65ab5f42175f41c101/pkg/util/third_party.go#L19-L21).
+If `podLabels` is not configured, Velero uses the in-tree third-party labels for compatibility with common cloud providers and networking solutions.
+
+The configurations work for DataUpload, DataDownload, PodVolumeBackup, and PodVolumeRestore pods.
+
+#### Configuration Example
+```json
+{
+  "podLabels": {
+    "spectrocloud.com/connection": "proxy",
+    "gnp/k8s-api-access": "",
+    "gnp/monitoring-client": "",
+    "np/s3-backup-backend": "",
+    "cp/inject-truststore": "extended"
+  }
+}
+```
+
+### Pod Annotations
+Add customized annotations for data mover pods to support third-party integrations and pod-level configuration.
+
+If `podAnnotations` is configured, it supersedes Velero's [in-tree third-party annotations](https://github.com/vmware-tanzu/velero/blob/94f64639cee09c5caaa65b65ab5f42175f41c101/pkg/util/third_party.go#L23-L25).
+If `podAnnotations` is not configured, Velero uses the in-tree third-party annotations for compatibility with common cloud providers and networking solutions.
+
+The configurations work for DataUpload, DataDownload, PodVolumeBackup, and PodVolumeRestore pods.
+
+#### Configuration Example
+```json
+{
+  "podAnnotations": {
+    "iam.amazonaws.com/role": "velero-backup-role",
+    "vault.hashicorp.com/agent-inject": "true",
+    "prometheus.io/scrape": "true",
+    "custom.company.com/environment": "production"
+  }
+}
+```
 
 ## Related Documentation
 

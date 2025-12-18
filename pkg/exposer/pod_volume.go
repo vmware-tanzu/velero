@@ -184,7 +184,22 @@ func (e *podVolumeExposer) Expose(ctx context.Context, ownerObject corev1api.Obj
 		}
 	}
 
-	hostingPod, err := e.createHostingPod(ctx, ownerObject, param.Type, path.ByPath, param.OperationTimeout, param.HostingPodLabels, param.HostingPodAnnotations, param.HostingPodTolerations, pod.Spec.NodeName, param.Resources, nodeOS, param.PriorityClassName, param.Privileged, cachePVC)
+	hostingPod, err := e.createHostingPod(
+		ctx,
+		ownerObject,
+		param.Type,
+		path.ByPath,
+		param.OperationTimeout,
+		param.HostingPodLabels,
+		param.HostingPodAnnotations,
+		param.HostingPodTolerations,
+		pod.Spec.NodeName,
+		param.Resources,
+		nodeOS,
+		param.PriorityClassName,
+		param.Privileged,
+		cachePVC,
+	)
 	if err != nil {
 		return errors.Wrapf(err, "error to create hosting pod")
 	}
@@ -328,8 +343,22 @@ func (e *podVolumeExposer) CleanUp(ctx context.Context, ownerObject corev1api.Ob
 	kube.DeletePVAndPVCIfAny(ctx, e.kubeClient.CoreV1(), cachePVCName, ownerObject.Namespace, 0, e.log)
 }
 
-func (e *podVolumeExposer) createHostingPod(ctx context.Context, ownerObject corev1api.ObjectReference, exposeType string, hostPath string,
-	operationTimeout time.Duration, label map[string]string, annotation map[string]string, toleration []corev1api.Toleration, selectedNode string, resources corev1api.ResourceRequirements, nodeOS string, priorityClassName string, privileged bool, cachePVC *corev1api.PersistentVolumeClaim) (*corev1api.Pod, error) {
+func (e *podVolumeExposer) createHostingPod(
+	ctx context.Context,
+	ownerObject corev1api.ObjectReference,
+	exposeType string,
+	hostPath string,
+	operationTimeout time.Duration,
+	label map[string]string,
+	annotation map[string]string,
+	toleration []corev1api.Toleration,
+	selectedNode string,
+	resources corev1api.ResourceRequirements,
+	nodeOS string,
+	priorityClassName string,
+	privileged bool,
+	cachePVC *corev1api.PersistentVolumeClaim,
+) (*corev1api.Pod, error) {
 	hostingPodName := ownerObject.Name
 
 	containerName := string(ownerObject.UID)

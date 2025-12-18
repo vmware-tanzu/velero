@@ -47,13 +47,12 @@ import (
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
+	datapathmocks "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	datapathmocks "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
 )
 
 const pvbName = "pvb-1"
@@ -153,6 +152,8 @@ func initPVBReconcilerWithError(needError ...error) (*PodVolumeBackupReconciler,
 		velerotest.NewLogger(),
 		"",    // dataMovePriorityClass
 		false, // privileged
+		nil,   // podLabels
+		nil,   // podAnnotations
 	), nil
 }
 
@@ -1184,6 +1185,126 @@ func TestResumeCancellablePodVolumeBackup(t *testing.T) {
 			if test.expectedError != "" {
 				assert.EqualError(t, err, test.expectedError)
 			}
+		})
+	}
+}
+
+func TestPodVolumeBackupSetupExposeParam(t *testing.T) {
+	// common objects for all cases
+	node := builder.ForNode("worker-1").Labels(map[string]string{kube.NodeOSLabel: kube.NodeOSLinux}).Result()
+
+	basePVB := pvbBuilder().Result()
+	basePVB.Spec.Node = "worker-1"
+	basePVB.Spec.Pod.Namespace = "app-ns"
+	basePVB.Spec.Pod.Name = "app-pod"
+	basePVB.Spec.Volume = "data-vol"
+
+	type args struct {
+		customLabels      map[string]string
+		customAnnotations map[string]string
+	}
+	type want struct {
+		labels      map[string]string
+		annotations map[string]string
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "label has customize values",
+			args: args{
+				customLabels:      map[string]string{"custom-label": "label-value"},
+				customAnnotations: nil,
+			},
+			want: want{
+				labels: map[string]string{
+					velerov1api.PVBLabel: basePVB.Name,
+					"custom-label":       "label-value",
+				},
+				annotations: map[string]string{},
+			},
+		},
+		{
+			name: "label has no customize values",
+			args: args{
+				customLabels:      nil,
+				customAnnotations: nil,
+			},
+			want: want{
+				labels:      map[string]string{velerov1api.PVBLabel: basePVB.Name},
+				annotations: map[string]string{},
+			},
+		},
+		{
+			name: "annotation has customize values",
+			args: args{
+				customLabels:      nil,
+				customAnnotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+			want: want{
+				labels:      map[string]string{velerov1api.PVBLabel: basePVB.Name},
+				annotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+		},
+		{
+			name: "annotation has no customize values",
+			args: args{
+				customLabels:      map[string]string{"another-label": "lval"},
+				customAnnotations: nil,
+			},
+			want: want{
+				labels: map[string]string{
+					velerov1api.PVBLabel: basePVB.Name,
+					"another-label":      "lval",
+				},
+				annotations: map[string]string{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Fake clients per case
+			fakeCRClient := velerotest.NewFakeControllerRuntimeClient(t, node, basePVB.DeepCopy())
+			fakeKubeClient := clientgofake.NewSimpleClientset(node)
+
+			// Reconciler config per case
+			preparingTimeout := time.Minute * 3
+			resourceTimeout := time.Minute * 10
+			podRes := corev1api.ResourceRequirements{}
+			r := NewPodVolumeBackupReconciler(
+				fakeCRClient,
+				nil,
+				fakeKubeClient,
+				datapath.NewManager(1),
+				nil,
+				"test-node",
+				preparingTimeout,
+				resourceTimeout,
+				podRes,
+				metrics.NewServerMetrics(),
+				velerotest.NewLogger(),
+				"backup-priority",
+				true,
+				tt.args.customLabels,
+				tt.args.customAnnotations,
+			)
+
+			// Act
+			got := r.setupExposeParam(basePVB)
+
+			// Core fields
+			assert.Equal(t, exposer.PodVolumeExposeTypeBackup, got.Type)
+			assert.Equal(t, basePVB.Spec.Pod.Namespace, got.ClientNamespace)
+			assert.Equal(t, basePVB.Spec.Pod.Name, got.ClientPodName)
+			assert.Equal(t, basePVB.Spec.Volume, got.ClientPodVolume)
+
+			// Labels/Annotations
+			assert.Equal(t, tt.want.labels, got.HostingPodLabels)
+			assert.Equal(t, tt.want.annotations, got.HostingPodAnnotations)
 		})
 	}
 }

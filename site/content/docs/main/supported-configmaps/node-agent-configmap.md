@@ -426,6 +426,70 @@ For detailed information, see [Cache PVC Configuration for Data Movement Restore
 }
 ```
 
+### Pod Labels Configuration (`podLabels`)
+
+Add customized labels for data mover pods to support third-party integrations and environment-specific requirements.
+
+If `podLabels` is configured, it supersedes Velero's [in-tree third-party labels](https://github.com/vmware-tanzu/velero/blob/94f64639cee09c5caaa65b65ab5f42175f41c101/pkg/util/third_party.go#L19-L21).
+If `podLabels` is not configured, Velero uses the in-tree third-party labels for compatibility with common cloud providers and networking solutions.
+
+The configurations work for DataUpload, DataDownload, PodVolumeBackup, and PodVolumeRestore pods.
+
+#### Configuration Example
+```json
+{
+  "podLabels": {
+    "spectrocloud.com/connection": "proxy",
+    "gnp/k8s-api-access": "",
+    "gnp/monitoring-client": "",
+    "np/s3-backup-backend": "",
+    "cp/inject-truststore": "extended"
+  }
+}
+```
+
+#### Use Cases
+- **Proxy Configuration**: Kubernetes environment requires proxy settings for external connections configured via labels
+- **Firewall Rules**: Network policies configured based on pod labels for traffic control
+- **Cloud Provider Integration**: Labels required by managed Kubernetes services (AKS, EKS, GKE)
+- **Security Policy Injection**: Labels that trigger security agent or certificate injection
+
+#### Important Notes
+- **Third-party Label Replacement**: When `podLabels` is configured, Velero's built-in in-tree labels are NOT automatically added
+- **Explicit Configuration Required**: If you need both custom labels and in-tree third-party labels, explicitly include the in-tree labels in the `podLabels` configuration
+- **In-tree Labels**: The default in-tree labels include support for Azure workload identity
+
+### Pod Annotations Configuration (`podAnnotations`)
+
+Add customized annotations for data mover pods to support third-party integrations and pod-level configuration.
+
+If `podAnnotations` is configured, it supersedes Velero's [in-tree third-party annotations](https://github.com/vmware-tanzu/velero/blob/94f64639cee09c5caaa65b65ab5f42175f41c101/pkg/util/third_party.go#L23-L25).
+If `podAnnotations` is not configured, Velero uses the in-tree third-party annotations for compatibility with common cloud providers and networking solutions.
+
+The configurations work for DataUpload, DataDownload, PodVolumeBackup, and PodVolumeRestore pods.
+
+#### Configuration Example
+```json
+{
+  "podAnnotations": {
+    "iam.amazonaws.com/role": "velero-backup-role",
+    "vault.hashicorp.com/agent-inject": "true",
+    "prometheus.io/scrape": "true",
+    "custom.company.com/environment": "production"
+  }
+}
+```
+
+#### Use Cases
+- **Secret Management Integration**: HashiCorp Vault or other secret managers using annotations for automatic secret injection
+- **Monitoring and Observability**: Prometheus scrape configurations and other monitoring tool annotations
+- **Custom Application Integration**: Company-specific annotations for operational tooling
+
+#### Important Notes
+- **Third-party Annotation Replacement**: When `podAnnotations` is configured, Velero's built-in in-tree annotations are NOT automatically added
+- **Explicit Configuration Required**: If you need both custom annotations and in-tree third-party annotations, explicitly include the in-tree annotations in the `podAnnotations` configuration
+- **In-tree Annotations**: The default in-tree annotations include support for AWS IAM roles
+
 ## Complete Configuration Example
 Here's a comprehensive example showing how all configuration sections work together:
 
@@ -492,6 +556,19 @@ Here's a comprehensive example showing how all configuration sections work toget
   "cachePVC": {
       "thresholdInGB": 1,
       "storageClass": "cache-optimized-storage"
+  },
+  "podLabels": {
+    "spectrocloud.com/connection": "proxy",
+    "gnp/k8s-api-access": "",
+    "gnp/monitoring-client": "",
+    "np/s3-backup-backend": "",
+    "cp/inject-truststore": "extended"
+  },
+  "podAnnotations": {
+    "iam.amazonaws.com/role": "velero-backup-role",
+    "vault.hashicorp.com/agent-inject": "true",
+    "prometheus.io/scrape": "true",
+    "custom.company.com/environment": "production"
   }
 }
 ```
@@ -508,6 +585,7 @@ This configuration:
 - Enable privileged permission for PodVolume pods
 - Enable cache PVC for file system restore
 - The cache threshold is 1GB and use dedicated StorageClass
+- Use customized labels and annotations data mover pods
 
 ## Troubleshooting
 

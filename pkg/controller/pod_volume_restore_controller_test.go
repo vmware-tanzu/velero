@@ -617,7 +617,25 @@ func initPodVolumeRestoreReconcilerWithError(objects []runtime.Object, cliObj []
 
 	dataPathMgr := datapath.NewManager(1)
 
-	return NewPodVolumeRestoreReconciler(fakeClient, nil, fakeKubeClient, dataPathMgr, nil, "test-node", time.Minute*5, time.Minute, nil, nil, corev1api.ResourceRequirements{}, velerotest.NewLogger(), "", false, nil), nil
+	return NewPodVolumeRestoreReconciler(
+		fakeClient,
+		nil,
+		fakeKubeClient,
+		dataPathMgr,
+		nil,
+		"test-node",
+		time.Minute*5,
+		time.Minute,
+		nil,
+		nil,
+		corev1api.ResourceRequirements{},
+		velerotest.NewLogger(),
+		"",
+		false,
+		nil,
+		nil, // podLabels
+		nil, // podAnnotations
+	), nil
 }
 
 func TestPodVolumeRestoreReconcile(t *testing.T) {
@@ -1078,6 +1096,128 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 			} else if pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseAccepted {
 				assert.Contains(t, pvr.Labels, exposer.ExposeOnGoingLabel)
 			}
+		})
+	}
+}
+
+func TestPodVolumeRestoreSetupExposeParam(t *testing.T) {
+	// common objects for all cases
+	node := builder.ForNode("worker-1").Labels(map[string]string{kube.NodeOSLabel: kube.NodeOSLinux}).Result()
+
+	basePVR := pvrBuilder().Result()
+	basePVR.Status.Node = "worker-1"
+	basePVR.Spec.Pod.Namespace = "app-ns"
+	basePVR.Spec.Pod.Name = "app-pod"
+	basePVR.Spec.Volume = "data-vol"
+
+	type args struct {
+		customLabels      map[string]string
+		customAnnotations map[string]string
+	}
+	type want struct {
+		labels      map[string]string
+		annotations map[string]string
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "label has customize values",
+			args: args{
+				customLabels:      map[string]string{"custom-label": "label-value"},
+				customAnnotations: nil,
+			},
+			want: want{
+				labels: map[string]string{
+					velerov1api.PVRLabel: basePVR.Name,
+					"custom-label":       "label-value",
+				},
+				annotations: map[string]string{},
+			},
+		},
+		{
+			name: "label has no customize values",
+			args: args{
+				customLabels:      nil,
+				customAnnotations: nil,
+			},
+			want: want{
+				labels:      map[string]string{velerov1api.PVRLabel: basePVR.Name},
+				annotations: map[string]string{},
+			},
+		},
+		{
+			name: "annotation has customize values",
+			args: args{
+				customLabels:      nil,
+				customAnnotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+			want: want{
+				labels:      map[string]string{velerov1api.PVRLabel: basePVR.Name},
+				annotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+		},
+		{
+			name: "annotation has no customize values",
+			args: args{
+				customLabels:      map[string]string{"another-label": "lval"},
+				customAnnotations: nil,
+			},
+			want: want{
+				labels: map[string]string{
+					velerov1api.PVRLabel: basePVR.Name,
+					"another-label":      "lval",
+				},
+				annotations: map[string]string{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Fake clients per case
+			fakeCRClient := velerotest.NewFakeControllerRuntimeClient(t, node, basePVR.DeepCopy())
+			fakeKubeClient := clientgofake.NewSimpleClientset(node)
+
+			// Reconciler config per case
+			preparingTimeout := time.Minute * 3
+			resourceTimeout := time.Minute * 10
+			podRes := corev1api.ResourceRequirements{}
+			r := NewPodVolumeRestoreReconciler(
+				fakeCRClient,
+				nil,
+				fakeKubeClient,
+				datapath.NewManager(1),
+				nil,
+				"test-node",
+				preparingTimeout,
+				resourceTimeout,
+				nil, // backupRepoConfigs
+				nil, // cacheVolumeConfigs -> keep nil so CacheVolume is nil
+				podRes,
+				velerotest.NewLogger(),
+				"restore-priority",
+				true,
+				nil, // repoConfigMgr (unused when cacheVolumeConfigs is nil)
+				tt.args.customLabels,
+				tt.args.customAnnotations,
+			)
+
+			// Act
+			got := r.setupExposeParam(basePVR)
+
+			// Core fields
+			assert.Equal(t, exposer.PodVolumeExposeTypeRestore, got.Type)
+			assert.Equal(t, basePVR.Spec.Pod.Namespace, got.ClientNamespace)
+			assert.Equal(t, basePVR.Spec.Pod.Name, got.ClientPodName)
+			assert.Equal(t, basePVR.Spec.Volume, got.ClientPodVolume)
+
+			// Labels/Annotations
+			assert.Equal(t, tt.want.labels, got.HostingPodLabels)
+			assert.Equal(t, tt.want.annotations, got.HostingPodAnnotations)
 		})
 	}
 }

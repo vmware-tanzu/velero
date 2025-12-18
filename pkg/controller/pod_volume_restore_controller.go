@@ -56,10 +56,25 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
-func NewPodVolumeRestoreReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
-	counter *exposer.VgdpCounter, nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, backupRepoConfigs map[string]string,
-	cacheVolumeConfigs *velerotypes.CachePVC, podResources corev1api.ResourceRequirements, logger logrus.FieldLogger, dataMovePriorityClass string,
-	privileged bool, repoConfigMgr repository.ConfigManager) *PodVolumeRestoreReconciler {
+func NewPodVolumeRestoreReconciler(
+	client client.Client,
+	mgr manager.Manager,
+	kubeClient kubernetes.Interface,
+	dataPathMgr *datapath.Manager,
+	counter *exposer.VgdpCounter,
+	nodeName string,
+	preparingTimeout time.Duration,
+	resourceTimeout time.Duration,
+	backupRepoConfigs map[string]string,
+	cacheVolumeConfigs *velerotypes.CachePVC,
+	podResources corev1api.ResourceRequirements,
+	logger logrus.FieldLogger,
+	dataMovePriorityClass string,
+	privileged bool,
+	repoConfigMgr repository.ConfigManager,
+	podLabels map[string]string,
+	podAnnotations map[string]string,
+) *PodVolumeRestoreReconciler {
 	return &PodVolumeRestoreReconciler{
 		client:                client,
 		mgr:                   mgr,
@@ -79,6 +94,8 @@ func NewPodVolumeRestoreReconciler(client client.Client, mgr manager.Manager, ku
 		dataMovePriorityClass: dataMovePriorityClass,
 		privileged:            privileged,
 		repoConfigMgr:         repoConfigMgr,
+		podLabels:             podLabels,
+		podAnnotations:        podAnnotations,
 	}
 }
 
@@ -101,6 +118,8 @@ type PodVolumeRestoreReconciler struct {
 	dataMovePriorityClass string
 	privileged            bool
 	repoConfigMgr         repository.ConfigManager
+	podLabels             map[string]string
+	podAnnotations        map[string]string
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumerestores,verbs=get;list;watch;create;update;patch;delete
@@ -863,24 +882,36 @@ func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolume
 	}
 
 	hostingPodLabels := map[string]string{velerov1api.PVRLabel: pvr.Name}
-	for _, k := range util.ThirdPartyLabels {
-		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvr.Namespace, k, nodeOS); err != nil {
-			if err != nodeagent.ErrNodeAgentLabelNotFound {
-				log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
-			}
-		} else {
+	if len(r.podLabels) > 0 {
+		for k, v := range r.podLabels {
 			hostingPodLabels[k] = v
+		}
+	} else {
+		for _, k := range util.ThirdPartyLabels {
+			if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvr.Namespace, k, nodeOS); err != nil {
+				if err != nodeagent.ErrNodeAgentLabelNotFound {
+					log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
+				}
+			} else {
+				hostingPodLabels[k] = v
+			}
 		}
 	}
 
 	hostingPodAnnotation := map[string]string{}
-	for _, k := range util.ThirdPartyAnnotations {
-		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvr.Namespace, k, nodeOS); err != nil {
-			if err != nodeagent.ErrNodeAgentAnnotationNotFound {
-				log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
-			}
-		} else {
+	if len(r.podAnnotations) > 0 {
+		for k, v := range r.podAnnotations {
 			hostingPodAnnotation[k] = v
+		}
+	} else {
+		for _, k := range util.ThirdPartyAnnotations {
+			if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvr.Namespace, k, nodeOS); err != nil {
+				if err != nodeagent.ErrNodeAgentAnnotationNotFound {
+					log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
+				}
+			} else {
+				hostingPodAnnotation[k] = v
+			}
 		}
 	}
 
