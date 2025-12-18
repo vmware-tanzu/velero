@@ -124,14 +124,20 @@ func TestVSExecute(t *testing.T) {
 		},
 		{
 			name: "Normal case, VSC should be created",
-			vs: builder.ForVolumeSnapshot("ns", "vsName").ObjectMeta(
-				builder.WithAnnotationsMap(
-					map[string]string{
-						velerov1api.VolumeSnapshotHandleAnnotation: "vsc",
-						velerov1api.DriverNameAnnotation:           "pd.csi.storage.gke.io",
-					},
-				),
-			).SourceVolumeSnapshotContentName(newVscName).Status().BoundVolumeSnapshotContentName("vscName").Result(),
+			vs: builder.ForVolumeSnapshot("ns", "vsName").
+				ObjectMeta(
+					builder.WithAnnotationsMap(
+						map[string]string{
+							velerov1api.VolumeSnapshotHandleAnnotation: "vsc",
+							velerov1api.DriverNameAnnotation:           "pd.csi.storage.gke.io",
+						},
+					),
+				).
+				SourceVolumeSnapshotContentName(newVscName).
+				VolumeSnapshotClass("vscClass").
+				Status().
+				BoundVolumeSnapshotContentName("vscName").
+				Result(),
 			restore:    builder.ForRestore("velero", "restore").ObjectMeta(builder.WithUID("restoreUID")).Result(),
 			expectErr:  false,
 			expectedVS: builder.ForVolumeSnapshot("ns", "test").SourceVolumeSnapshotContentName(newVscName).Result(),
