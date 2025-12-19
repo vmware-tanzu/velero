@@ -558,7 +558,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		return clientmgmt.NewManager(logger, s.logLevel, s.pluginRegistry)
 	}
 
-	backupStoreGetter := persistence.NewObjectBackupStoreGetter(s.credentialFileStore)
+	backupStoreGetter := persistence.NewObjectBackupStoreGetterWithSecretStore(s.credentialFileStore, s.credentialSecretStore)
 
 	backupTracker := controller.NewBackupTracker()
 

@@ -28,9 +28,9 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
-func NewResticRepositoryProvider(store credentials.FileStore, fs filesystem.Interface, log logrus.FieldLogger) Provider {
+func NewResticRepositoryProvider(credGetter credentials.CredentialGetter, fs filesystem.Interface, log logrus.FieldLogger) Provider {
 	return &resticRepositoryProvider{
-		svc: restic.NewRepositoryService(store, fs, log),
+		svc: restic.NewRepositoryService(credGetter, fs, log),
 	}
 }
 

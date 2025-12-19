@@ -201,8 +201,19 @@ func (r *BackupRepoReconciler) needInvalidBackupRepo(oldObj client.Object, newOb
 		return true
 	}
 
+	// Check if either CACert or CACertRef has changed
 	if !bytes.Equal(oldStorage.CACert, newStorage.CACert) {
 		logger.Info("BSL's CACert has changed, invalid backup repositories")
+		return true
+	}
+
+	// Check if CACertRef has changed
+	if (oldStorage.CACertRef == nil && newStorage.CACertRef != nil) ||
+		(oldStorage.CACertRef != nil && newStorage.CACertRef == nil) ||
+		(oldStorage.CACertRef != nil && newStorage.CACertRef != nil &&
+			(oldStorage.CACertRef.Name != newStorage.CACertRef.Name ||
+				oldStorage.CACertRef.Key != newStorage.CACertRef.Key)) {
+		logger.Info("BSL's CACertRef has changed, invalid backup repositories")
 		return true
 	}
 
