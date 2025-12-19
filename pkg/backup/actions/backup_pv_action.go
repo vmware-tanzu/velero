@@ -103,34 +103,32 @@ func (a *PVCAction) cleanupStaleVeleroLabels(pvc *corev1api.PersistentVolumeClai
 	// Clean stale Velero labels from main metadata
 	if pvc.Labels != nil {
 		for k, v := range pvc.Labels {
-			if strings.HasPrefix(k, "velero.io/") || strings.HasPrefix(k, "backup.velero.io/") {
-				// Only remove labels that are clearly stale from previous operations
-				shouldRemove := false
+			// Only remove labels that are clearly stale from previous operations
+			shouldRemove := false
 
-				// Always remove restore-name labels as these are from previous restores
-				if k == "velero.io/restore-name" {
-					shouldRemove = true
-				}
+			// Always remove restore-name labels as these are from previous restores
+			if k == v1.RestoreNameLabel {
+				shouldRemove = true
+			}
 
-				if k == "backup.velero.io/must-include-additional-items" {
-					shouldRemove = true
-				}
+			if k == v1.MustIncludeAdditionalItemAnnotation {
+				shouldRemove = true
+			}
 
-				// Remove backup-name labels that don't match current backup
-				if k == "velero.io/backup-name" && v != backup.Name {
-					shouldRemove = true
-				}
+			// Remove backup-name labels that don't match current backup
+			if k == v1.BackupNameLabel && v != backup.Name {
+				shouldRemove = true
+			}
 
-				// Remove volume-snapshot-name labels from previous CSI backups
-				// Note: If this backup creates new CSI snapshots, the CSI action will add them back
-				if k == "velero.io/volume-snapshot-name" {
-					shouldRemove = true
-				}
+			// Remove volume-snapshot-name labels from previous CSI backups
+			// Note: If this backup creates new CSI snapshots, the CSI action will add them back
+			if k == v1.VolumeSnapshotLabel {
+				shouldRemove = true
+			}
 
-				if shouldRemove {
-					a.log.Infof("Deleting stale Velero label %s=%s from PVC %s", k, v, pvc.Name)
-					delete(pvc.Labels, k)
-				}
+			if shouldRemove {
+				a.log.Infof("Deleting stale Velero label %s=%s from PVC %s", k, v, pvc.Name)
+				delete(pvc.Labels, k)
 			}
 		}
 	}
