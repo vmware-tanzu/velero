@@ -259,13 +259,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 		return errors.Wrap(err, "error to create backup pod")
 	}
 
-	curLog = curLog.WithField("pod name", backupPod.Name)
-	if affinity != nil {
-		curLog = curLog.WithField("affinity", *affinity)
-	} else {
-		curLog = curLog.WithField("affinity", "nil")
-	}
-	curLog.Info("Backup pod is created")
+	curLog.WithField("pod name", backupPod.Name).WithField("affinity", affinity).Info("Backup pod is created")
 
 	defer func() {
 		if err != nil {
