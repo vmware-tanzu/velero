@@ -779,20 +779,6 @@ func dueForMaintenance(req *velerov1api.BackupRepository, now time.Time) bool {
 func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *velerov1api.BackupRepository, bsl *velerov1api.BackupStorageLocation, log logrus.FieldLogger) (bool, error) {
 	log.Info("Checking backup repository for readiness")
 
-	// If the repository was invalidated due to BSL configuration changes,
-	// delete it so a new repository can be created with the new BSL configuration.
-	// This allows operators to intentionally change BSL config and have the next
-	// backup/restore automatically create a new repository for the new location.
-	if req.Status.Message == msgBSLChangedOnStartup || req.Status.Message == msgBSLChanged {
-		log.WithField("message", req.Status.Message).Info("Repository invalidated due to BSL change, deleting so new repository can be created")
-		if err := r.Delete(ctx, req); err != nil {
-			return false, errors.Wrap(err, "error deleting invalidated BackupRepository")
-		}
-		// Return false with no error - the repository no longer exists
-		// and a new one will be created on the next backup/restore
-		return false, nil
-	}
-
 	// Only check and update restic identifier for restic repositories
 	if req.Spec.RepositoryType == "" || req.Spec.RepositoryType == velerov1api.BackupRepositoryTypeRestic {
 		repoIdentifier, err := r.getIdentifierByBSL(bsl, req)

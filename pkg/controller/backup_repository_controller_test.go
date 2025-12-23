@@ -26,7 +26,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -177,18 +176,28 @@ func TestCheckNotReadyRepo(t *testing.T) {
 		assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
 	})
 
-	// Test that repository invalidated by BSL changes on startup is deleted
-	t.Run("repository invalidated by BSL changes on startup is deleted", func(t *testing.T) {
+	// Test that repository invalidated by BSL changes on startup recovers and adopts new BSL config
+	t.Run("repository invalidated by BSL changes on startup recovers", func(t *testing.T) {
 		rr := mockBackupRepositoryCR()
 		rr.Spec.BackupStorageLocation = "default"
 		rr.Spec.VolumeNamespace = "volume-ns-1"
+		rr.Spec.RepositoryType = velerov1api.BackupRepositoryTypeKopia
 		rr.Status.Phase = velerov1api.BackupRepositoryPhaseNotReady
 		rr.Status.Message = msgBSLChangedOnStartup
-		// PrepareRepo should NOT be called because we delete the repo
-		reconciler := mockBackupRepoReconciler(t, "", nil)
+		// PrepareRepo SHOULD be called because we recover the repo with new BSL config
+		reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
 		err := reconciler.Client.Create(t.Context(), rr)
 		require.NoError(t, err)
 		location := velerov1api.BackupStorageLocation{
+			Spec: velerov1api.BackupStorageLocationSpec{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
+						Bucket: "new-bucket",
+						Prefix: "new-prefix",
+					},
+				},
+				Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic", "region": "us-west-2"},
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: velerov1api.DefaultNamespace,
 				Name:      rr.Spec.BackupStorageLocation,
@@ -197,30 +206,46 @@ func TestCheckNotReadyRepo(t *testing.T) {
 
 		ready, err := reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
 		require.NoError(t, err)
-		// Should return false (not ready) after deleting the repository
-		assert.False(t, ready)
+		// Should return true (ready) after recovering the repository
+		assert.True(t, ready)
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
+		assert.Empty(t, rr.Status.Message)
 
-		// Verify the repository was deleted
-		deletedRepo := &velerov1api.BackupRepository{}
+		// Verify the repository still exists and adopted new BSL config
+		recoveredRepo := &velerov1api.BackupRepository{}
 		err = reconciler.Client.Get(t.Context(), types.NamespacedName{
 			Namespace: rr.Namespace,
 			Name:      rr.Name,
-		}, deletedRepo)
-		assert.True(t, apierrors.IsNotFound(err), "repository should have been deleted")
+		}, recoveredRepo)
+		require.NoError(t, err, "repository should still exist")
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, recoveredRepo.Status.Phase)
+		assert.Equal(t, "new-bucket", recoveredRepo.Annotations[velerov1api.BSLBucketAnnotation])
+		assert.Equal(t, "new-prefix", recoveredRepo.Annotations[velerov1api.BSLPrefixAnnotation])
+		assert.Contains(t, recoveredRepo.Annotations[velerov1api.BSLConfigAnnotation], "us-west-2")
 	})
 
-	// Test that repository invalidated by BSL changes during runtime is deleted
-	t.Run("repository invalidated by BSL changes during runtime is deleted", func(t *testing.T) {
+	// Test that repository invalidated by BSL changes during runtime recovers and adopts new BSL config
+	t.Run("repository invalidated by BSL changes during runtime recovers", func(t *testing.T) {
 		rr := mockBackupRepositoryCR()
 		rr.Spec.BackupStorageLocation = "default"
 		rr.Spec.VolumeNamespace = "volume-ns-1"
+		rr.Spec.RepositoryType = velerov1api.BackupRepositoryTypeKopia
 		rr.Status.Phase = velerov1api.BackupRepositoryPhaseNotReady
 		rr.Status.Message = msgBSLChanged
-		// PrepareRepo should NOT be called because we delete the repo
-		reconciler := mockBackupRepoReconciler(t, "", nil)
+		// PrepareRepo SHOULD be called because we recover the repo with new BSL config
+		reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
 		err := reconciler.Client.Create(t.Context(), rr)
 		require.NoError(t, err)
 		location := velerov1api.BackupStorageLocation{
+			Spec: velerov1api.BackupStorageLocationSpec{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
+						Bucket: "updated-bucket",
+						Prefix: "updated-prefix",
+					},
+				},
+				Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic", "region": "eu-west-1"},
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: velerov1api.DefaultNamespace,
 				Name:      rr.Spec.BackupStorageLocation,
@@ -229,16 +254,22 @@ func TestCheckNotReadyRepo(t *testing.T) {
 
 		ready, err := reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
 		require.NoError(t, err)
-		// Should return false (not ready) after deleting the repository
-		assert.False(t, ready)
+		// Should return true (ready) after recovering the repository
+		assert.True(t, ready)
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
+		assert.Empty(t, rr.Status.Message)
 
-		// Verify the repository was deleted
-		deletedRepo := &velerov1api.BackupRepository{}
+		// Verify the repository still exists and adopted new BSL config
+		recoveredRepo := &velerov1api.BackupRepository{}
 		err = reconciler.Client.Get(t.Context(), types.NamespacedName{
 			Namespace: rr.Namespace,
 			Name:      rr.Name,
-		}, deletedRepo)
-		assert.True(t, apierrors.IsNotFound(err), "repository should have been deleted")
+		}, recoveredRepo)
+		require.NoError(t, err, "repository should still exist")
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, recoveredRepo.Status.Phase)
+		assert.Equal(t, "updated-bucket", recoveredRepo.Annotations[velerov1api.BSLBucketAnnotation])
+		assert.Equal(t, "updated-prefix", recoveredRepo.Annotations[velerov1api.BSLPrefixAnnotation])
+		assert.Contains(t, recoveredRepo.Annotations[velerov1api.BSLConfigAnnotation], "eu-west-1")
 	})
 }
 
