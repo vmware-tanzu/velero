@@ -142,16 +142,14 @@ func BackupRepositoryStartupValidation() {
 				Expect(targetRepo.Status.Phase).To(Equal(velerov1api.BackupRepositoryPhaseReady))
 			})
 
-			// Store original BSL configuration
+			// Store original BSL prefix for modification
 			originalBSL := &velerov1api.BackupStorageLocation{}
 			Expect(veleroCfg.ClientToInstallVelero.Kubebuilder.Get(oneHourTimeout,
 				types.NamespacedName{Namespace: veleroCfg.VeleroNamespace, Name: backupLocation},
 				originalBSL)).To(Succeed())
 
-			originalBucket := ""
 			originalPrefix := ""
 			if originalBSL.Spec.StorageType.ObjectStorage != nil {
-				originalBucket = originalBSL.Spec.StorageType.ObjectStorage.Bucket
 				originalPrefix = originalBSL.Spec.StorageType.ObjectStorage.Prefix
 			}
 
@@ -291,64 +289,233 @@ func BackupRepositoryStartupValidation() {
 				time.Sleep(10 * time.Second)
 			})
 
-			By("Verify BackupRepository is invalidated with correct message", func() {
-				Eventually(func() string {
+			By("Verify BackupRepository is deleted after being invalidated", func() {
+				// The controller first marks the repo as NotReady with BSL change message,
+				// then on the next reconciliation it deletes the invalidated repository.
+				// This allows operators to intentionally change BSL config and have the
+				// next backup/restore automatically create a new repository.
+				Eventually(func() bool {
 					repoList := &velerov1api.BackupRepositoryList{}
 					err := veleroCfg.ClientToInstallVelero.Kubebuilder.List(oneHourTimeout, repoList,
 						client.InNamespace(veleroCfg.VeleroNamespace))
 					if err != nil {
-						return fmt.Sprintf("Error listing repos: %v", err)
+						fmt.Printf("Error listing repos: %v\n", err)
+						return false
 					}
 
 					for _, repo := range repoList.Items {
 						if repo.Spec.VolumeNamespace == startupValidationTestNs {
 							// Log the current status for debugging
-							fmt.Printf("Repository %s: Phase=%s, Message=%s\n",
+							fmt.Printf("Repository %s still exists: Phase=%s, Message=%s\n",
 								repo.Name, repo.Status.Phase, repo.Status.Message)
-							if repo.Status.Message != "" {
-								return repo.Status.Message
-							}
-							return fmt.Sprintf("Repository found but no message, phase: %s", repo.Status.Phase)
+							return false // Repository still exists
 						}
 					}
-					return "Repository not found for namespace " + startupValidationTestNs
-				}, 3*time.Minute, 10*time.Second).Should(ContainSubstring("BSL configuration changed while Velero was not running"))
+					fmt.Println("Repository has been deleted as expected")
+					return true // Repository was deleted
+				}, 3*time.Minute, 10*time.Second).Should(BeTrue(), "BackupRepository should be deleted after BSL change")
 			})
 
-			By("Restore original BSL configuration", func() {
+			// Now verify that a new backup creates a new Ready repository
+			backupName2 := "backup2-" + UUIDgen.String()
+			BackupCfg.BackupName = backupName2
+
+			By("Create a new backup to trigger new BackupRepository creation", func() {
+				Expect(VeleroBackupNamespace(oneHourTimeout, veleroCfg.VeleroCLI,
+					veleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+					RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, BackupCfg.BackupName, "")
+					return "Fail to backup workload after BSL change"
+				})
+			})
+
+			By("Verify new backup completed successfully", func() {
+				Expect(WaitForBackupToBeCreated(context.Background(), backupName2, 10*time.Minute, &veleroCfg)).To(Succeed())
+			})
+
+			By("Verify new BackupRepository is created and Ready", func() {
+				Eventually(func() velerov1api.BackupRepositoryPhase {
+					repoList := &velerov1api.BackupRepositoryList{}
+					err := veleroCfg.ClientToInstallVelero.Kubebuilder.List(oneHourTimeout, repoList,
+						client.InNamespace(veleroCfg.VeleroNamespace))
+					if err != nil {
+						fmt.Printf("Error listing repos: %v\n", err)
+						return ""
+					}
+
+					for _, repo := range repoList.Items {
+						if repo.Spec.VolumeNamespace == startupValidationTestNs {
+							fmt.Printf("New repository %s: Phase=%s, Message=%s\n",
+								repo.Name, repo.Status.Phase, repo.Status.Message)
+							return repo.Status.Phase
+						}
+					}
+					fmt.Println("New repository not found yet")
+					return ""
+				}, 3*time.Minute, 10*time.Second).Should(Equal(velerov1api.BackupRepositoryPhaseReady),
+					"New BackupRepository should be created and Ready after BSL change")
+			})
+
+			fmt.Printf("|| EXPECTED || - Backup repository startup validation test completed successfully\n")
+		})
+	})
+
+	When("BSL configuration changes while Velero is running", func() {
+		It("Should invalidate and delete backup repositories, then allow new repo creation", func() {
+			oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
+			defer ctxCancel()
+
+			backupName := "backup-runtime-" + UUIDgen.String()
+			backupLocation := "default"
+
+			By("Create namespace for sample workload", func() {
+				Expect(CreateNamespace(oneHourTimeout, *veleroCfg.ClientToInstallVelero, startupValidationTestNs)).To(Succeed())
+			})
+
+			By("Deploy sample workload of Kibishii", func() {
+				Expect(KibishiiPrepareBeforeBackup(
+					oneHourTimeout,
+					*veleroCfg.ClientToInstallVelero,
+					veleroCfg.CloudProvider,
+					startupValidationTestNs,
+					veleroCfg.RegistryCredentialFile,
+					veleroCfg.Features,
+					veleroCfg.KibishiiDirectory,
+					DefaultKibishiiData,
+					veleroCfg.ImageRegistryProxy,
+					veleroCfg.WorkerOS,
+				)).To(Succeed())
+			})
+
+			var BackupCfg BackupConfig
+			BackupCfg.BackupName = backupName
+			BackupCfg.Namespace = startupValidationTestNs
+			BackupCfg.BackupLocation = backupLocation
+			BackupCfg.UseVolumeSnapshots = false
+			BackupCfg.DefaultVolumesToFsBackup = true
+
+			By("Backup sample workload to establish BackupRepository", func() {
+				Expect(VeleroBackupNamespace(oneHourTimeout, veleroCfg.VeleroCLI,
+					veleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+					RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, BackupCfg.BackupName, "")
+					return "Fail to backup workload"
+				})
+			})
+
+			By("Verify backup completed successfully", func() {
+				Expect(WaitForBackupToBeCreated(context.Background(), backupName, 10*time.Minute, &veleroCfg)).To(Succeed())
+			})
+
+			By("Verify BackupRepository is created and ready", func() {
+				Expect(BackupRepositoriesCountShouldBe(context.Background(),
+					veleroCfg.VeleroNamespace, startupValidationTestNs+"-"+backupLocation, 1)).To(Succeed())
+
+				repoList := &velerov1api.BackupRepositoryList{}
+				Expect(veleroCfg.ClientToInstallVelero.Kubebuilder.List(oneHourTimeout, repoList,
+					client.InNamespace(veleroCfg.VeleroNamespace))).To(Succeed())
+
+				var targetRepo *velerov1api.BackupRepository
+				for i := range repoList.Items {
+					if repoList.Items[i].Spec.VolumeNamespace == startupValidationTestNs {
+						targetRepo = &repoList.Items[i]
+						break
+					}
+				}
+				Expect(targetRepo).NotTo(BeNil(), "BackupRepository not found")
+				Expect(targetRepo.Status.Phase).To(Equal(velerov1api.BackupRepositoryPhaseReady))
+			})
+
+			// Store original BSL prefix for modification
+			originalBSL := &velerov1api.BackupStorageLocation{}
+			Expect(veleroCfg.ClientToInstallVelero.Kubebuilder.Get(oneHourTimeout,
+				types.NamespacedName{Namespace: veleroCfg.VeleroNamespace, Name: backupLocation},
+				originalBSL)).To(Succeed())
+
+			originalPrefix := ""
+			if originalBSL.Spec.StorageType.ObjectStorage != nil {
+				originalPrefix = originalBSL.Spec.StorageType.ObjectStorage.Prefix
+			}
+
+			By("Modify BSL configuration while Velero is running (change prefix)", func() {
 				bsl := &velerov1api.BackupStorageLocation{}
 				Expect(veleroCfg.ClientToInstallVelero.Kubebuilder.Get(oneHourTimeout,
 					types.NamespacedName{Namespace: veleroCfg.VeleroNamespace, Name: backupLocation},
 					bsl)).To(Succeed())
 
 				if bsl.Spec.StorageType.ObjectStorage != nil {
-					bsl.Spec.StorageType.ObjectStorage.Bucket = originalBucket
-					bsl.Spec.StorageType.ObjectStorage.Prefix = originalPrefix
+					fmt.Printf("Original BSL prefix: %s\n", bsl.Spec.StorageType.ObjectStorage.Prefix)
+					bsl.Spec.StorageType.ObjectStorage.Prefix = originalPrefix + "-runtime-modified"
+					fmt.Printf("Modified BSL prefix: %s\n", bsl.Spec.StorageType.ObjectStorage.Prefix)
 				}
 
 				Expect(veleroCfg.ClientToInstallVelero.Kubebuilder.Update(oneHourTimeout,
 					bsl)).To(Succeed())
+				fmt.Println("BSL configuration successfully modified while Velero is running")
 			})
 
-			By("Verify BackupRepository recovers to Ready state", func() {
+			By("Verify BackupRepository is deleted after runtime BSL change", func() {
+				// The BSL watcher detects the change, marks repo NotReady,
+				// then the controller deletes it on next reconciliation.
+				Eventually(func() bool {
+					repoList := &velerov1api.BackupRepositoryList{}
+					err := veleroCfg.ClientToInstallVelero.Kubebuilder.List(oneHourTimeout, repoList,
+						client.InNamespace(veleroCfg.VeleroNamespace))
+					if err != nil {
+						fmt.Printf("Error listing repos: %v\n", err)
+						return false
+					}
+
+					for _, repo := range repoList.Items {
+						if repo.Spec.VolumeNamespace == startupValidationTestNs {
+							fmt.Printf("Repository %s still exists: Phase=%s, Message=%s\n",
+								repo.Name, repo.Status.Phase, repo.Status.Message)
+							return false
+						}
+					}
+					fmt.Println("Repository has been deleted as expected")
+					return true
+				}, 3*time.Minute, 10*time.Second).Should(BeTrue(), "BackupRepository should be deleted after runtime BSL change")
+			})
+
+			// Now verify that a new backup creates a new Ready repository
+			backupName2 := "backup-runtime2-" + UUIDgen.String()
+			BackupCfg.BackupName = backupName2
+
+			By("Create a new backup to trigger new BackupRepository creation", func() {
+				Expect(VeleroBackupNamespace(oneHourTimeout, veleroCfg.VeleroCLI,
+					veleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+					RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, BackupCfg.BackupName, "")
+					return "Fail to backup workload after runtime BSL change"
+				})
+			})
+
+			By("Verify new backup completed successfully", func() {
+				Expect(WaitForBackupToBeCreated(context.Background(), backupName2, 10*time.Minute, &veleroCfg)).To(Succeed())
+			})
+
+			By("Verify new BackupRepository is created and Ready", func() {
 				Eventually(func() velerov1api.BackupRepositoryPhase {
 					repoList := &velerov1api.BackupRepositoryList{}
 					err := veleroCfg.ClientToInstallVelero.Kubebuilder.List(oneHourTimeout, repoList,
 						client.InNamespace(veleroCfg.VeleroNamespace))
 					if err != nil {
+						fmt.Printf("Error listing repos: %v\n", err)
 						return ""
 					}
 
 					for _, repo := range repoList.Items {
 						if repo.Spec.VolumeNamespace == startupValidationTestNs {
+							fmt.Printf("New repository %s: Phase=%s, Message=%s\n",
+								repo.Name, repo.Status.Phase, repo.Status.Message)
 							return repo.Status.Phase
 						}
 					}
+					fmt.Println("New repository not found yet")
 					return ""
-				}, 5*time.Minute, 10*time.Second).Should(Equal(velerov1api.BackupRepositoryPhaseReady))
+				}, 3*time.Minute, 10*time.Second).Should(Equal(velerov1api.BackupRepositoryPhaseReady),
+					"New BackupRepository should be created and Ready after runtime BSL change")
 			})
 
-			fmt.Printf("|| EXPECTED || - Backup repository startup validation test completed successfully\n")
+			fmt.Printf("|| EXPECTED || - Backup repository runtime validation test completed successfully\n")
 		})
 	})
 }

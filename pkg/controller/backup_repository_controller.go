@@ -780,10 +780,16 @@ func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *veler
 	log.Info("Checking backup repository for readiness")
 
 	// If the repository was invalidated due to BSL configuration changes,
-	// don't try to reconnect until those changes are resolved. The BSL must
-	// be corrected first before the repository can be re-established.
+	// delete it so a new repository can be created with the new BSL configuration.
+	// This allows operators to intentionally change BSL config and have the next
+	// backup/restore automatically create a new repository for the new location.
 	if req.Status.Message == msgBSLChangedOnStartup || req.Status.Message == msgBSLChanged {
-		log.WithField("message", req.Status.Message).Info("Repository invalidated due to BSL change, waiting for BSL to be corrected")
+		log.WithField("message", req.Status.Message).Info("Repository invalidated due to BSL change, deleting so new repository can be created")
+		if err := r.Delete(ctx, req); err != nil {
+			return false, errors.Wrap(err, "error deleting invalidated BackupRepository")
+		}
+		// Return false with no error - the repository no longer exists
+		// and a new one will be created on the next backup/restore
 		return false, nil
 	}
 

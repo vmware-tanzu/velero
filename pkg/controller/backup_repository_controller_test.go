@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -176,14 +177,14 @@ func TestCheckNotReadyRepo(t *testing.T) {
 		assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
 	})
 
-	// Test that repository invalidated by BSL changes is not reconnected
-	t.Run("repository invalidated by BSL changes on startup", func(t *testing.T) {
+	// Test that repository invalidated by BSL changes on startup is deleted
+	t.Run("repository invalidated by BSL changes on startup is deleted", func(t *testing.T) {
 		rr := mockBackupRepositoryCR()
 		rr.Spec.BackupStorageLocation = "default"
 		rr.Spec.VolumeNamespace = "volume-ns-1"
 		rr.Status.Phase = velerov1api.BackupRepositoryPhaseNotReady
 		rr.Status.Message = msgBSLChangedOnStartup
-		// PrepareRepo should NOT be called because we skip reconnection
+		// PrepareRepo should NOT be called because we delete the repo
 		reconciler := mockBackupRepoReconciler(t, "", nil)
 		err := reconciler.Client.Create(t.Context(), rr)
 		require.NoError(t, err)
@@ -196,20 +197,26 @@ func TestCheckNotReadyRepo(t *testing.T) {
 
 		ready, err := reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
 		require.NoError(t, err)
-		// Should return false (not ready) and preserve the message
+		// Should return false (not ready) after deleting the repository
 		assert.False(t, ready)
-		assert.Equal(t, velerov1api.BackupRepositoryPhaseNotReady, rr.Status.Phase)
-		assert.Equal(t, msgBSLChangedOnStartup, rr.Status.Message)
+
+		// Verify the repository was deleted
+		deletedRepo := &velerov1api.BackupRepository{}
+		err = reconciler.Client.Get(t.Context(), types.NamespacedName{
+			Namespace: rr.Namespace,
+			Name:      rr.Name,
+		}, deletedRepo)
+		assert.True(t, apierrors.IsNotFound(err), "repository should have been deleted")
 	})
 
-	// Test that repository invalidated by BSL changes during runtime is not reconnected
-	t.Run("repository invalidated by BSL changes during runtime", func(t *testing.T) {
+	// Test that repository invalidated by BSL changes during runtime is deleted
+	t.Run("repository invalidated by BSL changes during runtime is deleted", func(t *testing.T) {
 		rr := mockBackupRepositoryCR()
 		rr.Spec.BackupStorageLocation = "default"
 		rr.Spec.VolumeNamespace = "volume-ns-1"
 		rr.Status.Phase = velerov1api.BackupRepositoryPhaseNotReady
 		rr.Status.Message = msgBSLChanged
-		// PrepareRepo should NOT be called because we skip reconnection
+		// PrepareRepo should NOT be called because we delete the repo
 		reconciler := mockBackupRepoReconciler(t, "", nil)
 		err := reconciler.Client.Create(t.Context(), rr)
 		require.NoError(t, err)
@@ -222,10 +229,16 @@ func TestCheckNotReadyRepo(t *testing.T) {
 
 		ready, err := reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
 		require.NoError(t, err)
-		// Should return false (not ready) and preserve the message
+		// Should return false (not ready) after deleting the repository
 		assert.False(t, ready)
-		assert.Equal(t, velerov1api.BackupRepositoryPhaseNotReady, rr.Status.Phase)
-		assert.Equal(t, msgBSLChanged, rr.Status.Message)
+
+		// Verify the repository was deleted
+		deletedRepo := &velerov1api.BackupRepository{}
+		err = reconciler.Client.Get(t.Context(), types.NamespacedName{
+			Namespace: rr.Namespace,
+			Name:      rr.Name,
+		}, deletedRepo)
+		assert.True(t, apierrors.IsNotFound(err), "repository should have been deleted")
 	})
 }
 
