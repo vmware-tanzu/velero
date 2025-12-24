@@ -17,11 +17,11 @@ limitations under the License.
 package k8s
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"time"
 
-	"golang.org/x/net/context"
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

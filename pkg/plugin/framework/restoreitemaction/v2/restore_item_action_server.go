@@ -17,10 +17,10 @@ limitations under the License.
 package v2
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"

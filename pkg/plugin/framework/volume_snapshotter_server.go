@@ -17,10 +17,10 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"

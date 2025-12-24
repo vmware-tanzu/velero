@@ -17,12 +17,12 @@ limitations under the License.
 package k8s
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
 	"time"
 
-	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
