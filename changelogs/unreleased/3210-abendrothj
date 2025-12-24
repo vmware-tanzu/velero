@@ -1,0 +1,49 @@
+# Display which plugins are mandatory and can't be removed
+
+## Summary
+
+This change implements issue #3210 by adding built-in plugin detection and enhancing the plugin management CLI commands.
+
+## Changes
+
+- Added `Command` and `BuiltIn` fields to `PluginInfo` struct for better plugin identification
+- Enhanced `velero plugin get` to display a `BuiltIn` column showing which plugins are mandatory and cannot be removed
+- Enhanced `velero plugin remove` to accept plugin names (e.g., `velero.io/aws`) instead of requiring exact init container image names
+- Added built-in plugin protection that refuses removal of system plugins with clear error messages
+- Implemented heuristics to map plugin names to init containers for external plugins
+- Added comprehensive unit tests covering all new functionality
+
+## Testing
+
+- Unit tests cover all new functionality (`TestGetInstalledPluginInfo`, `TestPluginNameHeuristics`, `TestBuiltInPluginDetection`)
+- Build verification successful (`go build ./...`)
+- CLI interface updated correctly (shows `[NAME | IMAGE]` syntax)
+- All tests pass
+
+## Example Usage
+
+```bash
+# Show which plugins are built-in
+$ velero plugin get
+NAME                    KIND                BuiltIn
+velero.io/pod          BackupItemAction    true
+velero.io/pv            BackupItemAction    true
+velero.io/aws          ObjectStore         false
+velero.io/gcp          ObjectStore         false
+
+# Try to remove built-in plugin - refused
+$ velero plugin remove velero.io/pod
+An error occurred: plugin velero.io/pod is built-in and cannot be removed
+
+# Remove external plugin by name - works
+$ velero plugin remove velero.io/aws
+# (removes corresponding init container)
+```
+
+## Breaking Changes
+
+None - this is a backward-compatible enhancement.
+
+## Documentation
+
+The CLI help text has been updated to reflect the new `[NAME | IMAGE]` syntax for the plugin remove command.
