@@ -17,10 +17,10 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"

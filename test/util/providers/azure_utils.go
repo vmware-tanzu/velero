@@ -17,6 +17,7 @@ limitations under the License.
 package providers
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -36,7 +37,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	. "github.com/vmware-tanzu/velero/test"
