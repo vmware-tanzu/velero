@@ -128,7 +128,11 @@ func SetImagesToDefaultValues(config VeleroConfig, version string) (VeleroConfig
 
 	ret.Plugins = ""
 
-	versionWithoutPatch := semver.MajorMinor(version)
+	versionWithoutPatch := "main"
+	if version != "main" {
+		versionWithoutPatch = semver.MajorMinor(version)
+	}
+
 	// Read migration case needs images from the PluginsMatrix map.
 	images, ok := ImagesMatrix[versionWithoutPatch]
 	if !ok {
@@ -153,12 +157,6 @@ func SetImagesToDefaultValues(config VeleroConfig, version string) (VeleroConfig
 		ret.Plugins = images[AWS][0]
 	}
 
-	// Because Velero CSI plugin is deprecated in v1.14,
-	// only need to install it for version lower than v1.14.
-	if strings.Contains(ret.Features, FeatureCSI) &&
-		semver.Compare(versionWithoutPatch, "v1.14") < 0 {
-		ret.Plugins = ret.Plugins + "," + images[CSI][0]
-	}
 	if ret.SnapshotMoveData && ret.CloudProvider == Azure {
 		ret.Plugins = ret.Plugins + "," + images[AWS][0]
 	}
@@ -1567,9 +1565,6 @@ func RestorePVRNum(ctx context.Context, veleroNamespace, restoreName string) (in
 }
 
 func IsSupportUploaderType(version string) (bool, error) {
-	if strings.Contains(version, "self") {
-		return true, nil
-	}
 	verSupportUploaderType, err := ver.ParseSemantic("v1.10.0")
 	if err != nil {
 		return false, err
