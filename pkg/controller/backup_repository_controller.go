@@ -164,7 +164,18 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(ctx context.Context, 
 	requests := []reconcile.Request{}
 	for i := range list.Items {
 		r.logger.WithField("BSL", bsl.Name).Infof("Invalidating Backup Repository %s", list.Items[i].Name)
-		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady(msgBSLChanged)); err != nil {
+		// Patch both status AND an annotation to ensure the informer cache is updated
+		// and the SpecChangePredicate passes the event for immediate reconciliation.
+		// Without this, there's a race condition where the reconcile runs before the
+		// cache is updated, causing it to read the old Ready state.
+		if err := r.patchBackupRepository(context.Background(), &list.Items[i], func(rr *velerov1api.BackupRepository) {
+			repoNotReady(msgBSLChanged)(rr)
+			// Add/update annotation to trigger spec change predicate
+			if rr.Annotations == nil {
+				rr.Annotations = make(map[string]string)
+			}
+			rr.Annotations[velerov1api.BSLLastInvalidatedAnnotation] = r.clock.Now().Format(time.RFC3339)
+		}); err != nil {
 			r.logger.WithField("BSL", bsl.Name).WithError(err).Errorf("fail to patch BackupRepository %s", list.Items[i].Name)
 			continue
 		}
