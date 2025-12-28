@@ -69,7 +69,8 @@ func NewResticUploaderProvider(
 	var err error
 	provider.credentialsFile, err = credGetter.FromFile.Path(repoKeySelector)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating temp restic credentials file")
+		log.Warn("Could not fetch repository credentials secret; filesystem-level backups will not work. If you intentionally disabled secret creation, this is expected.")
+		return nil, errors.Wrap(err, "Could not fetch repository credentials secret; filesystem-level backups will not work. If you intentionally disabled secret creation, this is expected.")
 	}
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
