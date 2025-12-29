@@ -236,8 +236,13 @@ func (r *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			return ctrl.Result{}, nil
 		}
 
-		shouldProcess, pod, err := shouldProcess(ctx, r.client, log, pvr)
+		shouldProcess, pod, err := shouldProcess(ctx, r.client, r.kubeClient, log, pvr)
 		if err != nil {
+			// If the pod has been deleted, mark the PVR as Failed
+			if errors.Is(err, ErrPodDeleted) {
+				log.WithError(err).Warn("Target pod has been deleted, marking PVR as Failed")
+				return r.errorOut(ctx, pvr, err, "target pod has been deleted from the cluster", log)
+			}
 			return ctrl.Result{}, err
 		}
 		if !shouldProcess {
@@ -559,7 +564,10 @@ func UpdatePVRStatusToFailed(ctx context.Context, c client.Client, pvr *velerov1
 	return err
 }
 
-func shouldProcess(ctx context.Context, client client.Client, log logrus.FieldLogger, pvr *velerov1api.PodVolumeRestore) (bool, *corev1api.Pod, error) {
+// ErrPodDeleted is returned when the target pod for a PVR has been completely deleted from the cluster
+var ErrPodDeleted = errors.New("target pod has been deleted from the cluster")
+
+func shouldProcess(ctx context.Context, client client.Client, kubeClient kubernetes.Interface, log logrus.FieldLogger, pvr *velerov1api.PodVolumeRestore) (bool, *corev1api.Pod, error) {
 	if !isPVRNew(pvr) {
 		log.Debug("PVR is not new, skip")
 		return false, nil, nil
@@ -570,6 +578,21 @@ func shouldProcess(ctx context.Context, client client.Client, log logrus.FieldLo
 	pod := &corev1api.Pod{}
 	if err := client.Get(ctx, types.NamespacedName{Namespace: pvr.Spec.Pod.Namespace, Name: pvr.Spec.Pod.Name}, pod); err != nil {
 		if apierrors.IsNotFound(err) {
+			// Pod not found in the node-filtered cache. Check if it exists anywhere in the cluster.
+			// If it doesn't exist anywhere, the pod has been deleted and we should mark the PVR as Failed.
+			// If it exists on another node, we should skip (current behavior).
+			if kubeClient != nil {
+				_, clusterErr := kubeClient.CoreV1().Pods(pvr.Spec.Pod.Namespace).Get(ctx, pvr.Spec.Pod.Name, metav1.GetOptions{})
+				if clusterErr != nil && apierrors.IsNotFound(clusterErr) {
+					// Pod doesn't exist anywhere in the cluster - it has been deleted
+					log.WithError(clusterErr).Warn("Target pod has been deleted from the cluster")
+					return false, nil, ErrPodDeleted
+				}
+				// Pod exists on another node, skip (current behavior)
+				log.WithError(err).Debug("Pod not found on this node, skip")
+				return false, nil, nil
+			}
+			// If kubeClient is not available, fall back to old behavior (skip)
 			log.WithError(err).Debug("Pod not found on this node, skip")
 			return false, nil, nil
 		}

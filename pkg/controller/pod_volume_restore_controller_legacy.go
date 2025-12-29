@@ -124,8 +124,13 @@ func (c *PodVolumeRestoreReconcilerLegacy) Reconcile(ctx context.Context, req ct
 		log = log.WithField("restore", fmt.Sprintf("%s/%s", pvr.Namespace, pvr.OwnerReferences[0].Name))
 	}
 
-	shouldProcess, pod, err := shouldProcess(ctx, c.Client, log, pvr)
+	shouldProcess, pod, err := shouldProcess(ctx, c.Client, c.kubeClient, log, pvr)
 	if err != nil {
+		// If the pod has been deleted, mark the PVR as Failed
+		if errors.Is(err, ErrPodDeleted) {
+			log.WithError(err).Warn("Target pod has been deleted, marking PVR as Failed")
+			return c.errorOut(ctx, pvr, err, "target pod has been deleted from the cluster", log)
+		}
 		return ctrl.Result{}, err
 	}
 	if !shouldProcess {

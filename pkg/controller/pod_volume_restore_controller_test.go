@@ -214,6 +214,7 @@ func TestShouldProcess(t *testing.T) {
 				objs = append(objs, ts.pod)
 			}
 			cli := test.NewFakeControllerRuntimeClient(t, objs...)
+			kubeClient := clientgofake.NewSimpleClientset()
 
 			c := &PodVolumeRestoreReconciler{
 				logger: logrus.New(),
@@ -221,7 +222,7 @@ func TestShouldProcess(t *testing.T) {
 				clock:  &clocks.RealClock{},
 			}
 
-			shouldProcess, _, _ := shouldProcess(ctx, c.client, c.logger, ts.obj)
+			shouldProcess, _, _ := shouldProcess(ctx, c.client, kubeClient, c.logger, ts.obj)
 			require.Equal(t, ts.shouldProcessed, shouldProcess)
 		})
 	}
