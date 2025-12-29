@@ -101,3 +101,7 @@ func (o *BlockOutput) BeginDirectory(ctx context.Context, relativePath string, e
 
 	return nil
 }
+
+func (o *BlockOutput) Flush() error {
+	return flushVolume(o.targetFileName)
+}
