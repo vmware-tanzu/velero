@@ -63,6 +63,17 @@ const (
 type PluginInfo struct {
 	Name string `json:"name"`
 	Kind string `json:"kind"`
+	// Command is the command/binary that registered the plugin on the server. For
+	// built-in Velero plugins this will typically be the Velero server binary.
+	// This field is primarily for informational/diagnostic purposes.
+	// +optional
+	Command string `json:"command,omitempty"`
+
+	// BuiltIn indicates whether the plugin is provided by the Velero server
+	// binary (i.e. it's a system/plugin that cannot be removed by changing
+	// init containers). When true, the CLI should not allow removal.
+	// +optional
+	BuiltIn bool `json:"builtIn,omitempty"`
 }
 
 // ServerStatusRequestStatus is the current status of a ServerStatusRequest.
