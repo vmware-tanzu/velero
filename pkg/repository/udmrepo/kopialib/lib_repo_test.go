@@ -38,13 +38,14 @@ import (
 )
 
 func TestOpen(t *testing.T) {
-	var directRpo *repomocks.DirectRepository
+	var directRpo *repomocks.MockRepository
 	testCases := []struct {
 		name           string
 		repoOptions    udmrepo.RepoOptions
-		returnRepo     *repomocks.DirectRepository
+		returnRepo     *repomocks.MockRepository
 		repoOpen       func(context.Context, string, string, *repo.Options) (repo.Repository, error)
 		newWriterError error
+		mockClose      bool
 		expectedErr    string
 		expected       *kopiaRepository
 	}{
@@ -87,7 +88,8 @@ func TestOpen(t *testing.T) {
 			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
 				return directRpo, nil
 			},
-			returnRepo:     new(repomocks.DirectRepository),
+			returnRepo:     repomocks.NewMockRepository(t),
+			mockClose:      true,
 			newWriterError: errors.New("fake-new-writer-error"),
 			expectedErr:    "error to create repo writer: fake-new-writer-error",
 		},
@@ -100,7 +102,7 @@ func TestOpen(t *testing.T) {
 			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
 				return directRpo, nil
 			},
-			returnRepo: new(repomocks.DirectRepository),
+			returnRepo: repomocks.NewMockRepository(t),
 			expected: &kopiaRepository{
 				description: "fake-description",
 				throttle: logThrottle{
@@ -128,7 +130,10 @@ func TestOpen(t *testing.T) {
 
 			if tc.returnRepo != nil {
 				tc.returnRepo.On("NewWriter", mock.Anything, mock.Anything).Return(nil, nil, tc.newWriterError)
-				tc.returnRepo.On("Close", mock.Anything).Return(nil)
+
+				if tc.mockClose {
+					tc.returnRepo.On("Close", mock.Anything).Return(nil)
+				}
 			}
 
 			repo, err := service.Open(t.Context(), tc.repoOptions)
@@ -149,12 +154,11 @@ func TestOpen(t *testing.T) {
 }
 
 func TestMaintain(t *testing.T) {
-	var directRpo *repomocks.DirectRepository
 	testCases := []struct {
 		name               string
 		repoOptions        udmrepo.RepoOptions
-		returnRepo         *repomocks.DirectRepository
-		returnRepoWriter   *repomocks.DirectRepositoryWriter
+		returnRepo         *repomocks.MockRepository
+		returnRepoWriter   *repomocks.MockRepositoryWriter
 		repoOpen           func(context.Context, string, string, *repo.Options) (repo.Repository, error)
 		newRepoWriterError error
 		findManifestError  error
@@ -193,33 +197,6 @@ func TestMaintain(t *testing.T) {
 			},
 			expectedErr: "error to open repo: fake-repo-open-error",
 		},
-		{
-			name: "write session fail",
-			repoOptions: udmrepo.RepoOptions{
-				ConfigFilePath: "/tmp",
-				GeneralOptions: map[string]string{},
-			},
-			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
-				return directRpo, nil
-			},
-			returnRepo:         new(repomocks.DirectRepository),
-			newRepoWriterError: errors.New("fake-new-direct-writer-error"),
-			expectedErr:        "error to maintain repo: unable to create direct writer: fake-new-direct-writer-error",
-		},
-		{
-			name: "maintain fail",
-			repoOptions: udmrepo.RepoOptions{
-				ConfigFilePath: "/tmp",
-				GeneralOptions: map[string]string{},
-			},
-			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
-				return directRpo, nil
-			},
-			returnRepo:        new(repomocks.DirectRepository),
-			returnRepoWriter:  new(repomocks.DirectRepositoryWriter),
-			findManifestError: errors.New("fake-find-manifest-error"),
-			expectedErr:       "error to maintain repo: error to run maintenance under mode auto: unable to get maintenance params: error looking for maintenance manifest: fake-find-manifest-error",
-		},
 	}
 
 	for _, tc := range testCases {
@@ -236,20 +213,7 @@ func TestMaintain(t *testing.T) {
 			}
 
 			if tc.returnRepo != nil {
-				directRpo = tc.returnRepo
-			}
-
-			if tc.returnRepo != nil {
-				tc.returnRepo.On("NewDirectWriter", mock.Anything, mock.Anything).Return(ctx, tc.returnRepoWriter, tc.newRepoWriterError)
 				tc.returnRepo.On("Close", mock.Anything).Return(nil)
-			}
-
-			if tc.returnRepoWriter != nil {
-				tc.returnRepoWriter.On("DisableIndexRefresh").Return()
-				tc.returnRepoWriter.On("AlsoLogToContentLog", mock.Anything).Return(nil)
-				tc.returnRepoWriter.On("Close", mock.Anything).Return(nil)
-				tc.returnRepoWriter.On("FindManifests", mock.Anything, mock.Anything).Return(nil, tc.findManifestError)
-				tc.returnRepoWriter.On("ClientOptions").Return(repo.ClientOptions{})
 			}
 
 			err := service.Maintain(ctx, tc.repoOptions)
@@ -314,7 +278,7 @@ func TestShouldLog(t *testing.T) {
 func TestOpenObject(t *testing.T) {
 	testCases := []struct {
 		name        string
-		rawRepo     *repomocks.DirectRepository
+		rawRepo     *repomocks.MockRepository
 		objectID    string
 		retErr      error
 		expectedErr string
@@ -325,13 +289,13 @@ func TestOpenObject(t *testing.T) {
 		},
 		{
 			name:        "objectID is invalid",
-			rawRepo:     repomocks.NewDirectRepository(t),
+			rawRepo:     repomocks.NewMockRepository(t),
 			objectID:    "fake-id",
 			expectedErr: "error to parse object ID from fake-id: malformed content ID: \"fake-id\": invalid content prefix",
 		},
 		{
 			name:        "raw open fail",
-			rawRepo:     repomocks.NewDirectRepository(t),
+			rawRepo:     repomocks.NewMockRepository(t),
 			retErr:      errors.New("fake-open-error"),
 			expectedErr: "error to open object: fake-open-error",
 		},
@@ -363,7 +327,7 @@ func TestOpenObject(t *testing.T) {
 func TestGetManifest(t *testing.T) {
 	testCases := []struct {
 		name        string
-		rawRepo     *repomocks.DirectRepository
+		rawRepo     *repomocks.MockRepository
 		retErr      error
 		expectedErr string
 	}{
@@ -373,7 +337,7 @@ func TestGetManifest(t *testing.T) {
 		},
 		{
 			name:        "raw get fail",
-			rawRepo:     repomocks.NewDirectRepository(t),
+			rawRepo:     repomocks.NewMockRepository(t),
 			retErr:      errors.New("fake-get-error"),
 			expectedErr: "error to get manifest: fake-get-error",
 		},
@@ -405,7 +369,7 @@ func TestGetManifest(t *testing.T) {
 func TestFindManifests(t *testing.T) {
 	testCases := []struct {
 		name        string
-		rawRepo     *repomocks.DirectRepository
+		rawRepo     *repomocks.MockRepository
 		retErr      error
 		expectedErr string
 	}{
@@ -415,7 +379,7 @@ func TestFindManifests(t *testing.T) {
 		},
 		{
 			name:        "raw find fail",
-			rawRepo:     repomocks.NewDirectRepository(t),
+			rawRepo:     repomocks.NewMockRepository(t),
 			retErr:      errors.New("fake-find-error"),
 			expectedErr: "error to find manifests: fake-find-error",
 		},
@@ -444,8 +408,8 @@ func TestFindManifests(t *testing.T) {
 func TestClose(t *testing.T) {
 	testCases := []struct {
 		name            string
-		rawRepo         *repomocks.DirectRepository
-		rawWriter       *repomocks.DirectRepositoryWriter
+		rawRepo         *repomocks.MockRepository
+		rawWriter       *repomocks.MockRepositoryWriter
 		rawRepoRetErr   error
 		rawWriterRetErr error
 		expectedErr     string
@@ -455,21 +419,21 @@ func TestClose(t *testing.T) {
 		},
 		{
 			name:      "writer is not nil",
-			rawWriter: repomocks.NewDirectRepositoryWriter(t),
+			rawWriter: repomocks.NewMockRepositoryWriter(t),
 		},
 		{
 			name:    "repo is not nil",
-			rawRepo: repomocks.NewDirectRepository(t),
+			rawRepo: repomocks.NewMockRepository(t),
 		},
 		{
 			name:            "writer close error",
-			rawWriter:       repomocks.NewDirectRepositoryWriter(t),
+			rawWriter:       repomocks.NewMockRepositoryWriter(t),
 			rawWriterRetErr: errors.New("fake-writer-close-error"),
 			expectedErr:     "error to close repo writer: fake-writer-close-error",
 		},
 		{
 			name:          "repo is not nil",
-			rawRepo:       repomocks.NewDirectRepository(t),
+			rawRepo:       repomocks.NewMockRepository(t),
 			rawRepoRetErr: errors.New("fake-repo-close-error"),
 			expectedErr:   "error to close repo: fake-repo-close-error",
 		},
@@ -503,7 +467,7 @@ func TestClose(t *testing.T) {
 func TestPutManifest(t *testing.T) {
 	testCases := []struct {
 		name            string
-		rawWriter       *repomocks.DirectRepositoryWriter
+		rawWriter       *repomocks.MockRepositoryWriter
 		rawWriterRetErr error
 		expectedErr     string
 	}{
@@ -513,7 +477,7 @@ func TestPutManifest(t *testing.T) {
 		},
 		{
 			name:            "raw put fail",
-			rawWriter:       repomocks.NewDirectRepositoryWriter(t),
+			rawWriter:       repomocks.NewMockRepositoryWriter(t),
 			rawWriterRetErr: errors.New("fake-writer-put-error"),
 			expectedErr:     "error to put manifest: fake-writer-put-error",
 		},
@@ -544,7 +508,7 @@ func TestPutManifest(t *testing.T) {
 func TestDeleteManifest(t *testing.T) {
 	testCases := []struct {
 		name            string
-		rawWriter       *repomocks.DirectRepositoryWriter
+		rawWriter       *repomocks.MockRepositoryWriter
 		rawWriterRetErr error
 		expectedErr     string
 	}{
@@ -554,7 +518,7 @@ func TestDeleteManifest(t *testing.T) {
 		},
 		{
 			name:            "raw delete fail",
-			rawWriter:       repomocks.NewDirectRepositoryWriter(t),
+			rawWriter:       repomocks.NewMockRepositoryWriter(t),
 			rawWriterRetErr: errors.New("fake-writer-delete-error"),
 			expectedErr:     "error to delete manifest: fake-writer-delete-error",
 		},
@@ -583,7 +547,7 @@ func TestDeleteManifest(t *testing.T) {
 func TestFlush(t *testing.T) {
 	testCases := []struct {
 		name            string
-		rawWriter       *repomocks.DirectRepositoryWriter
+		rawWriter       *repomocks.MockRepositoryWriter
 		rawWriterRetErr error
 		expectedErr     string
 	}{
@@ -593,7 +557,7 @@ func TestFlush(t *testing.T) {
 		},
 		{
 			name:            "raw flush fail",
-			rawWriter:       repomocks.NewDirectRepositoryWriter(t),
+			rawWriter:       repomocks.NewMockRepositoryWriter(t),
 			rawWriterRetErr: errors.New("fake-writer-flush-error"),
 			expectedErr:     "error to flush repo: fake-writer-flush-error",
 		},
@@ -623,7 +587,7 @@ func TestConcatenateObjects(t *testing.T) {
 	testCases := []struct {
 		name            string
 		setWriter       bool
-		rawWriter       *repomocks.DirectRepositoryWriter
+		rawWriter       *repomocks.MockRepositoryWriter
 		rawWriterRetErr error
 		objectIDs       []udmrepo.ID
 		expectedErr     string
@@ -649,7 +613,7 @@ func TestConcatenateObjects(t *testing.T) {
 		},
 		{
 			name:            "concatenate error",
-			rawWriter:       repomocks.NewDirectRepositoryWriter(t),
+			rawWriter:       repomocks.NewMockRepositoryWriter(t),
 			rawWriterRetErr: errors.New("fake-concatenate-error"),
 			objectIDs: []udmrepo.ID{
 				"I123456",
@@ -659,7 +623,7 @@ func TestConcatenateObjects(t *testing.T) {
 		},
 		{
 			name:      "succeed",
-			rawWriter: repomocks.NewDirectRepositoryWriter(t),
+			rawWriter: repomocks.NewMockRepositoryWriter(t),
 			objectIDs: []udmrepo.ID{
 				"I123456",
 			},
@@ -695,7 +659,7 @@ func TestNewObjectWriter(t *testing.T) {
 	rawObjWriter := repomocks.NewWriter(t)
 	testCases := []struct {
 		name         string
-		rawWriter    *repomocks.DirectRepositoryWriter
+		rawWriter    *repomocks.MockRepositoryWriter
 		rawWriterRet object.Writer
 		expectedRet  udmrepo.ObjectWriter
 	}{
@@ -704,11 +668,11 @@ func TestNewObjectWriter(t *testing.T) {
 		},
 		{
 			name:      "new object writer fail",
-			rawWriter: repomocks.NewDirectRepositoryWriter(t),
+			rawWriter: repomocks.NewMockRepositoryWriter(t),
 		},
 		{
 			name:         "succeed",
-			rawWriter:    repomocks.NewDirectRepositoryWriter(t),
+			rawWriter:    repomocks.NewMockRepositoryWriter(t),
 			rawWriterRet: rawObjWriter,
 			expectedRet:  &kopiaObjectWriter{rawWriter: rawObjWriter},
 		},

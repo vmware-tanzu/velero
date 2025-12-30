@@ -471,15 +471,15 @@ func TestGetRepositoryStatus(t *testing.T) {
 }
 
 func TestWriteInitParameters(t *testing.T) {
-	var directRpo *repomocks.DirectRepository
+	var directRpo *repomocks.MockRepository
 	assertFullMaintIntervalEqual := func(expected, actual *maintenance.Params) bool {
 		return assert.Equal(t, expected.FullCycle.Interval, actual.FullCycle.Interval)
 	}
 	testCases := []struct {
 		name                 string
 		repoOptions          udmrepo.RepoOptions
-		returnRepo           *repomocks.DirectRepository
-		returnRepoWriter     *repomocks.DirectRepositoryWriter
+		returnRepo           *repomocks.MockRepository
+		returnRepoWriter     *repomocks.MockRepositoryWriter
 		repoOpen             func(context.Context, string, string, *repo.Options) (repo.Repository, error)
 		newRepoWriterError   error
 		replaceManifestError error
@@ -488,6 +488,8 @@ func TestWriteInitParameters(t *testing.T) {
 		expectedReplaceManifestsParams *maintenance.Params
 		// allows for asserting only certain fields are set as expected
 		assertReplaceManifestsParams func(*maintenance.Params, *maintenance.Params) bool
+		mockNewWriter                bool
+		mockClientOptions            bool
 		expectedErr                  string
 	}{
 		{
@@ -524,7 +526,7 @@ func TestWriteInitParameters(t *testing.T) {
 			getParam: func(context.Context, repo.Repository) (*maintenance.Params, error) {
 				return nil, errors.New("fake-get-param-error")
 			},
-			returnRepo:  new(repomocks.DirectRepository),
+			returnRepo:  repomocks.NewMockRepository(t),
 			expectedErr: "error getting existing maintenance params: fake-get-param-error",
 		},
 		{
@@ -541,6 +543,7 @@ func TestWriteInitParameters(t *testing.T) {
 					Owner: "default@default",
 				}, nil
 			},
+			returnRepo: repomocks.NewMockRepository(t),
 		},
 		{
 			name: "existing param with different owner",
@@ -556,13 +559,15 @@ func TestWriteInitParameters(t *testing.T) {
 					Owner: "fake-owner",
 				}, nil
 			},
-			returnRepo:       new(repomocks.DirectRepository),
-			returnRepoWriter: new(repomocks.DirectRepositoryWriter),
+			returnRepo:       repomocks.NewMockRepository(t),
+			returnRepoWriter: repomocks.NewMockRepositoryWriter(t),
 			expectedReplaceManifestsParams: &maintenance.Params{
 				FullCycle: maintenance.CycleParams{
 					Interval: udmrepo.NormalGCInterval,
 				},
 			},
+			mockNewWriter:                true,
+			mockClientOptions:            true,
 			assertReplaceManifestsParams: assertFullMaintIntervalEqual,
 		},
 		{
@@ -574,7 +579,8 @@ func TestWriteInitParameters(t *testing.T) {
 			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
 				return directRpo, nil
 			},
-			returnRepo:         new(repomocks.DirectRepository),
+			returnRepo:         repomocks.NewMockRepository(t),
+			mockNewWriter:      true,
 			newRepoWriterError: errors.New("fake-new-writer-error"),
 			expectedErr:        "error to init write repo parameters: unable to create writer: fake-new-writer-error",
 		},
@@ -587,8 +593,10 @@ func TestWriteInitParameters(t *testing.T) {
 			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
 				return directRpo, nil
 			},
-			returnRepo:           new(repomocks.DirectRepository),
-			returnRepoWriter:     new(repomocks.DirectRepositoryWriter),
+			returnRepo:           repomocks.NewMockRepository(t),
+			returnRepoWriter:     repomocks.NewMockRepositoryWriter(t),
+			mockNewWriter:        true,
+			mockClientOptions:    true,
 			replaceManifestError: errors.New("fake-replace-manifest-error"),
 			expectedErr:          "error to init write repo parameters: error to set maintenance params: put manifest: fake-replace-manifest-error",
 		},
@@ -603,8 +611,10 @@ func TestWriteInitParameters(t *testing.T) {
 			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
 				return directRpo, nil
 			},
-			returnRepo:       new(repomocks.DirectRepository),
-			returnRepoWriter: new(repomocks.DirectRepositoryWriter),
+			returnRepo:        repomocks.NewMockRepository(t),
+			returnRepoWriter:  repomocks.NewMockRepositoryWriter(t),
+			mockNewWriter:     true,
+			mockClientOptions: true,
 			expectedReplaceManifestsParams: &maintenance.Params{
 				FullCycle: maintenance.CycleParams{
 					Interval: udmrepo.FastGCInterval,
@@ -623,8 +633,10 @@ func TestWriteInitParameters(t *testing.T) {
 			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
 				return directRpo, nil
 			},
-			returnRepo:       new(repomocks.DirectRepository),
-			returnRepoWriter: new(repomocks.DirectRepositoryWriter),
+			returnRepo:        repomocks.NewMockRepository(t),
+			returnRepoWriter:  repomocks.NewMockRepositoryWriter(t),
+			mockNewWriter:     true,
+			mockClientOptions: true,
 			expectedReplaceManifestsParams: &maintenance.Params{
 				FullCycle: maintenance.CycleParams{
 					Interval: udmrepo.NormalGCInterval,
@@ -643,8 +655,9 @@ func TestWriteInitParameters(t *testing.T) {
 			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
 				return directRpo, nil
 			},
-			returnRepo:       new(repomocks.DirectRepository),
-			returnRepoWriter: new(repomocks.DirectRepositoryWriter),
+			returnRepo:       repomocks.NewMockRepository(t),
+			returnRepoWriter: repomocks.NewMockRepositoryWriter(t),
+			mockNewWriter:    true,
 			expectedErr:      "error to init write repo parameters: invalid full maintenance interval option foo",
 		},
 	}
@@ -663,8 +676,14 @@ func TestWriteInitParameters(t *testing.T) {
 			}
 
 			if tc.returnRepo != nil {
-				tc.returnRepo.On("NewWriter", mock.Anything, mock.Anything).Return(ctx, tc.returnRepoWriter, tc.newRepoWriterError)
-				tc.returnRepo.On("ClientOptions").Return(repo.ClientOptions{})
+				if tc.mockNewWriter {
+					tc.returnRepo.On("NewWriter", mock.Anything, mock.Anything).Return(ctx, tc.returnRepoWriter, tc.newRepoWriterError)
+				}
+
+				if tc.mockClientOptions {
+					tc.returnRepo.On("ClientOptions").Return(repo.ClientOptions{})
+				}
+
 				tc.returnRepo.On("Close", mock.Anything).Return(nil)
 			}
 
