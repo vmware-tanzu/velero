@@ -316,12 +316,14 @@ func cleanVSpherePluginConfig(c clientset.Interface, ns, secretName, configMapNa
 // version can be in the format of 'main', 'release-x.y(-dev)', or 'vX.Y(.Z)'
 func ValidateVeleroVersion(version string) error {
 	mainRe := regexp.MustCompile(`^main$`)
-	releaseRe := regexp.MustCompile(`^release-(\d)\.(\d)(-dev)?$`)
+	releaseRe := regexp.MustCompile(`^release-(\d+)\.(\d+)(-dev)?$`)
 	tagRe := regexp.MustCompile(`^v(\d+)\.(\d+)(\.\d+)?$`)
 
 	if mainRe.MatchString(version) || releaseRe.MatchString(version) || tagRe.MatchString(version) {
 		return nil
 	}
+
+	fmt.Println("Invalid Velero version:", version)
 	return fmt.Errorf("invalid Velero version: %s, Velero version must be 'main', 'release-x.y(-dev)', or 'vX.Y.Z'", version)
 }
 
@@ -331,13 +333,14 @@ func ValidateVeleroVersion(version string) error {
 // return true if version is no older than targetVersion
 func VersionNoOlderThan(version string, targetVersion string) (bool, error) {
 	mainRe := regexp.MustCompile(`^main$`)
-	releaseRe := regexp.MustCompile(`^release-(\d)\.(\d)(-dev)?$`)
-	tagRe := regexp.MustCompile(`^v(\d)\.(\d)(\.\d+)?$`)
+	releaseRe := regexp.MustCompile(`^release-(\d+)\.(\d+)(-dev)?$`)
+	tagRe := regexp.MustCompile(`^v(\d+)\.(\d+)(\.\d+)?$`)
 
 	if err := ValidateVeleroVersion(version); err != nil {
 		return false, err
 	}
 	if !tagRe.MatchString(targetVersion) && !mainRe.MatchString(targetVersion) {
+		fmt.Printf("targetVersion %s is invalid. it must be in the format of 'main', or 'vX.Y.(Z)'.\n", targetVersion)
 		return false, fmt.Errorf("targetVersion is invalid. it must be in the format of 'main', or 'vX.Y.(Z)'.")
 	}
 
@@ -383,7 +386,8 @@ func VersionNoOlderThan(version string, targetVersion string) (bool, error) {
 		}
 	}
 
-	return false, fmt.Errorf("unknown error in VersionNoOlderThan")
+	fmt.Printf("Unknown version %s in VersionNoOlderThan\n", version)
+	return false, fmt.Errorf("unknown version in VersionNoOlderThan: %s", version)
 }
 
 func installVeleroServer(
