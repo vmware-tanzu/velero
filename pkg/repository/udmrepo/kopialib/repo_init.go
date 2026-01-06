@@ -32,6 +32,7 @@ import (
 	"github.com/kopia/kopia/repo/maintenance"
 	"github.com/pkg/errors"
 
+	"github.com/vmware-tanzu/velero/pkg/kopia"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend"
 )
@@ -354,7 +355,7 @@ func (b *byteBufferReader) Seek(offset int64, whence int) (int64, error) {
 var funcGetParam = maintenance.GetParams
 
 func writeInitParameters(ctx context.Context, repoOption udmrepo.RepoOptions, logger logrus.FieldLogger) error {
-	r, err := openKopiaRepo(ctx, repoOption.ConfigFilePath, repoOption.RepoPassword, nil)
+	r, err := openKopiaRepo(ctx, repoOption.ConfigFilePath, repoOption.RepoPassword, &openOptions{repoLogger: kopia.RepositoryLogger(logger)})
 	if err != nil {
 		return err
 	}

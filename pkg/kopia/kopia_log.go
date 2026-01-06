@@ -18,6 +18,7 @@ limitations under the License.
 
 import (
 	"context"
+	"io"
 
 	"github.com/kopia/kopia/repo/logging"
 	"github.com/sirupsen/logrus"
@@ -30,6 +31,10 @@ type kopiaLog struct {
 	logger logrus.FieldLogger
 }
 
+type repoLog struct {
+	logger logrus.FieldLogger
+}
+
 // SetupKopiaLog sets the Kopia log handler to the specific context, Kopia modules
 // call the logger in the context to write logs
 func SetupKopiaLog(ctx context.Context, logger logrus.FieldLogger) context.Context {
@@ -37,6 +42,10 @@ func SetupKopiaLog(ctx context.Context, logger logrus.FieldLogger) context.Conte
 		kpLog := &kopiaLog{module, logger}
 		return zap.New(kpLog).Sugar()
 	})
+}
+
+func RepositoryLogger(logger logrus.FieldLogger) io.Writer {
+	return &repoLog{logger: logger}
 }
 
 // Enabled decides whether a given logging level is enabled when logging a message
@@ -159,4 +168,10 @@ func (kl *kopiaLog) logrusFieldsForWrite(ent zapcore.Entry, fields []zapcore.Fie
 	}
 
 	return copied
+}
+
+func (rl *repoLog) Write(p []byte) (int, error) {
+	rl.logger.Debug(string(p))
+
+	return len(p), nil
 }
