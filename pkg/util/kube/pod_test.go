@@ -520,6 +520,27 @@ func TestGetPodTerminateMessage(t *testing.T) {
 			},
 			message: "message-1/message-2/message-3/",
 		},
+		{
+			name: "with pod status message",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					Message: "pod-message",
+				},
+			},
+			message: "pod-message/",
+		},
+		{
+			name: "with termination and pod status message",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					ContainerStatuses: []corev1api.ContainerStatus{
+						{Name: "container-1", State: corev1api.ContainerState{Terminated: &corev1api.ContainerStateTerminated{Message: "message-1"}}},
+					},
+					Message: "pod-message",
+				},
+			},
+			message: "message-1/pod-message/",
+		},
 	}
 
 	for _, test := range tests {

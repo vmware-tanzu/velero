@@ -184,6 +184,10 @@ func GetPodTerminateMessage(pod *corev1api.Pod) string {
 		}
 	}
 
+	if pod.Status.Message != "" {
+		message += pod.Status.Message + "/"
+	}
+
 	return message
 }
 
