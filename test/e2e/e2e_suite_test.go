@@ -601,6 +601,11 @@ var _ = Describe(
 	Label("BSL", "Deletion", "Restic", "AdditionalBSL"),
 	BslDeletionWithRestic,
 )
+var _ = Describe(
+	"Backup repositories are validated against BSL configuration on startup",
+	Label("BSL", "BackupRepository", "StartupValidation"),
+	BackupRepositoryStartupValidation,
+)
 
 var _ = Describe(
 	"Migrate resources between clusters by FileSystem backup",
