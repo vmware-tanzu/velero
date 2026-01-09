@@ -16,6 +16,7 @@ https://velero.io/docs/v1.17/upgrade-to-1.17/
   * Track actual resource names for GenerateName in restore status (#9409, @shubham-pampattiwar)
   * Fix managed fields patch for resources using GenerateName (#9408, @shubham-pampattiwar)
   * don't copy securitycontext from first container if configmap found (#9394, @sseago)
+  * Add Role, RoleBinding, ClusterRole, and ClusterRoleBinding in restore sequence. (#9479, @blackpiglet)
   
 
 ## v1.17.1
