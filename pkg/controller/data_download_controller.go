@@ -292,8 +292,14 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	} else if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted {
 		if peekErr := r.restoreExposer.PeekExposed(ctx, getDataDownloadOwnerObject(dd)); peekErr != nil {
-			r.tryCancelDataDownload(ctx, dd, fmt.Sprintf("found a datadownload %s/%s with expose error: %s. mark it as cancel", dd.Namespace, dd.Name, peekErr))
 			log.Errorf("Cancel dd %s/%s because of expose error %s", dd.Namespace, dd.Name, peekErr)
+
+			diags := strings.Split(r.restoreExposer.DiagnoseExpose(ctx, getDataDownloadOwnerObject(dd)), "\n")
+			for _, diag := range diags {
+				log.Warnf("[Diagnose DD expose]%s", diag)
+			}
+
+			r.tryCancelDataDownload(ctx, dd, fmt.Sprintf("found a datadownload %s/%s with expose error: %s. mark it as cancel", dd.Namespace, dd.Name, peekErr))
 		} else if dd.Status.AcceptedTimestamp != nil {
 			if time.Since(dd.Status.AcceptedTimestamp.Time) >= r.preparingTimeout {
 				r.onPrepareTimeout(ctx, dd)

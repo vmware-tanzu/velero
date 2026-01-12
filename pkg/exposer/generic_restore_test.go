@@ -664,6 +664,7 @@ func Test_ReastoreDiagnoseExpose(t *testing.T) {
 					Message: "fake-pod-message",
 				},
 			},
+			Message: "fake-pod-message-1",
 		},
 	}
 
@@ -815,7 +816,7 @@ end diagnose restore exposer`,
 				&restorePVCWithoutVolumeName,
 			},
 			expected: `begin diagnose restore exposer
-Pod velero/fake-restore, phase Pending, node name 
+Pod velero/fake-restore, phase Pending, node name , message fake-pod-message-1
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to 
 end diagnose restore exposer`,
@@ -828,7 +829,7 @@ end diagnose restore exposer`,
 				&restorePVCWithoutVolumeName,
 			},
 			expected: `begin diagnose restore exposer
-Pod velero/fake-restore, phase Pending, node name 
+Pod velero/fake-restore, phase Pending, node name , message fake-pod-message-1
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to 
 end diagnose restore exposer`,
@@ -841,7 +842,7 @@ end diagnose restore exposer`,
 				&restorePVCWithoutVolumeName,
 			},
 			expected: `begin diagnose restore exposer
-Pod velero/fake-restore, phase Pending, node name fake-node
+Pod velero/fake-restore, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 node-agent is not running in node fake-node, err: daemonset pod not found in running state in node fake-node
 PVC velero/fake-restore, phase Pending, binding to 
@@ -856,7 +857,7 @@ end diagnose restore exposer`,
 				&nodeAgentPod,
 			},
 			expected: `begin diagnose restore exposer
-Pod velero/fake-restore, phase Pending, node name fake-node
+Pod velero/fake-restore, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to 
 end diagnose restore exposer`,
@@ -870,7 +871,7 @@ end diagnose restore exposer`,
 				&nodeAgentPod,
 			},
 			expected: `begin diagnose restore exposer
-Pod velero/fake-restore, phase Pending, node name fake-node
+Pod velero/fake-restore, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to fake-pv
 error getting restore pv fake-pv, err: persistentvolumes "fake-pv" not found
@@ -886,7 +887,7 @@ end diagnose restore exposer`,
 				&nodeAgentPod,
 			},
 			expected: `begin diagnose restore exposer
-Pod velero/fake-restore, phase Pending, node name fake-node
+Pod velero/fake-restore, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to fake-pv
 PV fake-pv, phase Pending, reason , message fake-pv-message
@@ -902,7 +903,7 @@ end diagnose restore exposer`,
 				&nodeAgentPod,
 			},
 			expected: `begin diagnose restore exposer
-Pod velero/fake-restore, phase Pending, node name fake-node
+Pod velero/fake-restore, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to fake-pv
 error getting restore pv fake-pv, err: persistentvolumes "fake-pv" not found
@@ -922,7 +923,7 @@ end diagnose restore exposer`,
 				&nodeAgentPod,
 			},
 			expected: `begin diagnose restore exposer
-Pod velero/fake-restore, phase Pending, node name fake-node
+Pod velero/fake-restore, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to fake-pv
 PV fake-pv, phase Pending, reason , message fake-pv-message
@@ -975,7 +976,7 @@ end diagnose restore exposer`,
 				},
 			},
 			expected: `begin diagnose restore exposer
-Pod velero/fake-restore, phase Pending, node name fake-node
+Pod velero/fake-restore, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 Pod event reason reason-2, message message-2
 Pod event reason reason-5, message message-5
