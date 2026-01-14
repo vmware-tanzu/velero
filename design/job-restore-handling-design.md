@@ -26,9 +26,9 @@ Some users have workflows that depend on the presence of Job resources (even com
 - Providing a mechanism to selectively restore only certain Jobs based on complex criteria
 
 ## High-Level Design
-The proposed solution introduces annotations and restore options to control how Velero handles Jobs during restore operations.
+The proposed solution extends the existing ResourcePolicy framework (similar to VolumePolicy) to control how Velero handles Jobs during restore operations.
 By default, Velero will continue to skip completed Jobs but will restore running or failed Jobs with parallelism set to 0, effectively pausing them to prevent immediate execution.
-Users will be able to override this behavior using annotations on individual Jobs or through restore options that apply to all Jobs in a restore operation.
+Users will be able to override this behavior using ResourcePolicy rules with label selectors (for granular control) or through restore annotations (for default fallback behavior).
 
 ## Detailed Design
 
@@ -50,52 +50,76 @@ The current logic for handling Jobs during restore will be modified as follows:
 
 ### Implementation Details
 
-#### 1. Annotations
+#### 1. ResourcePolicy for Jobs
 
-We will introduce the following annotations to control Job restoration behavior:
+We will extend the existing ResourcePolicy framework to support Job restore policies.
+This follows the same pattern as VolumePolicy, allowing users to define policies in a ConfigMap that is referenced during restore operations.
+This approach provides better user experience compared to Job annotations because:
+- Jobs are often dynamically created and deleted by controllers (e.g., CronJobs, Argo Workflows)
+- Jobs may be short-lived, making annotation difficult before backup
+- Large numbers of Jobs would require modifying the owning controller
+- ResourcePolicy provides a centralized, label-based approach that doesn't require modifying Jobs
 
-##### Phase-Specific Restoration Policies
+##### ResourcePolicy ConfigMap Structure
 
+The ResourcePolicy ConfigMap will be extended to include a `jobRestorePolicies` section:
+
+```yaml
+version: v1
+volumePolicies:
+  # ... existing volume policies ...
+jobRestorePolicies:
+  - conditions:
+      jobPhase:
+        - completed
+        - failed
+      jobLabels:
+        app: my-batch-processor
+    action:
+      type: restore-paused
+  - conditions:
+      jobPhase:
+        - running
+    action:
+      type: skip
+  - conditions:
+      # Default policy for all other jobs (no conditions specified)
+    action:
+      type: restore-paused
 ```
-velero.io/job-restore-policy-completed: <policy>
-velero.io/job-restore-policy-failed: <policy>
-velero.io/job-restore-policy-running: <policy>
-```
 
-Where `<policy>` can be one of:
-- `skip`: Skip restoration of this Job
-- `restore-paused`: Restore the Job with parallelism=0 (paused)
-- `restore-as-is`: Restore the Job with its original configuration
+##### Condition Fields
 
-These annotations can be applied to individual Jobs before backup to control their restoration behavior based on their phase at backup time.
+- `jobPhase`: List of Job phases to match. Valid values are:
+  - `completed`: Job had a completionTime set
+  - `failed`: Job had failed status
+  - `running`: Job was actively running
+  - `pending`: Job was created but not yet started
+- `jobLabels`: Simple key/value map for label matching (consistent with VolumePolicy's `pvcLabels`). All specified labels must match.
 
-##### General Restoration Policy (applies to all phases)
+##### Action Types
 
-```
-velero.io/job-restore-policy: <policy>
-```
+The `action.type` field can be one of:
+- `skip`: Skip restoration of matching Jobs
+- `restore-paused`: Restore matching Jobs with parallelism=0 (paused)
+- `restore-as-is`: Restore matching Jobs with their original configuration
 
-This annotation provides a fallback policy for any phase that doesn't have a specific policy set. If both a phase-specific and general policy are present, the phase-specific policy takes precedence.
+##### Policy Matching
 
-##### Backup Phase Recording
+Policies are evaluated in order.
+The first policy whose conditions match the Job will be applied.
+If no policy matches, the default behavior is applied (based on Restore annotations or built-in defaults).
 
-During backup, Velero will automatically add the following annotation to record the Job's phase:
+#### 2. Restore Annotations (Default Fallback)
 
-```
-velero.io/job-phase-at-backup: <phase>
-```
+Restore annotations provide default fallback behavior when no ResourcePolicy rule matches a Job.
+These annotations are applied to the Velero Restore object and affect all Jobs that don't have a matching ResourcePolicy rule.
 
-Where `<phase>` can be one of:
-- `completed`: Job had a completionTime set
-- `failed`: Job had failed status
-- `running`: Job was actively running
-- `pending`: Job was created but not yet started
+##### Precedence Order
 
-This annotation allows users to understand why a Job was restored with specific modifications and helps with debugging restore behavior. The annotation is preserved during the restore process since Velero's `resetMetadata` function only removes specific metadata fields (like uid, resourceVersion) but preserves annotations and labels.
-
-#### 2. Restore Annotations
-
-Instead of modifying the Restore CRD, we will use annotations on the Velero Restore object to control the default behavior for all Jobs:
+1. **ResourcePolicy rules** (highest priority): If a Job matches a rule in the ResourcePolicy ConfigMap, that rule's action is applied
+2. **Restore annotations** (fallback): If no ResourcePolicy rule matches, these annotations determine the behavior
+3. **Built-in defaults** (lowest priority): If neither ResourcePolicy nor Restore annotations are specified
 
 ##### Phase-Specific Restore Policies
 
@@ -111,23 +135,23 @@ velero.io/job-restore-policy-running: <policy>
 velero.io/job-restore-policy: <policy>
 ```
 
-Where `<policy>` can be one of the same values as the Job annotation.
+Where `<policy>` can be one of: `skip`, `restore-paused`, or `restore-as-is`.
 
 These annotations can be added to the Restore object through the CLI:
 
 ```
-# Set a general policy for all Jobs
+# Set a general policy for all Jobs (applies when no ResourcePolicy matches)
 velero restore create --from-backup=my-backup \
   --annotations velero.io/job-restore-policy=<policy>
 
-# Set phase-specific policies
+# Set phase-specific fallback policies
 velero restore create --from-backup=my-backup \
   --annotations velero.io/job-restore-policy-completed=skip \
   --annotations velero.io/job-restore-policy-failed=restore-paused \
   --annotations velero.io/job-restore-policy-running=restore-paused
 ```
 
-The default behavior (if no annotation is specified) will be:
+The built-in default behavior (if neither ResourcePolicy nor annotations are specified) will be:
 - `skip` for completed Jobs
 - `restore-paused` for running and failed Jobs
 
@@ -135,29 +159,35 @@ The default behavior (if no annotation is specified) will be:
 
 The implementation will require changes to the following components:
 
-1. **Backup Controller**:
-   - Modify the backup process to automatically add the `velero.io/job-phase-at-backup` annotation to all Jobs
+1. **ResourcePolicy Framework** (`internal/resourcepolicies/`):
+   - Extend `ResourcePolicies` struct to include `JobRestorePolicies` field
+   - Implement `jobPolicy` struct with conditions and actions (following VolumePolicy pattern)
+   - Implement `jobPhaseCondition` to match Job phases
+   - Implement `jobLabelsCondition` to match Job labels (similar to `pvcLabelsCondition`)
+   - Add `GetJobMatchAction` function to evaluate policies against Jobs
+
+2. **Backup Controller**:
    - Determine the Job phase based on its status (completed, failed, running, or pending)
-   - Preserve any existing Job restore policy annotations during backup
+   - The phase information is stored in the backup data itself
 
-2. **Restore Controller**:
-   - Modify the `restoreItem` function in `pkg/restore/restore.go` to check for the Job restore policy
-   - Implement logic to determine which policy to apply based on the Job's phase at backup time
-   - Check for phase-specific policies first, then fall back to general policies
+3. **Restore Controller** (`pkg/restore/restore.go`):
+   - Modify the `restoreItem` function to check for Job restore policies
+   - Load ResourcePolicy from ConfigMap if specified in Restore
+   - Evaluate ResourcePolicy rules first, then fall back to Restore annotations
    - Implement logic to modify the Job spec based on the determined policy
-   - Add logic to check Job status and apply the appropriate default policy
+   - Apply the appropriate default policy if no policy matches
 
-3. **Restore Annotations**:
+4. **Restore Annotations**:
    - Implement support for the new annotations on Restore objects
    - Update the CLI documentation to explain the new annotations
    - Implement validation for the annotation values
    - Ensure proper precedence of phase-specific over general policies
 
-4. **Documentation**:
+5. **Documentation**:
    - Update documentation to explain the new behavior and options
-   - Document the automatic phase recording during backup
+   - Document the ResourcePolicy ConfigMap structure for Jobs
    - Explain why parallelism is modified for certain Jobs
-   - Provide examples of common use cases
+   - Provide examples of common use cases with label-based selection
 
 #### 4. Modification of Job Resources
 
@@ -174,13 +204,13 @@ This change effectively pauses the Job, preventing it from creating new pods unt
 
 To ensure users understand why a Job's parallelism was modified:
 
-1. The `velero.io/job-phase-at-backup` annotation will be present on all restored Jobs, indicating their phase at backup time
-2. The Velero logs will include information about which policy was applied to each Job and why
+1. The Velero logs will include information about which policy was applied to each Job and why
+2. The backup data itself contains the Job's phase at backup time for verification if needed
 3. The documentation will clearly explain:
    - The default behavior for each Job phase
    - Why parallelism is set to 0 for certain Jobs (to prevent unintended re-execution)
    - How to restore Jobs with their original configuration if needed
-   - The precedence order for annotations (phase-specific > general, Job-level > Restore-level)
+   - The precedence order (ResourcePolicy > Restore annotations > built-in defaults)
 
 ### User Experience
 
@@ -190,50 +220,61 @@ By default, a restore operation will:
 - Skip completed Jobs
 - Restore running and failed Jobs with parallelism=0
 
-This prevents unintended re-execution while preserving the Job resources. After restore, Jobs will include the `velero.io/job-phase-at-backup` annotation showing their phase at backup time, helping users understand why certain modifications were made.
+This prevents unintended re-execution while preserving the Job resources.
 
-#### Example 2: Using Phase-Specific Annotations on Jobs
+#### Example 2: Using ResourcePolicy for Dynamic Jobs
 
-A user can annotate specific Jobs before backup to control behavior based on phase:
-
-```yaml
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: important-job
-  annotations:
-    velero.io/job-restore-policy-completed: restore-as-is
-    velero.io/job-restore-policy-failed: restore-paused
-    velero.io/job-restore-policy-running: skip
-spec:
-  # ...
-```
-
-This Job will be:
-- Restored with its original configuration if it was completed
-- Restored with parallelism=0 if it had failed
-- Skipped if it was still running
-
-#### Example 3: Using General Annotations on Jobs
-
-A user can also use a general policy that applies to all phases:
+For Jobs that are dynamically created by controllers (e.g., CronJobs, Argo Workflows), users can define a ResourcePolicy ConfigMap with label-based selection:
 
 ```yaml
-apiVersion: batch/v1
-kind: Job
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: less-important-job
-  annotations:
-    velero.io/job-restore-policy: skip
-spec:
-  # ...
+  name: job-restore-policy
+  namespace: velero
+data:
+  policy.yaml: |
+    version: v1
+    jobRestorePolicies:
+      # Skip all jobs owned by Argo Workflows
+      - conditions:
+          jobLabels:
+            workflows.argoproj.io/workflow: "*"
+        action:
+          type: skip
+      # Restore critical failed jobs as-is for investigation
+      - conditions:
+          jobLabels:
+            critical: "true"
+          jobPhase:
+            - failed
+        action:
+          type: restore-as-is
+      # Default: pause all other running/failed jobs
+      - conditions:
+          jobPhase:
+            - running
+            - failed
+        action:
+          type: restore-paused
 ```
 
-This Job will be skipped during restore regardless of its phase.
+This allows users to control Job restoration based on labels without modifying the Job manifests or controllers.
 
-#### Example 4: Using Phase-Specific Restore Annotations
+#### Example 3: Using ResourcePolicy with Restore
 
-A user can specify different policies for different Job phases during restore:
+To use the ResourcePolicy ConfigMap during restore:
+
+```bash
+velero restore create --from-backup=my-backup \
+  --resource-policy-configmap job-restore-policy
+```
+
+Jobs will be processed according to the rules defined in the ConfigMap.
+
+#### Example 4: Using Restore Annotations as Fallback
+
+When ResourcePolicy is not specified or a Job doesn't match any rule, Restore annotations provide fallback behavior:
 
 ```bash
 velero restore create --from-backup=my-backup \
@@ -249,14 +290,14 @@ This will:
 
 #### Example 5: Using General Restore Annotations
 
-A user can specify a global policy for all Jobs during restore:
+A user can specify a global fallback policy for all Jobs during restore:
 
 ```bash
 velero restore create --from-backup=my-backup \
   --annotations velero.io/job-restore-policy=skip
 ```
 
-This will skip restoration of all Jobs, regardless of their status.
+This will skip restoration of all Jobs that don't match any ResourcePolicy rule.
 
 ## Alternatives Considered
 
@@ -288,6 +329,27 @@ While this would provide a more structured approach than using annotations, we d
 - Annotations provide a more flexible and extensible mechanism for adding metadata without schema changes
 
 However, if this feature proves valuable and widely used, adding a dedicated field to the Restore CRD could be considered in a future release with proper deprecation notices for the annotation-based approach.
+
+### 5. Job Annotations
+
+We initially considered using annotations directly on Job resources to control restoration behavior.
+However, this approach was rejected due to poor user experience:
+- Jobs are often dynamically created and deleted by controllers (e.g., CronJobs, Argo Workflows)
+- Jobs may be short-lived, making annotation difficult before backup
+- Large numbers of Jobs would require modifying the owning controller
+- ResourcePolicy provides a centralized, label-based approach that doesn't require modifying Jobs
+
+While annotations could work for static, long-lived Jobs that users create manually, the ResourcePolicy approach is more practical for real-world use cases where Jobs are managed by controllers.
+
+### 6. Backup Phase Recording Annotation
+
+We considered adding a `velero.io/job-phase-at-backup` annotation to Jobs during backup to record their phase (completed, failed, running, pending).
+This annotation would help users understand why a Job was restored with specific modifications.
+However, this approach was rejected because:
+- The backup data itself is the authoritative source of truth for the Job's phase
+- Users who need to verify a Job's phase at backup time can examine the backup data directly
+- Adding annotations during backup modifies the resources unnecessarily
+- In most cases, users don't need this double-check mechanism
 
 ## Security Considerations
 
