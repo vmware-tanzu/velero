@@ -166,24 +166,21 @@ The implementation will require changes to the following components:
    - Implement `jobLabelsCondition` to match Job labels (similar to `pvcLabelsCondition`)
    - Add `GetJobMatchAction` function to evaluate policies against Jobs
 
-2. **Backup Controller**:
-   - Determine the Job phase based on its status (completed, failed, running, or pending)
-   - The phase information is stored in the backup data itself
-
-3. **Restore Controller** (`pkg/restore/restore.go`):
+2. **Restore Controller** (`pkg/restore/restore.go`):
    - Modify the `restoreItem` function to check for Job restore policies
+   - Determine the Job phase from the backup data (status.completionTime, status.failed, status.active)
    - Load ResourcePolicy from ConfigMap if specified in Restore
    - Evaluate ResourcePolicy rules first, then fall back to Restore annotations
    - Implement logic to modify the Job spec based on the determined policy
    - Apply the appropriate default policy if no policy matches
 
-4. **Restore Annotations**:
+3. **Restore Annotations**:
    - Implement support for the new annotations on Restore objects
    - Update the CLI documentation to explain the new annotations
    - Implement validation for the annotation values
    - Ensure proper precedence of phase-specific over general policies
 
-5. **Documentation**:
+4. **Documentation**:
    - Update documentation to explain the new behavior and options
    - Document the ResourcePolicy ConfigMap structure for Jobs
    - Explain why parallelism is modified for certain Jobs
@@ -236,10 +233,10 @@ data:
   policy.yaml: |
     version: v1
     jobRestorePolicies:
-      # Skip all jobs owned by Argo Workflows
+      # Skip all jobs managed by Argo Workflows
       - conditions:
           jobLabels:
-            workflows.argoproj.io/workflow: "*"
+            managed-by: argo-workflows
         action:
           type: skip
       # Restore critical failed jobs as-is for investigation
