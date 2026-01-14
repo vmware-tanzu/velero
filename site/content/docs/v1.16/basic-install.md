@@ -17,9 +17,8 @@ Velero supports storage providers for both cloud-provider environments and on-pr
 
 ### Velero on Windows
 
-Velero does not officially support Windows. In testing, the Velero team was able to backup stateless Windows applications only. The File System Backup and backups of stateful applications or PersistentVolumes were not supported.
-
-If you want to perform your own testing of Velero on Windows, you must deploy Velero as a Windows container. Velero does not provide official Windows images, but its possible for you to build your own Velero Windows container image to use. Note that you must build this image on a Windows node.
+Velero supports to backup and restore Windows workloads, either stateless or stateful.
+Velero node-agent and data mover pods could run in Windows nodes. To keep compatibility to the existing Velero plugins, Velero server runs in linux nodes only, so Velero requires at least one linux node in the cluster. Velero provides Windows images for specific Windows versions. For more information see [Backup Restore Windows Workloads][6].  
 
 ## Install the CLI
 
@@ -71,3 +70,4 @@ Please refer to [this part of the documentation][5].
 [3]: overview-plugins.md
 [4]: customize-installation.md#install-an-additional-volume-snapshot-provider
 [5]: customize-installation.md#optional-velero-cli-configurations
+[6]: backup-restore-windows.md
