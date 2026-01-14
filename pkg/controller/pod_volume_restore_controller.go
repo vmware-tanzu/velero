@@ -934,7 +934,7 @@ func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolume
 			cacheVolume = &exposer.CacheConfigs{
 				Limit:             limit,
 				StorageClass:      r.cacheVolumeConfigs.StorageClass,
-				ResidentThreshold: r.cacheVolumeConfigs.ResidentThreshold,
+				ResidentThreshold: r.cacheVolumeConfigs.ResidentThresholdInMB << 20,
 			}
 		}
 	}

@@ -76,7 +76,7 @@ toc:
       - page: Data Movement Node Selection Configuration
         url: /data-movement-node-selection
       - page: Data Movement Cache PVC Configuration
-        url: /data-movement-cache-volume.md
+        url: /data-movement-cache-volume
       - page: Node-agent Concurrency
         url: /node-agent-concurrency
   - title: Plugins

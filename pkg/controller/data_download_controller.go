@@ -918,7 +918,7 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 			cacheVolume = &exposer.CacheConfigs{
 				Limit:             limit,
 				StorageClass:      r.cacheVolumeConfigs.StorageClass,
-				ResidentThreshold: r.cacheVolumeConfigs.ResidentThreshold,
+				ResidentThreshold: r.cacheVolumeConfigs.ResidentThresholdInMB << 20,
 			}
 		}
 	}
