@@ -16,7 +16,7 @@ A sample of cache PVC configuration as part of the ConfigMap would look like:
 ```json
 {
     "cachePVC": {
-        "thresholdInGB": 1,
+        "residentThresholdInMB": 1024,
         "storageClass": "sc-wffc"
     }
 }
@@ -29,7 +29,7 @@ kubectl create cm node-agent-config -n velero --from-file=<json file name>
 
 A must-have field in the configuration is `storageClass` which tells Velero which storage class is used to provision the cache PVC. Velero relies on Kubernetes dynamic provision process to provision the PVC, static provision is not supported.  
 
-The cache PVC behavior could be further fine tuned through `thresholdInGB`. Its value is compared to the size of the backup, if the size is smaller than this value, no cache PVC would be created when restoring from the backup. This ensures that cache PVCs are not created in vain when the backup size is too small and can be accommodated in the data mover pods' root disk.  
+The cache PVC behavior could be further fine tuned through `residentThresholdInMB`. Its value is compared to the size of the backup, if the size is smaller than this value, no cache PVC would be created when restoring from the backup. This ensures that cache PVCs are not created in vain when the backup size is too small and can be accommodated in the data mover pods' root disk.  
 
 This configuration decides whether and how to provision cache PVCs, but it doesn't decide their size. Instead, the size is decided by the specific backup repository. Specifically, Velero asks a cache limit from the backup repository and uses this limit to calculate the cache PVC size.  
 The cache limit is decided by the backup repository itself, for Kopia repository, if `cacheLimitMB` is specified in the backup repository configuration, its value will be used; otherwise, a default limit (5 GB) is used.  

@@ -68,10 +68,10 @@ type RestorePVC struct {
 
 type CachePVC struct {
 	// StorageClass specifies the storage class for cache PVC
-	StorageClass string
+	StorageClass string `json:"storageClass,omitempty"`
 
-	// ResidentThreshold specifies the minimum size of the backup data to create cache PVC
-	ResidentThreshold int64
+	// ResidentThresholdInMB specifies the minimum size of the backup data to create cache PVC
+	ResidentThresholdInMB int64 `json:"residentThresholdInMB,omitempty"`
 }
 
 type NodeAgentConfigs struct {
