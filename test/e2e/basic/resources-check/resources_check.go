@@ -39,7 +39,7 @@ import (
 func GetResourcesCheckTestCases() []VeleroBackupRestoreTest {
 	return []VeleroBackupRestoreTest{
 		&NSAnnotationCase{},
-		&MultiNSBackup{IsScalTest: false},
+		&MultiNSBackup{IsScaleTest: false},
 		&RBACCase{},
 	}
 }

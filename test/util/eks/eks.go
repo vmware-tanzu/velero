@@ -22,7 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/net/context"
+	"context"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"

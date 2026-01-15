@@ -120,7 +120,7 @@ func TestHandleHooksSkips(t *testing.T) {
 
 			groupResource := schema.ParseGroupResource(test.groupResource)
 			err := h.HandleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, PhasePre, hookTracker)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		})
 	}
 }
@@ -1151,6 +1151,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 							WaitTimeout:  metav1.Duration{Duration: time.Minute},
 							WaitForReady: boolptr.False(),
 						},
+						hookIndex: 0,
 					},
 					{
 						HookName:   "hook1",
@@ -1163,6 +1164,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 							WaitTimeout:  metav1.Duration{Duration: time.Minute * 2},
 							WaitForReady: boolptr.False(),
 						},
+						hookIndex: 2,
 					},
 					{
 						HookName:   "hook2",
@@ -1175,6 +1177,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 							WaitTimeout:  metav1.Duration{Duration: time.Minute * 4},
 							WaitForReady: boolptr.True(),
 						},
+						hookIndex: 0,
 					},
 				},
 				"container2": {
@@ -1189,6 +1192,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 							WaitTimeout:  metav1.Duration{Duration: time.Second * 3},
 							WaitForReady: boolptr.False(),
 						},
+						hookIndex: 1,
 					},
 				},
 			},
@@ -1199,7 +1203,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			actual, err := GroupRestoreExecHooks("restore1", tc.resourceRestoreHooks, tc.pod, velerotest.NewLogger(), hookTracker)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
@@ -1955,13 +1959,13 @@ func TestHandleRestoreHooks(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			handler := InitContainerRestoreHookHandler{}
 			podMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&tc.podInput)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			actual, err := handler.HandleRestoreHooks(velerotest.NewLogger(), kuberesource.Pods, &unstructured.Unstructured{Object: podMap}, tc.restoreHooks, tc.namespaceMapping)
 			assert.Equal(t, tc.expectedError, err)
 			if actual != nil {
 				actualPod := new(corev1api.Pod)
 				err = runtime.DefaultUnstructuredConverter.FromUnstructured(actual.UnstructuredContent(), actualPod)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedPod, actualPod)
 			}
 		})
@@ -1976,7 +1980,7 @@ func TestValidateContainer(t *testing.T) {
 	expectedError := fmt.Errorf("invalid InitContainer in restore hook, it doesn't have Command, Name or Image field")
 
 	// valid string should return nil as result.
-	assert.NoError(t, ValidateContainer([]byte(valid)))
+	require.NoError(t, ValidateContainer([]byte(valid)))
 
 	// noName string should return expected error as result.
 	assert.Equal(t, expectedError, ValidateContainer([]byte(noName)))

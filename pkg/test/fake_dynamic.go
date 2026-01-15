@@ -83,3 +83,8 @@ func (c *FakeDynamicClient) UpdateStatus(obj *unstructured.Unstructured, opts me
 	args := c.Called(obj, opts)
 	return args.Get(0).(*unstructured.Unstructured), args.Error(1)
 }
+
+func (c *FakeDynamicClient) Apply(name string, obj *unstructured.Unstructured, opts metav1.ApplyOptions) (*unstructured.Unstructured, error) {
+	args := c.Called(name, obj, opts)
+	return args.Get(0).(*unstructured.Unstructured), args.Error(1)
+}

@@ -108,6 +108,10 @@ spec:
                 description: SnapshotID is the ID of the Velero backup snapshot to
                   be restored from.
                 type: string
+              snapshotSize:
+                description: SnapshotSize is the logical size in Bytes of the snapshot.
+                format: int64
+                type: integer
               sourceNamespace:
                 description: |-
                   SourceNamespace is the original namespace where the volume is backed up from.

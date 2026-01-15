@@ -221,14 +221,6 @@ func Test_getCloudConfiguration(t *testing.T) {
 		postestFn func()
 	}{
 		{
-			name:   "invalid cloud name",
-			bslCfg: map[string]string{},
-			creds: map[string]string{
-				CredentialKeyCloudName: "invalid",
-			},
-			err: true,
-		},
-		{
 			name:   "null cloud name",
 			bslCfg: map[string]string{},
 			creds: map[string]string{

@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package resourcepolicies
 
 import (
@@ -20,9 +21,11 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -49,24 +52,58 @@ type Action struct {
 	Parameters map[string]any `yaml:"parameters,omitempty"`
 }
 
-// volumePolicy defined policy to conditions to match Volumes and related action to handle matched Volumes
+// IncludeExcludePolicy defined policy to include or exclude resources based on the names
+type IncludeExcludePolicy struct {
+	// The following fields have the same semantics as those from the spec of backup.
+	// Refer to the comment in the velerov1api.BackupSpec for more details.
+	IncludedClusterScopedResources   []string `yaml:"includedClusterScopedResources"`
+	ExcludedClusterScopedResources   []string `yaml:"excludedClusterScopedResources"`
+	IncludedNamespaceScopedResources []string `yaml:"includedNamespaceScopedResources"`
+	ExcludedNamespaceScopedResources []string `yaml:"excludedNamespaceScopedResources"`
+}
+
+func (p *IncludeExcludePolicy) Validate() error {
+	if err := p.validateIncludeExclude(p.IncludedClusterScopedResources, p.ExcludedClusterScopedResources); err != nil {
+		return err
+	}
+	return p.validateIncludeExclude(p.IncludedNamespaceScopedResources, p.ExcludedNamespaceScopedResources)
+}
+
+func (p *IncludeExcludePolicy) validateIncludeExclude(includesList, excludesList []string) error {
+	includes := sets.NewString(includesList...)
+	excludes := sets.NewString(excludesList...)
+
+	if includes.Has("*") || excludes.Has("*") {
+		return fmt.Errorf("cannot use '*' in includes or excludes filters in the policy")
+	}
+	for _, itm := range excludes.List() {
+		if includes.Has(itm) {
+			return fmt.Errorf("excludes list cannot contain an item in the includes list: %s", itm)
+		}
+	}
+	return nil
+}
+
+// VolumePolicy defined policy to conditions to match Volumes and related action to handle matched Volumes
 type VolumePolicy struct {
 	// Conditions defined list of conditions to match Volumes
 	Conditions map[string]any `yaml:"conditions"`
 	Action     Action         `yaml:"action"`
 }
 
-// resourcePolicies currently defined slice of volume policies to handle backup
+// ResourcePolicies currently defined slice of volume policies to handle backup
 type ResourcePolicies struct {
-	Version        string         `yaml:"version"`
-	VolumePolicies []VolumePolicy `yaml:"volumePolicies"`
+	Version              string                `yaml:"version"`
+	VolumePolicies       []VolumePolicy        `yaml:"volumePolicies"`
+	IncludeExcludePolicy *IncludeExcludePolicy `yaml:"includeExcludePolicy"`
 	// we may support other resource policies in the future, and they could be added separately
 	// OtherResourcePolicies []OtherResourcePolicy
 }
 
 type Policies struct {
-	version        string
-	volumePolicies []volPolicy
+	version              string
+	volumePolicies       []volPolicy
+	includeExcludePolicy *IncludeExcludePolicy
 	// OtherPolicies
 }
 
@@ -109,12 +146,16 @@ func (p *Policies) BuildPolicy(resPolicies *ResourcePolicies) error {
 		if len(con.PVCLabels) > 0 {
 			volP.conditions = append(volP.conditions, &pvcLabelsCondition{labels: con.PVCLabels})
 		}
+		if len(con.PVCPhase) > 0 {
+			volP.conditions = append(volP.conditions, &pvcPhaseCondition{phases: con.PVCPhase})
+		}
 		p.volumePolicies = append(p.volumePolicies, volP)
 	}
 
 	// Other resource policies
 
 	p.version = resPolicies.Version
+	p.includeExcludePolicy = resPolicies.IncludeExcludePolicy
 	return nil
 }
 
@@ -153,6 +194,9 @@ func (p *Policies) GetMatchAction(res any) (*Action, error) {
 		if data.PVC != nil {
 			volume.parsePVC(data.PVC)
 		}
+	case data.PVC != nil:
+		// Handle PVC-only scenarios (e.g., unbound PVCs)
+		volume.parsePVC(data.PVC)
 	default:
 		return nil, errors.New("failed to convert object")
 	}
@@ -175,7 +219,18 @@ func (p *Policies) Validate() error {
 			}
 		}
 	}
+
+	if p.GetIncludeExcludePolicy() != nil {
+		if err := p.GetIncludeExcludePolicy().Validate(); err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
 	return nil
+}
+
+func (p *Policies) GetIncludeExcludePolicy() *IncludeExcludePolicy {
+	return p.includeExcludePolicy
 }
 
 func GetResourcePoliciesFromBackup(
@@ -185,7 +240,7 @@ func GetResourcePoliciesFromBackup(
 ) (resourcePolicies *Policies, err error) {
 	if backup.Spec.ResourcePolicy != nil &&
 		strings.EqualFold(backup.Spec.ResourcePolicy.Kind, ConfigmapRefType) {
-		policiesConfigMap := &v1.ConfigMap{}
+		policiesConfigMap := &corev1api.ConfigMap{}
 		err = client.Get(
 			context.Background(),
 			crclient.ObjectKey{Namespace: backup.Namespace, Name: backup.Spec.ResourcePolicy.Name},
@@ -214,7 +269,7 @@ func GetResourcePoliciesFromBackup(
 	return resourcePolicies, nil
 }
 
-func getResourcePoliciesFromConfig(cm *v1.ConfigMap) (*Policies, error) {
+func getResourcePoliciesFromConfig(cm *corev1api.ConfigMap) (*Policies, error) {
 	if cm == nil {
 		return nil, fmt.Errorf("could not parse config from nil configmap")
 	}

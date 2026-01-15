@@ -62,6 +62,8 @@ GINKGO_LABELS ?=
 # https://onsi.github.io/ginkgo/#mental-model-how-ginkgo-handles-failure
 FAIL_FAST ?= false
 
+VERSION ?= main
+
 VELERO_CLI ?=$$(pwd)/../_output/bin/$(GOOS)/$(GOARCH)/velero
 
 VELERO_IMAGE ?= velero/velero:main
@@ -74,7 +76,7 @@ HAS_VSPHERE_PLUGIN ?= false
 RESTORE_HELPER_IMAGE ?=
 
 #Released version only
-UPGRADE_FROM_VELERO_VERSION ?= v1.13.2,v1.14.1
+UPGRADE_FROM_VELERO_VERSION ?= v1.15.2,v1.16.2
 
 # UPGRADE_FROM_VELERO_CLI can has the same format(a list divided by comma) with UPGRADE_FROM_VELERO_VERSION
 # Upgrade tests will be executed sequently according to the list by UPGRADE_FROM_VELERO_VERSION
@@ -83,7 +85,7 @@ UPGRADE_FROM_VELERO_VERSION ?= v1.13.2,v1.14.1
 # to the end, nil string will be set if UPGRADE_FROM_VELERO_CLI is shorter than UPGRADE_FROM_VELERO_VERSION
 UPGRADE_FROM_VELERO_CLI ?=
 
-MIGRATE_FROM_VELERO_VERSION ?= v1.14.1,self
+MIGRATE_FROM_VELERO_VERSION ?= v1.16.2,$(VERSION)
 MIGRATE_FROM_VELERO_CLI ?=
 
 VELERO_NAMESPACE ?= velero
@@ -102,7 +104,11 @@ OBJECT_STORE_PROVIDER ?=
 INSTALL_VELERO ?= true
 REGISTRY_CREDENTIAL_FILE ?=
 KIBISHII_DIRECTORY ?= github.com/vmware-tanzu-experiments/distributed-data-generator/kubernetes/yaml/
+IMAGE_REGISTRY_PROXY ?=
 
+# Parameters for labels and annotations for Velero pods and service accounts.
+POD_LABELS ?=
+SA_ANNOTATIONS ?=
 
 # Flags to create an additional BSL for multiple credentials tests
 ADDITIONAL_BSL_PLUGINS ?=
@@ -115,6 +121,10 @@ ADDITIONAL_BSL_CONFIG ?=
 FEATURES ?=
 DEBUG_VELERO_POD_RESTART ?= false
 VELERO_SERVER_DEBUG_MODE ?= false
+
+ITEM_BLOCK_WORKER_COUNT ?= 1
+
+WORKER_OS ?= linux
 
 # Parameters to run migration tests along with all other E2E tests, and both of them should
 #   be provided or left them all empty to skip migration tests with no influence to other
@@ -167,7 +177,8 @@ COMMON_ARGS := --velerocli=$(VELERO_CLI) \
 	--uploader-type=$(UPLOADER_TYPE) \
 	--debug-velero-pod-restart=$(DEBUG_VELERO_POD_RESTART) \
 	--fail-fast=$(FAIL_FAST) \
-	--has-vsphere-plugin=$(HAS_VSPHERE_PLUGIN)
+	--has-vsphere-plugin=$(HAS_VSPHERE_PLUGIN) \
+	--item-block-worker-count=$(ITEM_BLOCK_WORKER_COUNT)
 
 # Make sure ginkgo is in $GOBIN
 .PHONY:ginkgo
@@ -175,7 +186,7 @@ ginkgo: ${GOBIN}/ginkgo
 
 # This target does not run if ginkgo is already in $GOBIN
 ${GOBIN}/ginkgo:
-	GOBIN=${GOBIN} go install github.com/onsi/ginkgo/v2/ginkgo@v2.19.0
+	GOBIN=${GOBIN} go install github.com/onsi/ginkgo/v2/ginkgo@v2.22.0
 
 .PHONY: run-e2e
 run-e2e: ginkgo
@@ -216,7 +227,11 @@ run-e2e: ginkgo
 		--default-cls-service-account-name=$(DEFAULT_CLS_SERVICE_ACCOUNT_NAME) \
 		--standby-cls-service-account-name=$(STANDBY_CLS_SERVICE_ACCOUNT_NAME) \
 		--kibishii-directory=$(KIBISHII_DIRECTORY) \
-		--disable-informer-cache=$(DISABLE_INFORMER_CACHE)
+		--disable-informer-cache=$(DISABLE_INFORMER_CACHE) \
+		--image-registry-proxy=$(IMAGE_REGISTRY_PROXY) \
+		--worker-os=$(WORKER_OS) \
+		--pod-labels=$(POD_LABELS) \
+		--sa-annotations=$(SA_ANNOTATIONS)
 
 .PHONY: run-perf
 run-perf: ginkgo

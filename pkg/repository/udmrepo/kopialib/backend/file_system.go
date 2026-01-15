@@ -18,13 +18,17 @@ package backend
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/kopia/kopia/repo/blob"
 	"github.com/kopia/kopia/repo/blob/filesystem"
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/logging"
 )
 
 type FsBackend struct {
@@ -36,7 +40,7 @@ const (
 	defaultDirMode  = 0o700
 )
 
-func (c *FsBackend) Setup(ctx context.Context, flags map[string]string) error {
+func (c *FsBackend) Setup(ctx context.Context, flags map[string]string, logger logrus.FieldLogger) error {
 	path, err := mustHaveString(udmrepo.StoreOptionFsPath, flags)
 	if err != nil {
 		return err
@@ -48,15 +52,25 @@ func (c *FsBackend) Setup(ctx context.Context, flags map[string]string) error {
 	c.options.FileMode = defaultFileMode
 	c.options.DirectoryMode = defaultDirMode
 
+	ctx = logging.WithLogger(ctx, logger)
+
 	c.options.Limits = setupLimits(ctx, flags)
 
 	return nil
 }
 
-func (c *FsBackend) Connect(ctx context.Context, isCreate bool) (blob.Storage, error) {
+func (c *FsBackend) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
 	if !filepath.IsAbs(c.options.Path) {
 		return nil, errors.Errorf("filesystem repository path is not absolute, path: %s", c.options.Path)
 	}
+
+	if !isCreate {
+		if _, err := os.Stat(c.options.Path); err != nil {
+			return nil, ErrStoreNotExist
+		}
+	}
+
+	ctx = logging.WithLogger(ctx, logger)
 
 	return filesystem.New(ctx, &c.options, isCreate)
 }

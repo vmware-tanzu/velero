@@ -17,7 +17,6 @@ limitations under the License.
 package kube
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -29,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
@@ -139,23 +138,23 @@ func TestEvent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset()
 			scheme := runtime.NewScheme()
-			err := corev1.AddToScheme(scheme)
+			err := corev1api.AddToScheme(scheme)
 			require.NoError(t, err)
 
 			recorder := NewEventRecorder(client, scheme, "source-1", "fake-node", velerotest.NewLogger())
 
-			pod := &corev1.Pod{
+			pod := &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "fake-ns",
 					Name:      "fake-pod",
 					UID:       types.UID("fake-uid"),
 				},
-				Spec: corev1.PodSpec{
+				Spec: corev1api.PodSpec{
 					NodeName: "fake-node",
 				},
 			}
 
-			_, err = client.CoreV1().Pods("fake-ns").Create(context.Background(), pod, metav1.CreateOptions{})
+			_, err = client.CoreV1().Pods("fake-ns").Create(t.Context(), pod, metav1.CreateOptions{})
 			require.NoError(t, err)
 
 			for i := 0; i < tc.generateDiff; i++ {
@@ -190,7 +189,7 @@ func TestEvent(t *testing.T) {
 
 			recorder.Shutdown()
 
-			items, err := client.CoreV1().Events("fake-ns").List(context.Background(), metav1.ListOptions{})
+			items, err := client.CoreV1().Events("fake-ns").List(t.Context(), metav1.ListOptions{})
 			require.NoError(t, err)
 
 			if tc.expected != len(items.Items) {

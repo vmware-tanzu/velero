@@ -19,17 +19,20 @@ package backend
 import (
 	"context"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/kopia/kopia/repo/blob"
 	"github.com/kopia/kopia/repo/blob/gcs"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/logging"
 )
 
 type GCSBackend struct {
 	options gcs.Options
 }
 
-func (c *GCSBackend) Setup(ctx context.Context, flags map[string]string) error {
+func (c *GCSBackend) Setup(ctx context.Context, flags map[string]string, logger logrus.FieldLogger) error {
 	var err error
 	c.options.BucketName, err = mustHaveString(udmrepo.StoreOptionOssBucket, flags)
 	if err != nil {
@@ -44,11 +47,14 @@ func (c *GCSBackend) Setup(ctx context.Context, flags map[string]string) error {
 	c.options.Prefix = optionalHaveString(udmrepo.StoreOptionPrefix, flags)
 	c.options.ReadOnly = optionalHaveBool(ctx, udmrepo.StoreOptionGcsReadonly, flags)
 
+	ctx = logging.WithLogger(ctx, logger)
+
 	c.options.Limits = setupLimits(ctx, flags)
 
 	return nil
 }
 
-func (c *GCSBackend) Connect(ctx context.Context, isCreate bool) (blob.Storage, error) {
+func (c *GCSBackend) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
+	ctx = logging.WithLogger(ctx, logger)
 	return gcs.New(ctx, &c.options, false)
 }

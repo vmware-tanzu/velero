@@ -335,7 +335,7 @@ func TestWrite(t *testing.T) {
 
 			err := log.Write(tc.ent, nil)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if len(tc.logMessage) > 0 {
 				assert.Contains(t, logMessage, tc.logMessage)

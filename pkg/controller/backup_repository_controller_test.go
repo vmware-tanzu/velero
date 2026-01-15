@@ -19,10 +19,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,17 +34,20 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/repository/maintenance"
+	repomaintenance "github.com/vmware-tanzu/velero/pkg/repository/maintenance"
+	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	repomokes "github.com/vmware-tanzu/velero/pkg/repository/mocks"
 	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	batchv1 "k8s.io/api/batch/v1"
+	batchv1api "k8s.io/api/batch/v1"
 )
 
 const testMaintenanceFrequency = 10 * time.Minute
@@ -59,10 +65,9 @@ func mockBackupRepoReconciler(t *testing.T, mockOn string, arg any, ret ...any) 
 		mgr,
 		testMaintenanceFrequency,
 		"fake-repo-config",
-		3,
 		"",
-		kube.PodResources{},
 		logrus.InfoLevel,
+		nil,
 		nil,
 	)
 }
@@ -82,45 +87,101 @@ func mockBackupRepositoryCR() *velerov1api.BackupRepository {
 func TestPatchBackupRepository(t *testing.T) {
 	rr := mockBackupRepositoryCR()
 	reconciler := mockBackupRepoReconciler(t, "", nil, nil)
-	err := reconciler.Client.Create(context.TODO(), rr)
-	assert.NoError(t, err)
-	err = reconciler.patchBackupRepository(context.Background(), rr, repoReady())
-	assert.NoError(t, err)
+	err := reconciler.Client.Create(t.Context(), rr)
+	require.NoError(t, err)
+	err = reconciler.patchBackupRepository(t.Context(), rr, repoReady())
+	require.NoError(t, err)
 	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
-	err = reconciler.patchBackupRepository(context.Background(), rr, repoNotReady("not ready"))
-	assert.NoError(t, err)
+	err = reconciler.patchBackupRepository(t.Context(), rr, repoNotReady("not ready"))
+	require.NoError(t, err)
 	assert.NotEqual(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 }
 
 func TestCheckNotReadyRepo(t *testing.T) {
-	rr := mockBackupRepositoryCR()
-	rr.Spec.BackupStorageLocation = "default"
-	rr.Spec.ResticIdentifier = "fake-identifier"
-	rr.Spec.VolumeNamespace = "volume-ns-1"
-	reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
-	err := reconciler.Client.Create(context.TODO(), rr)
-	assert.NoError(t, err)
-	location := velerov1api.BackupStorageLocation{
-		Spec: velerov1api.BackupStorageLocationSpec{
-			Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic"},
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: velerov1api.DefaultNamespace,
-			Name:      rr.Spec.BackupStorageLocation,
-		},
-	}
+	// Test for restic repository
+	t.Run("restic repository", func(t *testing.T) {
+		rr := mockBackupRepositoryCR()
+		rr.Spec.BackupStorageLocation = "default"
+		rr.Spec.ResticIdentifier = "fake-identifier"
+		rr.Spec.VolumeNamespace = "volume-ns-1"
+		rr.Spec.RepositoryType = velerov1api.BackupRepositoryTypeRestic
+		reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
+		err := reconciler.Client.Create(t.Context(), rr)
+		require.NoError(t, err)
+		location := velerov1api.BackupStorageLocation{
+			Spec: velerov1api.BackupStorageLocationSpec{
+				Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic"},
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: velerov1api.DefaultNamespace,
+				Name:      rr.Spec.BackupStorageLocation,
+			},
+		}
 
-	_, err = reconciler.checkNotReadyRepo(context.TODO(), rr, &location, reconciler.logger)
-	assert.NoError(t, err)
-	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
-	assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
+		_, err = reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
+		require.NoError(t, err)
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
+		assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
+	})
+
+	// Test for kopia repository
+	t.Run("kopia repository", func(t *testing.T) {
+		rr := mockBackupRepositoryCR()
+		rr.Spec.BackupStorageLocation = "default"
+		rr.Spec.VolumeNamespace = "volume-ns-1"
+		rr.Spec.RepositoryType = velerov1api.BackupRepositoryTypeKopia
+		reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
+		err := reconciler.Client.Create(t.Context(), rr)
+		require.NoError(t, err)
+		location := velerov1api.BackupStorageLocation{
+			Spec: velerov1api.BackupStorageLocationSpec{
+				Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic"},
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: velerov1api.DefaultNamespace,
+				Name:      rr.Spec.BackupStorageLocation,
+			},
+		}
+
+		_, err = reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
+		require.NoError(t, err)
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
+		// ResticIdentifier should remain empty for kopia
+		assert.Empty(t, rr.Spec.ResticIdentifier)
+	})
+
+	// Test for empty repository type (defaults to restic)
+	t.Run("empty repository type", func(t *testing.T) {
+		rr := mockBackupRepositoryCR()
+		rr.Spec.BackupStorageLocation = "default"
+		rr.Spec.ResticIdentifier = "fake-identifier"
+		rr.Spec.VolumeNamespace = "volume-ns-1"
+		// Deliberately leave RepositoryType empty
+		reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
+		err := reconciler.Client.Create(t.Context(), rr)
+		require.NoError(t, err)
+		location := velerov1api.BackupStorageLocation{
+			Spec: velerov1api.BackupStorageLocationSpec{
+				Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic"},
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: velerov1api.DefaultNamespace,
+				Name:      rr.Spec.BackupStorageLocation,
+			},
+		}
+
+		_, err = reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
+		require.NoError(t, err)
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
+		assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
+	})
 }
 
-func startMaintenanceJobFail(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
+func startMaintenanceJobFail(client.Client, context.Context, *velerov1api.BackupRepository, string, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
 	return "", errors.New("fake-start-error")
 }
 
-func startMaintenanceJobSucceed(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
+func startMaintenanceJobSucceed(client.Client, context.Context, *velerov1api.BackupRepository, string, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
 	return "fake-job-name", nil
 }
 
@@ -183,7 +244,7 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 	tests := []struct {
 		name                    string
 		repo                    *velerov1api.BackupRepository
-		startJobFunc            func(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error)
+		startJobFunc            func(client.Client, context.Context, *velerov1api.BackupRepository, string, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error)
 		waitJobFunc             func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error)
 		expectedMaintenanceTime time.Time
 		expectedHistory         []velerov1api.BackupRepositoryMaintenanceStatus
@@ -367,15 +428,15 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			reconciler := mockBackupRepoReconciler(t, "", test.repo, nil)
 			reconciler.clock = &fakeClock{now}
-			err := reconciler.Client.Create(context.TODO(), test.repo)
-			assert.NoError(t, err)
+			err := reconciler.Client.Create(t.Context(), test.repo)
+			require.NoError(t, err)
 
 			funcStartMaintenanceJob = test.startJobFunc
 			funcWaitMaintenanceJobComplete = test.waitJobFunc
 
-			err = reconciler.runMaintenanceIfDue(context.TODO(), test.repo, velerotest.NewLogger())
+			err = reconciler.runMaintenanceIfDue(t.Context(), test.repo, velerotest.NewLogger())
 			if test.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.expectedMaintenanceTime, test.repo.Status.LastMaintenanceTime.Time)
@@ -400,8 +461,8 @@ func TestInitializeRepo(t *testing.T) {
 	rr := mockBackupRepositoryCR()
 	rr.Spec.BackupStorageLocation = "default"
 	reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
-	err := reconciler.Client.Create(context.TODO(), rr)
-	assert.NoError(t, err)
+	err := reconciler.Client.Create(t.Context(), rr)
+	require.NoError(t, err)
 	location := velerov1api.BackupStorageLocation{
 		Spec: velerov1api.BackupStorageLocationSpec{
 			Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic"},
@@ -412,8 +473,8 @@ func TestInitializeRepo(t *testing.T) {
 		},
 	}
 
-	err = reconciler.initializeRepo(context.TODO(), rr, &location, reconciler.logger)
-	assert.NoError(t, err)
+	err = reconciler.initializeRepo(t.Context(), rr, &location, reconciler.logger)
+	require.NoError(t, err)
 	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 }
 
@@ -469,9 +530,9 @@ func TestBackupRepoReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			reconciler := mockBackupRepoReconciler(t, "", test.repo, nil)
-			err := reconciler.Client.Create(context.TODO(), test.repo)
-			assert.NoError(t, err)
-			_, err = reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: "repo"}})
+			err := reconciler.Client.Create(t.Context(), test.repo)
+			require.NoError(t, err)
+			_, err = reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: "repo"}})
 			if test.expectNil {
 				assert.NoError(t, err)
 			} else {
@@ -524,10 +585,9 @@ func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
 				&mgr,
 				test.userDefinedFreq,
 				"",
-				3,
 				"",
-				kube.PodResources{},
 				logrus.InfoLevel,
+				nil,
 				nil,
 			)
 
@@ -658,11 +718,11 @@ func TestNeedInvalidBackupRepo(t *testing.T) {
 				nil,
 				time.Duration(0),
 				"",
-				3,
 				"",
-				kube.PodResources{},
 				logrus.InfoLevel,
-				nil)
+				nil,
+				nil,
+			)
 
 			need := reconciler.needInvalidBackupRepo(test.oldBSL, test.newBSL)
 			assert.Equal(t, test.expect, need)
@@ -671,14 +731,14 @@ func TestNeedInvalidBackupRepo(t *testing.T) {
 }
 
 func TestGetBackupRepositoryConfig(t *testing.T) {
-	configWithNoData := &corev1.ConfigMap{
+	configWithNoData := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "config-1",
 			Namespace: velerov1api.DefaultNamespace,
 		},
 	}
 
-	configWithWrongData := &corev1.ConfigMap{
+	configWithWrongData := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "config-1",
 			Namespace: velerov1api.DefaultNamespace,
@@ -688,7 +748,7 @@ func TestGetBackupRepositoryConfig(t *testing.T) {
 		},
 	}
 
-	configWithData := &corev1.ConfigMap{
+	configWithData := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "config-1",
 			Namespace: velerov1api.DefaultNamespace,
@@ -752,7 +812,7 @@ func TestGetBackupRepositoryConfig(t *testing.T) {
 	}
 
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -761,12 +821,12 @@ func TestGetBackupRepositoryConfig(t *testing.T) {
 
 			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
 
-			result, err := getBackupRepositoryConfig(context.Background(), fakeClient, test.congiName, velerov1api.DefaultNamespace, test.repoName, test.repoType, velerotest.NewLogger())
+			result, err := getBackupRepositoryConfig(t.Context(), fakeClient, test.congiName, velerov1api.DefaultNamespace, test.repoName, test.repoType, velerotest.NewLogger())
 
 			if test.expectedErr != "" {
 				assert.EqualError(t, err, test.expectedErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, test.expectedResult, result)
 			}
 		})
@@ -957,27 +1017,27 @@ func TestRecallMaintenance(t *testing.T) {
 	velerov1api.AddToScheme(schemeFail)
 
 	scheme := runtime.NewScheme()
-	batchv1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
+	batchv1api.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 	velerov1api.AddToScheme(scheme)
 
-	jobSucceeded := &batchv1.Job{
+	jobSucceeded := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job1",
 			Namespace:         velerov1api.DefaultNamespace,
 			Labels:            map[string]string{maintenance.RepositoryNameLabel: "repo"},
 			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour)},
 		},
-		Status: batchv1.JobStatus{
+		Status: batchv1api.JobStatus{
 			StartTime:      &metav1.Time{Time: now.Add(time.Hour)},
 			CompletionTime: &metav1.Time{Time: now.Add(time.Hour * 2)},
 			Succeeded:      1,
 		},
 	}
 
-	jobPodSucceeded := builder.ForPod(velerov1api.DefaultNamespace, "job1").Labels(map[string]string{"job-name": "job1"}).ContainerStatuses(&corev1.ContainerStatus{
-		State: corev1.ContainerState{
-			Terminated: &corev1.ContainerStateTerminated{},
+	jobPodSucceeded := builder.ForPod(velerov1api.DefaultNamespace, "job1").Labels(map[string]string{"job-name": "job1"}).ContainerStatuses(&corev1api.ContainerStatus{
+		State: corev1api.ContainerState{
+			Terminated: &corev1api.ContainerStateTerminated{},
 		},
 	}).Result()
 
@@ -993,7 +1053,7 @@ func TestRecallMaintenance(t *testing.T) {
 		{
 			name:          "wait completion error",
 			runtimeScheme: schemeFail,
-			expectedErr:   "error waiting incomplete repo maintenance job for repo repo: error listing maintenance job for repo repo: no kind is registered for the type v1.JobList in scheme \"pkg/runtime/scheme.go:100\"",
+			expectedErr:   "error waiting incomplete repo maintenance job for repo repo: error listing maintenance job for repo repo: no kind is registered for the type v1.JobList in scheme",
 		},
 		{
 			name:          "no consolidate result",
@@ -1049,9 +1109,9 @@ func TestRecallMaintenance(t *testing.T) {
 
 			lastTm := backupRepo.Status.LastMaintenanceTime
 
-			err := r.recallMaintenance(context.TODO(), backupRepo, velerotest.NewLogger())
+			err := r.recallMaintenance(t.Context(), backupRepo, velerotest.NewLogger())
 			if test.expectedErr != "" {
-				assert.EqualError(t, err, test.expectedErr)
+				assert.ErrorContains(t, err, test.expectedErr)
 			} else {
 				assert.NoError(t, err)
 
@@ -1412,4 +1472,477 @@ func TestGetLastMaintenanceTimeFromHistory(t *testing.T) {
 			assert.Equal(t, test.expected, time.Time)
 		})
 	}
+}
+
+func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
+	tests := []struct {
+		name               string
+		repo               *velerov1api.BackupRepository
+		expectedKeptJobs   int
+		maintenanceJobs    []batchv1api.Job
+		bsl                *velerov1api.BackupStorageLocation
+		repoMaintenanceJob *corev1api.ConfigMap
+	}{
+		{
+			name: "test with global config",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "repo",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency:  metav1.Duration{Duration: testMaintenanceFrequency},
+					BackupStorageLocation: "default",
+					VolumeNamespace:       "test-ns",
+					RepositoryType:        "restic",
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					Phase: velerov1api.BackupRepositoryPhaseReady,
+				},
+			},
+			expectedKeptJobs: 5,
+			maintenanceJobs: []batchv1api.Job{
+				*builder.ForJob("velero", "job-01").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
+				*builder.ForJob("velero", "job-02").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
+				*builder.ForJob("velero", "job-03").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
+				*builder.ForJob("velero", "job-04").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
+				*builder.ForJob("velero", "job-05").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
+				*builder.ForJob("velero", "job-06").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
+			},
+			bsl: builder.ForBackupStorageLocation("velero", "default").Result(),
+			repoMaintenanceJob: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "repo-maintenance-job-config",
+				},
+				Data: map[string]string{
+					"global": `{"keepLatestMaintenanceJobs": 5}`,
+				},
+			},
+		},
+		{
+			name: "test with specific repo config overriding global",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "repo",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency:  metav1.Duration{Duration: testMaintenanceFrequency},
+					BackupStorageLocation: "default",
+					VolumeNamespace:       "test-ns",
+					RepositoryType:        "restic",
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					Phase: velerov1api.BackupRepositoryPhaseReady,
+				},
+			},
+			expectedKeptJobs: 2,
+			maintenanceJobs: []batchv1api.Job{
+				*builder.ForJob("velero", "job-01").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
+				*builder.ForJob("velero", "job-02").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
+				*builder.ForJob("velero", "job-03").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
+			},
+			bsl: builder.ForBackupStorageLocation("velero", "default").Result(),
+			repoMaintenanceJob: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "repo-maintenance-job-config",
+				},
+				Data: map[string]string{
+					"global":                 `{"keepLatestMaintenanceJobs": 5}`,
+					"test-ns-default-restic": `{"keepLatestMaintenanceJobs": 2}`,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			objects := []runtime.Object{test.repo, test.bsl}
+			if test.repoMaintenanceJob != nil {
+				objects = append(objects, test.repoMaintenanceJob)
+			}
+			crClient := velerotest.NewFakeControllerRuntimeClient(t, objects...)
+
+			for _, job := range test.maintenanceJobs {
+				require.NoError(t, crClient.Create(t.Context(), &job))
+			}
+
+			repoLocker := repository.NewRepoLocker()
+			mgr := repomanager.NewManager("", crClient, repoLocker, nil, nil, nil)
+
+			repoMaintenanceConfigName := ""
+			if test.repoMaintenanceJob != nil {
+				repoMaintenanceConfigName = test.repoMaintenanceJob.Name
+			}
+
+			reconciler := NewBackupRepoReconciler(
+				velerov1api.DefaultNamespace,
+				velerotest.NewLogger(),
+				crClient,
+				mgr,
+				time.Duration(0),
+				"",
+				repoMaintenanceConfigName,
+				logrus.InfoLevel,
+				nil,
+				nil,
+			)
+
+			_, err := reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: "repo"}})
+			require.NoError(t, err)
+
+			jobList := new(batchv1api.JobList)
+			require.NoError(t, reconciler.Client.List(t.Context(), jobList, &client.ListOptions{Namespace: "velero"}))
+			assert.Len(t, jobList.Items, test.expectedKeptJobs, "Expected %d jobs to be kept, but got %d", test.expectedKeptJobs, len(jobList.Items))
+		})
+	}
+}
+
+func TestInitializeRepoWithRepositoryTypes(t *testing.T) {
+	scheme := runtime.NewScheme()
+	corev1api.AddToScheme(scheme)
+	velerov1api.AddToScheme(scheme)
+
+	// Test for restic repository
+	t.Run("restic repository", func(t *testing.T) {
+		rr := mockBackupRepositoryCR()
+		rr.Spec.BackupStorageLocation = "default"
+		rr.Spec.VolumeNamespace = "volume-ns-1"
+		rr.Spec.RepositoryType = velerov1api.BackupRepositoryTypeRestic
+
+		location := &velerov1api.BackupStorageLocation{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: velerov1api.DefaultNamespace,
+				Name:      "default",
+			},
+			Spec: velerov1api.BackupStorageLocationSpec{
+				Provider: "aws",
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
+						Bucket: "test-bucket",
+						Prefix: "test-prefix",
+					},
+				},
+				Config: map[string]string{
+					"region": "us-east-1",
+				},
+			},
+		}
+
+		fakeClient := clientFake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(rr, location).Build()
+		mgr := &repomokes.Manager{}
+		mgr.On("PrepareRepo", rr).Return(nil)
+
+		reconciler := NewBackupRepoReconciler(
+			velerov1api.DefaultNamespace,
+			velerotest.NewLogger(),
+			fakeClient,
+			mgr,
+			testMaintenanceFrequency,
+			"",
+			"",
+			logrus.InfoLevel,
+			nil,
+			nil,
+		)
+
+		err := reconciler.initializeRepo(t.Context(), rr, location, reconciler.logger)
+		require.NoError(t, err)
+
+		// Verify ResticIdentifier is set for restic
+		assert.NotEmpty(t, rr.Spec.ResticIdentifier)
+		assert.Contains(t, rr.Spec.ResticIdentifier, "volume-ns-1")
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
+	})
+
+	// Test for kopia repository
+	t.Run("kopia repository", func(t *testing.T) {
+		rr := mockBackupRepositoryCR()
+		rr.Spec.BackupStorageLocation = "default"
+		rr.Spec.VolumeNamespace = "volume-ns-1"
+		rr.Spec.RepositoryType = velerov1api.BackupRepositoryTypeKopia
+
+		location := &velerov1api.BackupStorageLocation{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: velerov1api.DefaultNamespace,
+				Name:      "default",
+			},
+			Spec: velerov1api.BackupStorageLocationSpec{
+				Provider: "aws",
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
+						Bucket: "test-bucket",
+						Prefix: "test-prefix",
+					},
+				},
+				Config: map[string]string{
+					"region": "us-east-1",
+				},
+			},
+		}
+
+		fakeClient := clientFake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(rr, location).Build()
+		mgr := &repomokes.Manager{}
+		mgr.On("PrepareRepo", rr).Return(nil)
+
+		reconciler := NewBackupRepoReconciler(
+			velerov1api.DefaultNamespace,
+			velerotest.NewLogger(),
+			fakeClient,
+			mgr,
+			testMaintenanceFrequency,
+			"",
+			"",
+			logrus.InfoLevel,
+			nil,
+			nil,
+		)
+
+		err := reconciler.initializeRepo(t.Context(), rr, location, reconciler.logger)
+		require.NoError(t, err)
+
+		// Verify ResticIdentifier is NOT set for kopia
+		assert.Empty(t, rr.Spec.ResticIdentifier)
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
+	})
+
+	// Test for empty repository type (defaults to restic)
+	t.Run("empty repository type", func(t *testing.T) {
+		rr := mockBackupRepositoryCR()
+		rr.Spec.BackupStorageLocation = "default"
+		rr.Spec.VolumeNamespace = "volume-ns-1"
+		// Leave RepositoryType empty
+
+		location := &velerov1api.BackupStorageLocation{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: velerov1api.DefaultNamespace,
+				Name:      "default",
+			},
+			Spec: velerov1api.BackupStorageLocationSpec{
+				Provider: "aws",
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
+						Bucket: "test-bucket",
+						Prefix: "test-prefix",
+					},
+				},
+				Config: map[string]string{
+					"region": "us-east-1",
+				},
+			},
+		}
+
+		fakeClient := clientFake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(rr, location).Build()
+		mgr := &repomokes.Manager{}
+		mgr.On("PrepareRepo", rr).Return(nil)
+
+		reconciler := NewBackupRepoReconciler(
+			velerov1api.DefaultNamespace,
+			velerotest.NewLogger(),
+			fakeClient,
+			mgr,
+			testMaintenanceFrequency,
+			"",
+			"",
+			logrus.InfoLevel,
+			nil,
+			nil,
+		)
+
+		err := reconciler.initializeRepo(t.Context(), rr, location, reconciler.logger)
+		require.NoError(t, err)
+
+		// Verify ResticIdentifier is set when type is empty (defaults to restic)
+		assert.NotEmpty(t, rr.Spec.ResticIdentifier)
+		assert.Contains(t, rr.Spec.ResticIdentifier, "volume-ns-1")
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
+	})
+}
+
+func TestRepoMaintenanceMetricsRecording(t *testing.T) {
+	now := time.Now().Round(time.Second)
+
+	tests := []struct {
+		name           string
+		repo           *velerov1api.BackupRepository
+		startJobFunc   func(client.Client, context.Context, *velerov1api.BackupRepository, string, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error)
+		waitJobFunc    func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error)
+		expectSuccess  bool
+		expectFailure  bool
+		expectDuration bool
+	}{
+		{
+			name: "metrics recorded on successful maintenance",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "test-repo-success",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					LastMaintenanceTime: &metav1.Time{Time: now.Add(-2 * time.Hour)},
+				},
+			},
+			startJobFunc:   startMaintenanceJobSucceed,
+			waitJobFunc:    waitMaintenanceJobCompleteFunc(now, velerov1api.BackupRepositoryMaintenanceSucceeded, ""),
+			expectSuccess:  true,
+			expectFailure:  false,
+			expectDuration: true,
+		},
+		{
+			name: "metrics recorded on failed maintenance",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "test-repo-failure",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					LastMaintenanceTime: &metav1.Time{Time: now.Add(-2 * time.Hour)},
+				},
+			},
+			startJobFunc: startMaintenanceJobSucceed,
+			waitJobFunc: func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
+				return velerov1api.BackupRepositoryMaintenanceStatus{
+					StartTimestamp:    &metav1.Time{Time: now},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Minute)}, // Job ran for 1 minute then failed
+					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					Message:           "test error",
+				}, nil
+			},
+			expectSuccess:  false,
+			expectFailure:  true,
+			expectDuration: true,
+		},
+		{
+			name: "metrics recorded on job start failure",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "test-repo-start-fail",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					LastMaintenanceTime: &metav1.Time{Time: now.Add(-2 * time.Hour)},
+				},
+			},
+			startJobFunc:   startMaintenanceJobFail,
+			expectSuccess:  false,
+			expectFailure:  true,
+			expectDuration: false, // No duration when job fails to start
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create metrics instance
+			m := metrics.NewServerMetrics()
+
+			// Create reconciler with metrics
+			reconciler := mockBackupRepoReconciler(t, "", test.repo, nil)
+			reconciler.metrics = m
+			reconciler.clock = &fakeClock{now}
+
+			err := reconciler.Client.Create(t.Context(), test.repo)
+			require.NoError(t, err)
+
+			// Set up job functions
+			funcStartMaintenanceJob = test.startJobFunc
+			funcWaitMaintenanceJobComplete = test.waitJobFunc
+
+			// Run maintenance
+			_ = reconciler.runMaintenanceIfDue(t.Context(), test.repo, velerotest.NewLogger())
+
+			// Verify metrics were recorded
+			successCount := getMaintenanceMetricValue(t, m, "repo_maintenance_success_total", test.repo.Name)
+			failureCount := getMaintenanceMetricValue(t, m, "repo_maintenance_failure_total", test.repo.Name)
+			durationCount := getMaintenanceDurationCount(t, m, test.repo.Name)
+
+			if test.expectSuccess {
+				assert.Equal(t, float64(1), successCount, "Success metric should be recorded")
+			} else {
+				assert.Equal(t, float64(0), successCount, "Success metric should not be recorded")
+			}
+
+			if test.expectFailure {
+				assert.Equal(t, float64(1), failureCount, "Failure metric should be recorded")
+			} else {
+				assert.Equal(t, float64(0), failureCount, "Failure metric should not be recorded")
+			}
+
+			if test.expectDuration {
+				assert.Equal(t, uint64(1), durationCount, "Duration metric should be recorded")
+			} else {
+				assert.Equal(t, uint64(0), durationCount, "Duration metric should not be recorded")
+			}
+		})
+	}
+}
+
+// Helper to get maintenance metric value from ServerMetrics
+func getMaintenanceMetricValue(t *testing.T, m *metrics.ServerMetrics, metricName, repoName string) float64 {
+	t.Helper()
+
+	metricMap := m.Metrics()
+	collector, ok := metricMap[metricName]
+	if !ok {
+		return 0
+	}
+
+	ch := make(chan prometheus.Metric, 1)
+	collector.Collect(ch)
+	close(ch)
+
+	for metric := range ch {
+		dto := &dto.Metric{}
+		err := metric.Write(dto)
+		require.NoError(t, err)
+
+		for _, label := range dto.Label {
+			if *label.Name == "repository_name" && *label.Value == repoName {
+				if dto.Counter != nil {
+					return *dto.Counter.Value
+				}
+			}
+		}
+	}
+	return 0
+}
+
+// Helper to get maintenance duration histogram count
+func getMaintenanceDurationCount(t *testing.T, m *metrics.ServerMetrics, repoName string) uint64 {
+	t.Helper()
+
+	metricMap := m.Metrics()
+	collector, ok := metricMap["repo_maintenance_duration_seconds"]
+	if !ok {
+		return 0
+	}
+
+	ch := make(chan prometheus.Metric, 1)
+	collector.Collect(ch)
+	close(ch)
+
+	for metric := range ch {
+		dto := &dto.Metric{}
+		err := metric.Write(dto)
+		require.NoError(t, err)
+
+		for _, label := range dto.Label {
+			if *label.Name == "repository_name" && *label.Value == repoName {
+				if dto.Histogram != nil {
+					return *dto.Histogram.SampleCount
+				}
+			}
+		}
+	}
+	return 0
 }

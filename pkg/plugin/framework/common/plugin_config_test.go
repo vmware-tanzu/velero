@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -35,7 +35,7 @@ func TestGetPluginConfig(t *testing.T) {
 		objects []runtime.Object
 	}
 	pluginLabelsMap := map[string]string{"velero.io/plugin-config": "", "foo": "RestoreItemAction"}
-	testConfigMap := &corev1.ConfigMap{
+	testConfigMap := &corev1api.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "ConfigMap",
 		},
@@ -48,7 +48,7 @@ func TestGetPluginConfig(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *corev1.ConfigMap
+		want    *corev1api.ConfigMap
 		wantErr bool
 	}{
 		{
@@ -67,7 +67,7 @@ func TestGetPluginConfig(t *testing.T) {
 				kind: PluginKindRestoreItemAction,
 				name: "foo",
 				objects: []runtime.Object{
-					&corev1.ConfigMap{
+					&corev1api.ConfigMap{
 						TypeMeta: metav1.TypeMeta{
 							Kind: "ConfigMap",
 						},
@@ -77,7 +77,7 @@ func TestGetPluginConfig(t *testing.T) {
 							Labels:    pluginLabelsMap,
 						},
 					},
-					&corev1.ConfigMap{
+					&corev1api.ConfigMap{
 						TypeMeta: metav1.TypeMeta{
 							Kind: "ConfigMap",
 						},

@@ -22,17 +22,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vmware-tanzu/velero/pkg/nodeagent"
-
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
-	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/fake"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned/fake"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +43,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -57,6 +54,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -167,19 +165,19 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		},
 	}
 
-	daemonSet := &appsv1.DaemonSet{
+	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "velero",
 			Name:      "node-agent",
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
-			APIVersion: appsv1.SchemeGroupVersion.String(),
+			APIVersion: appsv1api.SchemeGroupVersion.String(),
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
 						{
 							Image: "fake-image",
 						},
@@ -207,7 +205,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 	if err != nil {
 		return nil, err
 	}
-	err = corev1.AddToScheme(scheme)
+	err = corev1api.AddToScheme(scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -242,13 +240,17 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		fakeSnapshotClient.SnapshotV1(),
 		dataPathMgr,
 		nil,
-		map[string]nodeagent.BackupPVC{},
-		corev1.ResourceRequirements{},
+		nil,
+		map[string]velerotypes.BackupPVC{},
+		corev1api.ResourceRequirements{},
 		testclocks.NewFakeClock(now),
 		"test-node",
 		time.Minute*5,
 		velerotest.NewLogger(),
 		metrics.NewServerMetrics(),
+		"",  // dataMovePriorityClass
+		nil, // podLabels
+		nil, // podAnnotations
 	), nil
 }
 
@@ -259,7 +261,6 @@ func dataUploadBuilder() *builder.DataUploadBuilder {
 		VolumeSnapshot: "fake-volume-snapshot",
 	}
 	return builder.ForDataUpload(velerov1api.DefaultNamespace, dataUploadName).
-		Labels(map[string]string{velerov1api.DataUploadLabel: dataUploadName}).
 		BackupStorageLocation("bsl-loc").
 		DataMover("velero").
 		SnapshotType("CSI").SourceNamespace("fake-ns").SourcePVC("test-pvc").CSISnapshot(csi)
@@ -270,34 +271,29 @@ type fakeSnapshotExposer struct {
 	clock           clock.WithTickerAndDelayedExecution
 	ambiguousNodeOS bool
 	peekErr         error
+	exposeErr       error
+	getErr          error
+	getNil          bool
 }
 
-func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param any) error {
-	du := velerov2alpha1api.DataUpload{}
-	err := f.kubeClient.Get(ctx, kbclient.ObjectKey{
-		Name:      dataUploadName,
-		Namespace: velerov1api.DefaultNamespace,
-	}, &du)
-	if err != nil {
-		return err
+func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.ObjectReference, param any) error {
+	if f.exposeErr != nil {
+		return f.exposeErr
 	}
 
-	original := du
-	du.Status.Phase = velerov2alpha1api.DataUploadPhasePrepared
-	du.Status.StartTimestamp = &metav1.Time{Time: f.clock.Now()}
-	f.kubeClient.Patch(ctx, &du, kbclient.MergeFrom(&original))
 	return nil
 }
 
-func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1.ObjectReference, tm time.Duration, para any) (*exposer.ExposeResult, error) {
-	pod := &corev1.Pod{}
-	err := f.kubeClient.Get(ctx, kbclient.ObjectKey{
-		Name:      dataUploadName,
-		Namespace: velerov1api.DefaultNamespace,
-	}, pod)
-	if err != nil {
-		return nil, err
+func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1api.ObjectReference, tm time.Duration, para any) (*exposer.ExposeResult, error) {
+	if f.getErr != nil {
+		return nil, f.getErr
 	}
+
+	if f.getNil {
+		return nil, nil
+	}
+
+	pod := &corev1api.Pod{}
 
 	nodeOS := "linux"
 	pNodeOS := &nodeOS
@@ -307,263 +303,312 @@ func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1.ObjectRe
 	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, VolumeName: dataUploadName, NodeOS: pNodeOS}}, nil
 }
 
-func (f *fakeSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1.ObjectReference) error {
+func (f *fakeSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1api.ObjectReference) error {
 	return f.peekErr
 }
 
-func (f *fakeSnapshotExposer) DiagnoseExpose(context.Context, corev1.ObjectReference) string {
+func (f *fakeSnapshotExposer) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (f *fakeSnapshotExposer) CleanUp(context.Context, corev1.ObjectReference, string, string) {
+func (f *fakeSnapshotExposer) CleanUp(context.Context, corev1api.ObjectReference, string, string) {
 }
 
-type fakeDataUploadFSBR struct {
-	du         *velerov2alpha1api.DataUpload
+type fakeFSBR struct {
 	kubeClient kbclient.Client
 	clock      clock.WithTickerAndDelayedExecution
 	initErr    error
 	startErr   error
 }
 
-func (f *fakeDataUploadFSBR) Init(ctx context.Context, param any) error {
+func (f *fakeFSBR) Init(ctx context.Context, param any) error {
 	return f.initErr
 }
 
-func (f *fakeDataUploadFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param any) error {
+func (f *fakeFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param any) error {
 	return f.startErr
 }
 
-func (f *fakeDataUploadFSBR) StartRestore(snapshotID string, target datapath.AccessPoint, uploaderConfigs map[string]string) error {
+func (f *fakeFSBR) StartRestore(snapshotID string, target datapath.AccessPoint, uploaderConfigs map[string]string) error {
 	return nil
 }
 
-func (b *fakeDataUploadFSBR) Cancel() {
+func (b *fakeFSBR) Cancel() {
 }
 
-func (b *fakeDataUploadFSBR) Close(ctx context.Context) {
+func (b *fakeFSBR) Close(ctx context.Context) {
 }
 
 func TestReconcile(t *testing.T) {
 	tests := []struct {
-		name                string
-		du                  *velerov2alpha1api.DataUpload
-		pod                 *corev1.Pod
-		pvc                 *corev1.PersistentVolumeClaim
-		snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
-		dataMgr             *datapath.Manager
-		expectedProcessed   bool
-		expected            *velerov2alpha1api.DataUpload
-		checkFunc           func(velerov2alpha1api.DataUpload) bool
-		expectedRequeue     ctrl.Result
-		expectedErrMsg      string
-		needErrs            []bool
-		removeNode          bool
-		ambiguousNodeOS     bool
-		peekErr             error
-		notCreateFSBR       bool
-		fsBRInitErr         error
-		fsBRStartErr        error
+		name                     string
+		du                       *velerov2alpha1api.DataUpload
+		notCreateDU              bool
+		needDelete               bool
+		sportTime                *metav1.Time
+		pod                      *corev1api.Pod
+		pvc                      *corev1api.PersistentVolumeClaim
+		snapshotExposerList      map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
+		dataMgr                  *datapath.Manager
+		needCreateFSBR           bool
+		needExclusiveUpdateError error
+		expected                 *velerov2alpha1api.DataUpload
+		expectDeleted            bool
+		expectCancelRecord       bool
+		needErrs                 []bool
+		ambiguousNodeOS          bool
+		peekErr                  error
+		exposeErr                error
+		getExposeErr             error
+		getExposeNil             bool
+		fsBRInitErr              error
+		fsBRStartErr             error
+		constrained              bool
+		expectedErr              string
+		expectedResult           *ctrl.Result
+		expectDataPath           bool
 	}{
 		{
-			name:            "Dataupload is not initialized",
-			du:              builder.ForDataUpload("unknown-ns", "unknown-name").Result(),
-			expectedRequeue: ctrl.Result{},
+			name:        "du not found",
+			du:          dataUploadBuilder().Result(),
+			notCreateDU: true,
 		},
 		{
-			name:            "Error get Dataupload",
-			du:              builder.ForDataUpload(velerov1api.DefaultNamespace, "unknown-name").Result(),
-			expectedRequeue: ctrl.Result{},
-			expectedErrMsg:  "getting DataUpload: Get error",
-			needErrs:        []bool{true, false, false, false},
+			name: "du not created in velero default namespace",
+			du:   builder.ForDataUpload("test-ns", dataUploadName).Result(),
 		},
 		{
-			name:            "Unsupported data mover type",
-			du:              dataUploadBuilder().DataMover("unknown type").Result(),
-			expected:        dataUploadBuilder().Phase("").Result(),
-			expectedRequeue: ctrl.Result{},
+			name:        "get du fail",
+			du:          dataUploadBuilder().Result(),
+			needErrs:    []bool{true, false, false, false},
+			expectedErr: "getting DataUpload: Get error",
 		},
 		{
-			name:              "Unknown type of snapshot exposer is not initialized",
-			du:                dataUploadBuilder().SnapshotType("unknown type").Result(),
-			expectedProcessed: true,
-			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
-			expectedRequeue:   ctrl.Result{},
-			expectedErrMsg:    "unknown type type of snapshot exposer is not exist",
+			name: "du is not for built-in dm",
+			du:   dataUploadBuilder().DataMover("other").Result(),
 		},
 		{
-			name:            "Dataupload should be accepted",
-			du:              dataUploadBuilder().Result(),
-			pod:             builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1.Volume{Name: "test-pvc"}).Result(),
-			pvc:             builder.ForPersistentVolumeClaim("fake-ns", "test-pvc").Result(),
-			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
-			expectedRequeue: ctrl.Result{},
+			name:     "add finalizer to du",
+			du:       dataUploadBuilder().Result(),
+			expected: dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
 		},
 		{
-			name:              "Dataupload should fail to get PVC information",
-			du:                dataUploadBuilder().Result(),
-			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1.Volume{Name: "wrong-pvc"}).Result(),
-			expectedProcessed: true,
-			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
-			expectedRequeue:   ctrl.Result{},
-			expectedErrMsg:    "failed to get PVC",
+			name:        "add finalizer to du failed",
+			du:          dataUploadBuilder().Result(),
+			needErrs:    []bool{false, false, true, false},
+			expectedErr: "error updating dataupload with error velero/dataupload-1: Update error",
 		},
 		{
-			name:              "Dataupload should fail to get PVC attaching node",
-			du:                dataUploadBuilder().Result(),
-			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1.Volume{Name: "test-pvc"}).Result(),
-			pvc:               builder.ForPersistentVolumeClaim("fake-ns", "test-pvc").StorageClass("fake-sc").Result(),
-			expectedProcessed: true,
-			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
-			expectedRequeue:   ctrl.Result{},
-			expectedErrMsg:    "error to get storage class",
+			name:       "du is under deletion",
+			du:         dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			needDelete: true,
+			expected:   dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Result(),
 		},
 		{
-			name:              "Dataupload should fail because expected node doesn't exist",
-			du:                dataUploadBuilder().Result(),
-			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1.Volume{Name: "test-pvc"}).Result(),
-			pvc:               builder.ForPersistentVolumeClaim("fake-ns", "test-pvc").Result(),
-			removeNode:        true,
-			expectedProcessed: true,
-			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
-			expectedRequeue:   ctrl.Result{},
-			expectedErrMsg:    "no appropriate node to run data upload",
+			name:        "du is under deletion but cancel failed",
+			du:          dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			needErrs:    []bool{false, false, true, false},
+			needDelete:  true,
+			expectedErr: "error updating dataupload with error velero/dataupload-1: Update error",
 		},
 		{
-			name:            "Dataupload should be prepared",
-			du:              dataUploadBuilder().SnapshotType(fakeSnapshotType).Result(),
-			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).Result(),
-			expectedRequeue: ctrl.Result{},
+			name:          "du is under deletion and in terminal state",
+			du:            dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
+			sportTime:     &metav1.Time{Time: time.Now()},
+			needDelete:    true,
+			expectDeleted: true,
 		},
 		{
-			name:            "Dataupload prepared should be completed",
-			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du:              dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
-			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
-			expectedRequeue: ctrl.Result{},
+			name:        "du is under deletion and in terminal state, but remove finalizer failed",
+			du:          dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
+			needErrs:    []bool{false, false, true, false},
+			needDelete:  true,
+			expectedErr: "error updating dataupload with error velero/dataupload-1: Update error",
 		},
 		{
-			name:              "Dataupload should fail if expose returns ambiguous nodeOS",
-			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
-			ambiguousNodeOS:   true,
-			expectedProcessed: true,
-			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
-			expectedErrMsg:    "unsupported ambiguous node OS",
+			name:               "delay cancel negative for others",
+			du:                 dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataUploadPhasePrepared).Result(),
+			sportTime:          &metav1.Time{Time: time.Now()},
+			expectCancelRecord: true,
 		},
 		{
-			name:            "Dataupload with not enabled cancel",
-			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du:              dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).SnapshotType(fakeSnapshotType).Cancel(false).Result(),
-			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
-			expectedRequeue: ctrl.Result{},
+			name:               "delay cancel negative for inProgress",
+			du:                 dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
+			sportTime:          &metav1.Time{Time: time.Now().Add(-time.Minute * 58)},
+			expectCancelRecord: true,
 		},
 		{
-			name:            "Dataupload should be cancel",
-			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du:              dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).SnapshotType(fakeSnapshotType).Cancel(true).Result(),
-			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseCanceling).Result(),
-			expectedRequeue: ctrl.Result{},
+			name:      "delay cancel affirmative for others",
+			du:        dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataUploadPhasePrepared).Result(),
+			sportTime: &metav1.Time{Time: time.Now().Add(-time.Minute * 5)},
+			expected:  dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataUploadPhaseCanceled).Result(),
 		},
 		{
-			name: "Dataupload should be cancel with match node",
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du: func() *velerov2alpha1api.DataUpload {
-				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).SnapshotType(fakeSnapshotType).Cancel(true).Result()
-				du.Status.Node = "test-node"
-				return du
-			}(),
-			expectedProcessed: true,
-			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseCanceled).Result(),
-			expectedRequeue:   ctrl.Result{},
-			notCreateFSBR:     true,
+			name:      "delay cancel affirmative for inProgress",
+			du:        dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
+			sportTime: &metav1.Time{Time: time.Now().Add(-time.Hour)},
+			expected:  dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataUploadPhaseCanceled).Result(),
 		},
 		{
-			name: "Dataupload should not be cancel with mismatch node",
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du: func() *velerov2alpha1api.DataUpload {
-				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).SnapshotType(fakeSnapshotType).Cancel(true).Result()
-				du.Status.Node = "different_node"
-				return du
-			}(),
-			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
-			expectedRequeue: ctrl.Result{},
-			notCreateFSBR:   true,
+			name:               "delay cancel failed",
+			du:                 dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
+			needErrs:           []bool{false, false, true, false},
+			sportTime:          &metav1.Time{Time: time.Now().Add(-time.Hour)},
+			expected:           dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
+			expectCancelRecord: true,
 		},
 		{
-			name:            "runCancelableDataUpload is concurrent limited",
-			dataMgr:         datapath.NewManager(0),
-			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du:              dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
-			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).Result(),
-			expectedRequeue: ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
+			name: "Unknown data upload status",
+			du:   dataUploadBuilder().Phase("Unknown").Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
 		},
 		{
-			name:              "data path init error",
-			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
-			fsBRInitErr:       errors.New("fake-data-path-init-error"),
-			expectedProcessed: true,
-			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).SnapshotType(fakeSnapshotType).Result(),
-			expectedErrMsg:    "error initializing asyncBR: fake-data-path-init-error",
+			name:        "Unknown type of snapshot exposer is not initialized",
+			du:          dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).SnapshotType("unknown type").Result(),
+			expected:    dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
+			expectedErr: "unknown type type of snapshot exposer is not exist",
 		},
 		{
-			name:            "Unable to update status to in progress for data download",
-			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du:              dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
-			needErrs:        []bool{false, false, false, true},
-			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
-			expectedRequeue: ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
+			name:               "du is cancel on new",
+			du:                 dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Result(),
+			expectCancelRecord: true,
+			expected:           dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataUploadPhaseCanceled).Result(),
 		},
 		{
-			name:              "data path start error",
-			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
-			fsBRStartErr:      errors.New("fake-data-path-start-error"),
-			expectedProcessed: true,
-			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).SnapshotType(fakeSnapshotType).Result(),
-			expectedErrMsg:    "error starting async backup for pod dataupload-1, volume dataupload-1: fake-data-path-start-error",
+			name:           "new du but constrained",
+			du:             dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			constrained:    true,
+			expected:       dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
 		},
 		{
-			name:     "prepare timeout",
-			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).AcceptedTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 5)}).Result(),
-			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
+			name:                     "new du but accept failed",
+			du:                       dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			needExclusiveUpdateError: errors.New("exclusive-update-error"),
+			expected:                 dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectedErr:              "error accepting the data upload dataupload-1: exclusive-update-error",
 		},
 		{
-			name:              "peek error",
-			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).Result(),
-			peekErr:           errors.New("fake-peek-error"),
-			expectedProcessed: true,
-			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseCanceled).Result(),
+			name:        "du is accepted but setup expose param failed on getting PVC",
+			du:          dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expected:    dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataUploadPhaseFailed).Message("failed to set exposer parameters").Result(),
+			expectedErr: "failed to get PVC fake-ns/test-pvc: persistentvolumeclaims \"test-pvc\" not found",
 		},
 		{
-			name: "Dataupload with enabled cancel",
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du: func() *velerov2alpha1api.DataUpload {
-				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).Result()
-				controllerutil.AddFinalizer(du, DataUploadDownloadFinalizer)
-				du.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-				return du
-			}(),
-			checkFunc: func(du velerov2alpha1api.DataUpload) bool {
-				return du.Spec.Cancel
-			},
-			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
-			expectedRequeue: ctrl.Result{},
+			name:        "du expose failed",
+			du:          dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).SnapshotType(fakeSnapshotType).Result(),
+			pvc:         builder.ForPersistentVolumeClaim("fake-ns", "test-pvc").Result(),
+			exposeErr:   errors.New("fake-expose-error"),
+			expected:    dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataUploadPhaseFailed).Message("error exposing snapshot").Result(),
+			expectedErr: "fake-expose-error",
 		},
 		{
-			name: "Dataupload with remove finalizer and should not be retrieved",
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du: func() *velerov2alpha1api.DataUpload {
-				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).SnapshotType(fakeSnapshotType).Cancel(true).Result()
-				controllerutil.AddFinalizer(du, DataUploadDownloadFinalizer)
-				du.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-				return du
-			}(),
-			checkFunc: func(du velerov2alpha1api.DataUpload) bool {
-				return !controllerutil.ContainsFinalizer(&du, DataUploadDownloadFinalizer)
-			},
-			expectedRequeue: ctrl.Result{},
+			name:     "du succeeds for accepted",
+			du:       dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).SnapshotType(fakeSnapshotType).Result(),
+			pvc:      builder.ForPersistentVolumeClaim("fake-ns", "test-pvc").Result(),
+			expected: dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
+		},
+		{
+			name:     "prepare timeout on accepted",
+			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Finalizers([]string{DataUploadDownloadFinalizer}).AcceptedTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 30)}).Result(),
+			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataUploadPhaseFailed).Message("timeout on preparing data upload").Result(),
+		},
+		{
+			name:     "peek error on accepted",
+			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			peekErr:  errors.New("fake-peak-error"),
+			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseCanceled).Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataUploadPhaseCanceled).Message("found a du velero/dataupload-1 with expose error: fake-peak-error. mark it as cancel").Result(),
+		},
+		{
+			name:     "cancel on prepared",
+			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Cancel(true).Result(),
+			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseCanceled).Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataUploadPhaseCanceled).Result(),
+		},
+		{
+			name:         "Failed to get snapshot expose on prepared",
+			du:           dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			getExposeErr: errors.New("fake-get-error"),
+			expected:     dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Finalizers([]string{DataUploadDownloadFinalizer}).Message("exposed snapshot is not ready: fake-get-error").Result(),
+			expectedErr:  "fake-get-error",
+		},
+		{
+			name:         "Get nil restore expose on prepared",
+			du:           dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			getExposeNil: true,
+			expected:     dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Finalizers([]string{DataUploadDownloadFinalizer}).Message("exposed snapshot is not ready").Result(),
+			expectedErr:  "no expose result is available for the current node",
+		},
+		{
+			name:            "Dataupload should fail if expose returns ambiguous nodeOS",
+			du:              dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			ambiguousNodeOS: true,
+			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectedErr:     "unsupported ambiguous node OS",
+		},
+		{
+			name:           "Error in data path is concurrent limited",
+			du:             dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			dataMgr:        datapath.NewManager(0),
+			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
+		},
+		{
+			name:        "data path init error",
+			du:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			fsBRInitErr: errors.New("fake-data-path-init-error"),
+			expected:    dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Finalizers([]string{DataUploadDownloadFinalizer}).Message("error initializing data path").Result(),
+			expectedErr: "error initializing asyncBR: fake-data-path-init-error",
+		},
+		{
+			name:           "Unable to update status to in progress for data upload",
+			du:             dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			needErrs:       []bool{false, false, true, false},
+			expected:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
+		},
+		{
+			name:         "data path start error",
+			du:           dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			fsBRStartErr: errors.New("fake-data-path-start-error"),
+			expected:     dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Finalizers([]string{DataUploadDownloadFinalizer}).Message("error starting data path").Result(),
+			expectedErr:  "error starting async backup for pod , volume dataupload-1: fake-data-path-start-error",
+		},
+		{
+			name:           "Prepare succeeds",
+			du:             dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			expected:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectDataPath: true,
+		},
+		{
+			name:     "In progress du is not handled by the current node",
+			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+		},
+		{
+			name:     "In progress du is not set as cancel",
+			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+		},
+		{
+			name:     "Cancel data upload in progress with empty FSBR",
+			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Cancel(true).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseCanceled).Cancel(true).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+		},
+		{
+			name:               "Cancel data upload in progress and patch data upload error",
+			du:                 dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Cancel(true).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			needErrs:           []bool{false, false, true, false},
+			needCreateFSBR:     true,
+			expected:           dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Cancel(true).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectedErr:        "error updating dataupload with error velero/dataupload-1: Update error",
+			expectCancelRecord: true,
+			expectDataPath:     true,
+		},
+		{
+			name:               "Cancel data upload in progress succeeds",
+			du:                 dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Cancel(true).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			needCreateFSBR:     true,
+			expected:           dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseCanceling).Cancel(true).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectDataPath:     true,
+			expectCancelRecord: true,
 		},
 	}
 
@@ -571,24 +616,15 @@ func TestReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r, err := initDataUploaderReconciler(test.needErrs...)
 			require.NoError(t, err)
-			defer func() {
-				r.client.Delete(ctx, test.du, &kbclient.DeleteOptions{})
-				if test.pod != nil {
-					r.client.Delete(ctx, test.pod, &kbclient.DeleteOptions{})
-				}
-			}()
-			ctx := context.Background()
-			if test.du.Namespace == velerov1api.DefaultNamespace {
-				isDeletionTimestampSet := test.du.DeletionTimestamp != nil
-				err = r.client.Create(ctx, test.du)
+
+			if !test.notCreateDU {
+				err = r.client.Create(t.Context(), test.du)
 				require.NoError(t, err)
-				// because of the changes introduced by https://github.com/kubernetes-sigs/controller-runtime/commit/7a66d580c0c53504f5b509b45e9300cc18a1cc30
-				// the fake client ignores the DeletionTimestamp when calling the Create(),
-				// so call Delete() here
-				if isDeletionTimestampSet {
-					err = r.client.Delete(ctx, test.du)
-					require.NoError(t, err)
-				}
+			}
+
+			if test.needDelete {
+				err = r.client.Delete(t.Context(), test.du)
+				require.NoError(t, err)
 			}
 
 			if test.pod != nil {
@@ -601,38 +637,44 @@ func TestReconcile(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			if test.removeNode {
-				err = r.kubeClient.CoreV1().Nodes().Delete(ctx, "fake-node", metav1.DeleteOptions{})
-				require.NoError(t, err)
-			}
-
 			if test.dataMgr != nil {
 				r.dataPathMgr = test.dataMgr
 			} else {
 				r.dataPathMgr = datapath.NewManager(1)
 			}
 
+			if test.sportTime != nil {
+				r.cancelledDataUpload[test.du.Name] = test.sportTime.Time
+			}
+
+			if test.constrained {
+				r.vgdpCounter = &exposer.VgdpCounter{}
+			}
+
 			if test.du.Spec.SnapshotType == fakeSnapshotType {
-				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{fakeSnapshotType: &fakeSnapshotExposer{r.client, r.Clock, test.ambiguousNodeOS, test.peekErr}}
+				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{fakeSnapshotType: &fakeSnapshotExposer{r.client, r.Clock, test.ambiguousNodeOS, test.peekErr, test.exposeErr, test.getExposeErr, test.getExposeNil}}
 			} else if test.du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
 				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
 			}
-			if !test.notCreateFSBR {
-				datapath.MicroServiceBRWatcherCreator = func(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string, datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
-					return &fakeDataUploadFSBR{
-						du:         test.du,
-						kubeClient: r.client,
-						clock:      r.Clock,
-						initErr:    test.fsBRInitErr,
-						startErr:   test.fsBRStartErr,
-					}
+
+			funcExclusiveUpdateDataUpload = exclusiveUpdateDataUpload
+			if test.needExclusiveUpdateError != nil {
+				funcExclusiveUpdateDataUpload = func(context.Context, kbclient.Client, *velerov2alpha1api.DataUpload, func(*velerov2alpha1api.DataUpload)) (bool, error) {
+					return false, test.needExclusiveUpdateError
 				}
 			}
 
-			testCreateFsBR := false
-			if test.du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress && !test.notCreateFSBR {
+			datapath.MicroServiceBRWatcherCreator = func(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string, datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
+				return &fakeFSBR{
+					kubeClient: r.client,
+					clock:      r.Clock,
+					initErr:    test.fsBRInitErr,
+					startErr:   test.fsBRStartErr,
+				}
+			}
+
+			if test.needCreateFSBR {
 				if fsBR := r.dataPathMgr.GetAsyncBR(test.du.Name); fsBR == nil {
-					testCreateFsBR = true
 					_, err := r.dataPathMgr.CreateMicroServiceBRWatcher(ctx, r.client, nil, nil, datapath.TaskTypeBackup, test.du.Name, velerov1api.DefaultNamespace, "", "", "", datapath.Callbacks{OnCancelled: r.OnDataUploadCancelled}, false, velerotest.NewLogger())
 					require.NoError(t, err)
 				}
@@ -645,11 +687,15 @@ func TestReconcile(t *testing.T) {
 				},
 			})
 
-			assert.Equal(t, test.expectedRequeue, actualResult)
-			if test.expectedErrMsg == "" {
-				require.NoError(t, err)
+			if test.expectedErr != "" {
+				require.EqualError(t, err, test.expectedErr)
 			} else {
-				require.ErrorContains(t, err, test.expectedErrMsg)
+				require.NoError(t, err)
+			}
+
+			if test.expectedResult != nil {
+				assert.Equal(t, test.expectedResult.Requeue, actualResult.Requeue)
+				assert.Equal(t, test.expectedResult.RequeueAfter, actualResult.RequeueAfter)
 			}
 
 			du := velerov2alpha1api.DataUpload{}
@@ -657,36 +703,43 @@ func TestReconcile(t *testing.T) {
 				Name:      test.du.Name,
 				Namespace: test.du.Namespace,
 			}, &du)
-			t.Logf("%s: \n %v \n", test.name, du)
-			// Assertions
-			if test.expected == nil {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, test.expected.Status.Phase, du.Status.Phase)
+
+			if test.expected != nil || test.expectDeleted {
+				if test.expectDeleted {
+					assert.True(t, apierrors.IsNotFound(err))
+				} else {
+					require.NoError(t, err)
+
+					assert.Equal(t, test.expected.Status.Phase, du.Status.Phase)
+					assert.Contains(t, du.Status.Message, test.expected.Status.Message)
+					assert.Equal(t, du.Finalizers, test.expected.Finalizers)
+					assert.Equal(t, du.Spec.Cancel, test.expected.Spec.Cancel)
+				}
 			}
 
-			if test.expectedProcessed {
-				assert.False(t, du.Status.CompletionTimestamp.IsZero())
-			}
-
-			if !test.expectedProcessed {
-				assert.True(t, du.Status.CompletionTimestamp.IsZero())
-			}
-
-			if test.checkFunc != nil {
-				assert.True(t, test.checkFunc(du))
-			}
-
-			if !testCreateFsBR && du.Status.Phase != velerov2alpha1api.DataUploadPhaseInProgress {
+			if !test.expectDataPath {
 				assert.Nil(t, r.dataPathMgr.GetAsyncBR(test.du.Name))
+			} else {
+				assert.NotNil(t, r.dataPathMgr.GetAsyncBR(test.du.Name))
+			}
+
+			if test.expectCancelRecord {
+				assert.Contains(t, r.cancelledDataUpload, test.du.Name)
+			} else {
+				assert.Empty(t, r.cancelledDataUpload)
+			}
+
+			if isDataUploadInFinalState(&du) || du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
+				assert.NotContains(t, du.Labels, exposer.ExposeOnGoingLabel)
+			} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted {
+				assert.Contains(t, du.Labels, exposer.ExposeOnGoingLabel)
 			}
 		})
 	}
 }
 
 func TestOnDataUploadCancelled(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	r, err := initDataUploaderReconciler()
 	require.NoError(t, err)
 	// Create a DataUpload object
@@ -694,11 +747,11 @@ func TestOnDataUploadCancelled(t *testing.T) {
 	namespace := du.Namespace
 	duName := du.Name
 	// Add the DataUpload object to the fake client
-	assert.NoError(t, r.client.Create(ctx, du))
+	require.NoError(t, r.client.Create(ctx, du))
 
 	r.OnDataUploadCancelled(ctx, namespace, duName)
 	updatedDu := &velerov2alpha1api.DataUpload{}
-	assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
+	require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 	assert.Equal(t, velerov2alpha1api.DataUploadPhaseCanceled, updatedDu.Status.Phase)
 	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
 	assert.False(t, updatedDu.Status.StartTimestamp.IsZero())
@@ -729,12 +782,12 @@ func TestOnDataUploadProgress(t *testing.T) {
 		{
 			name:     "failed to patch dataupload",
 			du:       dataUploadBuilder().Result(),
-			needErrs: []bool{false, false, false, true},
+			needErrs: []bool{false, false, true, false},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 
 			r, err := initDataUploaderReconciler(test.needErrs...)
 			require.NoError(t, err)
@@ -746,7 +799,7 @@ func TestOnDataUploadProgress(t *testing.T) {
 			namespace := du.Namespace
 			duName := du.Name
 			// Add the DataUpload object to the fake client
-			assert.NoError(t, r.client.Create(context.Background(), du))
+			require.NoError(t, r.client.Create(t.Context(), du))
 
 			// Create a Progress object
 			progress := &uploader.Progress{
@@ -759,7 +812,7 @@ func TestOnDataUploadProgress(t *testing.T) {
 			if len(test.needErrs) != 0 && !test.needErrs[0] {
 				// Get the updated DataUpload object from the fake client
 				updatedDu := &velerov2alpha1api.DataUpload{}
-				assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
+				require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 				// Assert that the DataUpload object has been updated with the progress
 				assert.Equal(t, test.progress.TotalBytes, updatedDu.Status.Progress.TotalBytes)
 				assert.Equal(t, test.progress.BytesDone, updatedDu.Status.Progress.BytesDone)
@@ -769,7 +822,7 @@ func TestOnDataUploadProgress(t *testing.T) {
 }
 
 func TestOnDataUploadFailed(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	r, err := initDataUploaderReconciler()
 	require.NoError(t, err)
 
@@ -778,18 +831,18 @@ func TestOnDataUploadFailed(t *testing.T) {
 	namespace := du.Namespace
 	duName := du.Name
 	// Add the DataUpload object to the fake client
-	assert.NoError(t, r.client.Create(ctx, du))
+	require.NoError(t, r.client.Create(ctx, du))
 	r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
 	r.OnDataUploadFailed(ctx, namespace, duName, fmt.Errorf("Failed to handle %v", duName))
 	updatedDu := &velerov2alpha1api.DataUpload{}
-	assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
+	require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 	assert.Equal(t, velerov2alpha1api.DataUploadPhaseFailed, updatedDu.Status.Phase)
 	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
 	assert.False(t, updatedDu.Status.StartTimestamp.IsZero())
 }
 
 func TestOnDataUploadCompleted(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	r, err := initDataUploaderReconciler()
 	require.NoError(t, err)
 	// Create a DataUpload object
@@ -797,13 +850,22 @@ func TestOnDataUploadCompleted(t *testing.T) {
 	namespace := du.Namespace
 	duName := du.Name
 	// Add the DataUpload object to the fake client
-	assert.NoError(t, r.client.Create(ctx, du))
+	require.NoError(t, r.client.Create(ctx, du))
 	r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
-	r.OnDataUploadCompleted(ctx, namespace, duName, datapath.Result{})
+	r.OnDataUploadCompleted(ctx, namespace, duName, datapath.Result{
+		Backup: datapath.BackupResult{
+			SnapshotID: "fake-id",
+			Source: datapath.AccessPoint{
+				ByPath: "fake-path",
+			},
+		},
+	})
 	updatedDu := &velerov2alpha1api.DataUpload{}
-	assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
+	require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 	assert.Equal(t, velerov2alpha1api.DataUploadPhaseCompleted, updatedDu.Status.Phase)
 	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
+	assert.Equal(t, "fake-id", updatedDu.Status.SnapshotID)
+	assert.Equal(t, "fake-path", updatedDu.Status.Path)
 }
 
 func TestFindDataUploadForPod(t *testing.T) {
@@ -812,13 +874,13 @@ func TestFindDataUploadForPod(t *testing.T) {
 	tests := []struct {
 		name      string
 		du        *velerov2alpha1api.DataUpload
-		pod       *corev1.Pod
+		pod       *corev1api.Pod
 		checkFunc func(*velerov2alpha1api.DataUpload, []reconcile.Request)
 	}{
 		{
 			name: "find dataUpload for pod",
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Labels(map[string]string{velerov1api.DataUploadLabel: dataUploadName}).Status(corev1.PodStatus{Phase: corev1.PodRunning}).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Labels(map[string]string{velerov1api.DataUploadLabel: dataUploadName}).Status(corev1api.PodStatus{Phase: corev1api.PodRunning}).Result(),
 			checkFunc: func(du *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
 				// Assert that the function returns a single request
 				assert.Len(t, requests, 1)
@@ -852,11 +914,11 @@ func TestFindDataUploadForPod(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		assert.NoError(t, r.client.Create(ctx, test.pod))
 		assert.NoError(t, r.client.Create(ctx, test.du))
 		// Call the findDataUploadForPod function
-		requests := r.findDataUploadForPod(context.Background(), test.pod)
+		requests := r.findDataUploadForPod(t.Context(), test.pod)
 		test.checkFunc(test.du, requests)
 		r.client.Delete(ctx, test.du, &kbclient.DeleteOptions{})
 		if test.pod != nil {
@@ -906,7 +968,7 @@ func TestAcceptDataUpload(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initDataUploaderReconcilerWithError(test.needErrs...)
 		require.NoError(t, err)
 
@@ -950,7 +1012,7 @@ func TestOnDuPrepareTimeout(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initDataUploaderReconcilerWithError(test.needErrs...)
 		require.NoError(t, err)
 
@@ -995,14 +1057,14 @@ func TestTryCancelDataUpload(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initDataUploaderReconcilerWithError(test.needErrs...)
 		require.NoError(t, err)
 
 		err = r.client.Create(ctx, test.dd)
 		require.NoError(t, err)
 
-		r.tryCancelAcceptedDataUpload(ctx, test.dd, "")
+		r.tryCancelDataUpload(ctx, test.dd, "")
 
 		if test.expectedErr == "" {
 			assert.NoError(t, err)
@@ -1052,7 +1114,7 @@ func TestUpdateDataUploadWithRetry(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			ctx, cancelFunc := context.WithTimeout(context.TODO(), time.Second*5)
+			ctx, cancelFunc := context.WithTimeout(t.Context(), time.Second*5)
 			defer cancelFunc()
 			r, err := initDataUploaderReconciler(tc.needErrs...)
 			require.NoError(t, err)
@@ -1087,23 +1149,23 @@ func (dt *duResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler,
 	return dt.resumeErr
 }
 
-func (dt *duResumeTestHelper) Expose(context.Context, corev1.ObjectReference, any) error {
+func (dt *duResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, any) error {
 	return nil
 }
 
-func (dt *duResumeTestHelper) GetExposed(context.Context, corev1.ObjectReference, time.Duration, any) (*exposer.ExposeResult, error) {
+func (dt *duResumeTestHelper) GetExposed(context.Context, corev1api.ObjectReference, time.Duration, any) (*exposer.ExposeResult, error) {
 	return dt.exposeResult, dt.getExposeErr
 }
 
-func (dt *duResumeTestHelper) PeekExposed(context.Context, corev1.ObjectReference) error {
+func (dt *duResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
 	return nil
 }
 
-func (dt *duResumeTestHelper) DiagnoseExpose(context.Context, corev1.ObjectReference) string {
+func (dt *duResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (dt *duResumeTestHelper) CleanUp(context.Context, corev1.ObjectReference, string, string) {}
+func (dt *duResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference, string, string) {}
 
 func (dt *duResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
 	datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
@@ -1124,33 +1186,8 @@ func TestAttemptDataUploadResume(t *testing.T) {
 		expectedError         string
 	}{
 		{
-			name:                 "accepted DataUpload in other node",
-			du:                   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
-			cancelledDataUploads: []string{dataUploadName},
-			acceptedDataUploads:  []string{dataUploadName},
-		},
-		{
-			name:                 "accepted DataUpload in the current node",
-			du:                   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).AcceptedByNode("node-1").Result(),
-			cancelledDataUploads: []string{dataUploadName},
-			acceptedDataUploads:  []string{dataUploadName},
-		},
-		{
-			name:                 "accepted DataUpload in the current node but canceled",
-			du:                   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).AcceptedByNode("node-1").Cancel(true).Result(),
-			cancelledDataUploads: []string{dataUploadName},
-			acceptedDataUploads:  []string{dataUploadName},
-		},
-		{
-			name:                "accepted DataUpload in the current node but update error",
-			du:                  dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).AcceptedByNode("node-1").Result(),
-			needErrs:            []bool{false, false, true, false, false, false},
-			acceptedDataUploads: []string{dataUploadName},
-		},
-		{
-			name:                 "prepared DataUpload",
-			du:                   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).Result(),
-			prepareddDataUploads: []string{dataUploadName},
+			name: "Other DataUpload",
+			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).Result(),
 		},
 		{
 			name:                  "InProgress DataUpload, not the current node",
@@ -1186,7 +1223,7 @@ func TestAttemptDataUploadResume(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			r, err := initDataUploaderReconciler(test.needErrs...)
 			r.nodeName = "node-1"
 			require.NoError(t, err)
@@ -1210,28 +1247,28 @@ func TestAttemptDataUploadResume(t *testing.T) {
 				// Verify DataUploads marked as Canceled
 				for _, duName := range test.cancelledDataUploads {
 					dataUpload := &velerov2alpha1api.DataUpload{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
 					require.NoError(t, err)
 					assert.True(t, dataUpload.Spec.Cancel)
 				}
 				// Verify DataUploads marked as Accepted
 				for _, duName := range test.acceptedDataUploads {
 					dataUpload := &velerov2alpha1api.DataUpload{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
 					require.NoError(t, err)
 					assert.Equal(t, velerov2alpha1api.DataUploadPhaseAccepted, dataUpload.Status.Phase)
 				}
 				// Verify DataUploads marked as Prepared
 				for _, duName := range test.prepareddDataUploads {
 					dataUpload := &velerov2alpha1api.DataUpload{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
 					require.NoError(t, err)
 					assert.Equal(t, velerov2alpha1api.DataUploadPhasePrepared, dataUpload.Status.Phase)
 				}
 				// Verify DataUploads marked as InProgress
 				for _, duName := range test.inProgressDataUploads {
 					dataUpload := &velerov2alpha1api.DataUpload{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
 					require.NoError(t, err)
 					assert.Equal(t, velerov2alpha1api.DataUploadPhaseInProgress, dataUpload.Status.Phase)
 				}
@@ -1276,7 +1313,7 @@ func TestResumeCancellableBackup(t *testing.T) {
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Node("node-1").Result(),
 			exposeResult: &exposer.ExposeResult{
 				ByPod: exposer.ExposeByPod{
-					HostingPod: &corev1.Pod{},
+					HostingPod: &corev1api.Pod{},
 				},
 			},
 			mockInit:       true,
@@ -1289,7 +1326,7 @@ func TestResumeCancellableBackup(t *testing.T) {
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Node("node-1").Result(),
 			exposeResult: &exposer.ExposeResult{
 				ByPod: exposer.ExposeByPod{
-					HostingPod: &corev1.Pod{},
+					HostingPod: &corev1api.Pod{},
 				},
 			},
 			mockInit:        true,
@@ -1303,7 +1340,7 @@ func TestResumeCancellableBackup(t *testing.T) {
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Node("node-1").Result(),
 			exposeResult: &exposer.ExposeResult{
 				ByPod: exposer.ExposeByPod{
-					HostingPod: &corev1.Pod{},
+					HostingPod: &corev1api.Pod{},
 				},
 			},
 			mockInit:  true,
@@ -1313,7 +1350,7 @@ func TestResumeCancellableBackup(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			r, err := initDataUploaderReconciler()
 			r.nodeName = "node-1"
 			require.NoError(t, err)
@@ -1346,6 +1383,152 @@ func TestResumeCancellableBackup(t *testing.T) {
 			if test.expectedError != "" {
 				assert.EqualError(t, err, test.expectedError)
 			}
+		})
+	}
+}
+
+func TestDataUploadSetupExposeParam(t *testing.T) {
+	// Common objects for all cases
+	fileMode := corev1api.PersistentVolumeFilesystem
+	node := builder.ForNode("worker-1").Labels(map[string]string{kube.NodeOSLabel: kube.NodeOSLinux}).Result()
+
+	pvc := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "app-ns",
+			Name:      "test-pvc",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeName: "test-pv",
+			VolumeMode: &fileMode,
+			Resources: corev1api.VolumeResourceRequirements{
+				Requests: corev1api.ResourceList{
+					corev1api.ResourceStorage: resource.MustParse("10Gi"),
+				},
+			},
+		},
+	}
+
+	pv := &corev1api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pv",
+		},
+	}
+
+	baseDataUpload := dataUploadBuilder().Result()
+	baseDataUpload.Spec.SourceNamespace = "app-ns"
+	baseDataUpload.Spec.SourcePVC = "test-pvc"
+	baseDataUpload.Namespace = velerov1api.DefaultNamespace
+	baseDataUpload.Spec.OperationTimeout = metav1.Duration{Duration: time.Minute * 10}
+
+	type args struct {
+		customLabels      map[string]string
+		customAnnotations map[string]string
+	}
+	type want struct {
+		labels      map[string]string
+		annotations map[string]string
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "label has customize values",
+			args: args{
+				customLabels:      map[string]string{"custom-label": "label-value"},
+				customAnnotations: nil,
+			},
+			want: want{
+				labels: map[string]string{
+					velerov1api.DataUploadLabel: baseDataUpload.Name,
+					"custom-label":              "label-value",
+				},
+				annotations: map[string]string{},
+			},
+		},
+		{
+			name: "label has no customize values",
+			args: args{
+				customLabels:      nil,
+				customAnnotations: nil,
+			},
+			want: want{
+				labels:      map[string]string{velerov1api.DataUploadLabel: baseDataUpload.Name},
+				annotations: map[string]string{},
+			},
+		},
+		{
+			name: "annotation has customize values",
+			args: args{
+				customLabels:      nil,
+				customAnnotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+			want: want{
+				labels:      map[string]string{velerov1api.DataUploadLabel: baseDataUpload.Name},
+				annotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+		},
+		{
+			name: "both label and annotation have customize values",
+			args: args{
+				customLabels:      map[string]string{"custom-label": "label-value"},
+				customAnnotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+			want: want{
+				labels: map[string]string{
+					velerov1api.DataUploadLabel: baseDataUpload.Name,
+					"custom-label":              "label-value",
+				},
+				annotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Fake clients per case
+			fakeCRClient := velerotest.NewFakeControllerRuntimeClient(t, pvc, pv, node, baseDataUpload.DeepCopy())
+			fakeKubeClient := clientgofake.NewSimpleClientset(node)
+
+			// Reconciler config per case
+			preparingTimeout := time.Minute * 3
+			podRes := corev1api.ResourceRequirements{}
+			r := NewDataUploadReconciler(
+				fakeCRClient,
+				nil,
+				fakeKubeClient,
+				nil, // snapshotClient (unused in setupExposeParam)
+				datapath.NewManager(1),
+				nil, // dataPathMgr
+				nil, // exposer (unused in setupExposeParam)
+				map[string]velerotypes.BackupPVC{},
+				podRes,
+				testclocks.NewFakeClock(time.Now()),
+				"test-node",
+				preparingTimeout,
+				velerotest.NewLogger(),
+				metrics.NewServerMetrics(),
+				"upload-priority",
+				tt.args.customLabels,
+				tt.args.customAnnotations,
+			)
+
+			// Act
+			got, err := r.setupExposeParam(baseDataUpload)
+
+			// Assert no error
+			require.NoError(t, err)
+			require.NotNil(t, got)
+
+			// Type assertion to CSISnapshotExposeParam
+			csiParam, ok := got.(*exposer.CSISnapshotExposeParam)
+			require.True(t, ok, "expected CSISnapshotExposeParam type")
+
+			// Labels and Annotations
+			assert.Equal(t, tt.want.labels, csiParam.HostingPodLabels)
+			assert.Equal(t, tt.want.annotations, csiParam.HostingPodAnnotations)
 		})
 	}
 }

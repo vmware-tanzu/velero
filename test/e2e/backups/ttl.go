@@ -54,7 +54,6 @@ func (b *TTL) Init() {
 }
 
 func TTLTest() {
-	var err error
 	var veleroCfg VeleroConfig
 	useVolumeSnapshots := true
 	test := new(TTL)
@@ -100,9 +99,18 @@ func TTLTest() {
 		})
 
 		By("Deploy sample workload of Kibishii", func() {
-			Expect(KibishiiPrepareBeforeBackup(ctx, client, veleroCfg.CloudProvider,
-				test.testNS, veleroCfg.RegistryCredentialFile, veleroCfg.Features,
-				veleroCfg.KibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData)).To(Succeed())
+			Expect(KibishiiPrepareBeforeBackup(
+				ctx,
+				client,
+				veleroCfg.CloudProvider,
+				test.testNS,
+				veleroCfg.RegistryCredentialFile,
+				veleroCfg.Features,
+				veleroCfg.KibishiiDirectory,
+				DefaultKibishiiData,
+				veleroCfg.ImageRegistryProxy,
+				veleroCfg.WorkerOS,
+			)).To(Succeed())
 		})
 
 		var BackupCfg BackupConfig
@@ -129,10 +137,21 @@ func TTLTest() {
 				})
 			}
 
-			snapshotCheckPoint, err = GetSnapshotCheckPoint(
-				client,
+			backupVolumeInfo, err := GetVolumeInfo(
+				veleroCfg.ObjectStoreProvider,
+				veleroCfg.CloudCredentialsFile,
+				veleroCfg.BSLBucket,
+				veleroCfg.BSLPrefix,
+				veleroCfg.BSLConfig,
+				test.backupName,
+				BackupObjectsPrefix+"/"+test.backupName,
+			)
+			Expect(err).NotTo(HaveOccurred(), "Failed to get volume info for backup")
+
+			snapshotCheckPoint, err = BuildSnapshotCheckPointFromVolumeInfo(
 				veleroCfg,
-				2,
+				backupVolumeInfo,
+				DefaultKibishiiWorkerCounts,
 				test.testNS,
 				test.backupName,
 				KibishiiPVCNameList,

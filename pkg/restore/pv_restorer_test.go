@@ -17,7 +17,6 @@ limitations under the License.
 package restore
 
 import (
-	"context"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -128,14 +127,14 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			}
 
 			for _, loc := range tc.locations {
-				require.NoError(t, r.kbclient.Create(context.TODO(), loc))
+				require.NoError(t, r.kbclient.Create(t.Context(), loc))
 			}
 
 			res, err := r.executePVAction(tc.obj)
 			switch tc.expectedErr {
 			case true:
 				assert.Nil(t, res)
-				assert.Error(t, err)
+				require.Error(t, err)
 			case false:
 				assert.Equal(t, tc.expectedRes, res)
 				assert.NoError(t, err)
@@ -192,7 +191,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 			)
 
 			for _, loc := range tc.locations {
-				require.NoError(t, fakeClient.Create(context.Background(), loc))
+				require.NoError(t, fakeClient.Create(t.Context(), loc))
 			}
 
 			r := &pvRestorer{
@@ -209,7 +208,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 			volumeSnapshotter.On("SetVolumeID", tc.obj, "volume-1").Return(tc.obj, nil)
 
 			_, err := r.executePVAction(tc.obj)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			volumeSnapshotter.AssertExpectations(t)
 		})

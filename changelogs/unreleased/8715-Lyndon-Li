@@ -1,1 +1,0 @@
-Fix issue #8706, for immediate volumes, there is no selected-node annotation on PVC, so deduce the attached node from VolumeAttachment CRs

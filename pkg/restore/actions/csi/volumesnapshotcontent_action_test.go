@@ -17,11 +17,10 @@ limitations under the License.
 package csi
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -56,13 +55,17 @@ func TestVSCExecute(t *testing.T) {
 		},
 		{
 			name: "Normal case, additional items should return    ",
-			vsc: builder.ForVolumeSnapshotContent("test").ObjectMeta(builder.WithAnnotationsMap(
-				map[string]string{
-					velerov1api.PrefixedSecretNameAnnotation:      "name",
-					velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
-				},
-			)).VolumeSnapshotRef("velero", "vsName", "vsUID").
-				Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).Result(),
+			vsc: builder.ForVolumeSnapshotContent("test").
+				ObjectMeta(builder.WithAnnotationsMap(
+					map[string]string{
+						velerov1api.PrefixedSecretNameAnnotation:      "name",
+						velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
+					},
+				)).
+				VolumeSnapshotRef("velero", "vsName", "vsUID").
+				VolumeSnapshotClassName("vsClass").
+				Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).
+				Result(),
 			restore: builder.ForRestore("velero", "restore").ObjectMeta(builder.WithUID("restoreUID")).
 				NamespaceMappings("velero", "restore").Result(),
 			expectErr: false,
@@ -73,15 +76,17 @@ func TestVSCExecute(t *testing.T) {
 					Name:          "name",
 				},
 			},
-			expectedVSC: builder.ForVolumeSnapshotContent(newVscName).ObjectMeta(builder.WithAnnotationsMap(
-				map[string]string{
-					velerov1api.PrefixedSecretNameAnnotation:      "name",
-					velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
-				},
-			)).VolumeSnapshotRef("restore", newVscName, "").
+			expectedVSC: builder.ForVolumeSnapshotContent(newVscName).
+				ObjectMeta(builder.WithAnnotationsMap(
+					map[string]string{
+						velerov1api.PrefixedSecretNameAnnotation:      "name",
+						velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
+					},
+				)).VolumeSnapshotRef("restore", newVscName, "").
 				Source(snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: &snapshotHandleName}).
 				DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).
-				Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).Result(),
+				Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).
+				Result(),
 		},
 		{
 			name: "VSC exists in cluster, same as the normal case",
@@ -121,7 +126,7 @@ func TestVSCExecute(t *testing.T) {
 				test.item = &unstructured.Unstructured{Object: vsMap}
 
 				if test.createVSC {
-					require.NoError(t, action.client.Create(context.TODO(), test.vsc))
+					require.NoError(t, action.client.Create(t.Context(), test.vsc))
 				}
 			}
 

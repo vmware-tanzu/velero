@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 )
 
 func TestDaemonSet(t *testing.T) {
@@ -36,15 +36,17 @@ func TestDaemonSet(t *testing.T) {
 	assert.Equal(t, "node-agent", ds.Spec.Template.ObjectMeta.Labels["role"])
 	assert.Equal(t, "linux", ds.Spec.Template.Spec.NodeSelector["kubernetes.io/os"])
 	assert.Equal(t, "linux", string(ds.Spec.Template.Spec.OS.Name))
-	assert.Equal(t, corev1.PodSecurityContext{RunAsUser: &userID}, *ds.Spec.Template.Spec.SecurityContext)
-	assert.Equal(t, corev1.SecurityContext{Privileged: &boolFalse}, *ds.Spec.Template.Spec.Containers[0].SecurityContext)
+	assert.Equal(t, corev1api.PodSecurityContext{RunAsUser: &userID}, *ds.Spec.Template.Spec.SecurityContext)
+	assert.Equal(t, corev1api.SecurityContext{Privileged: &boolFalse}, *ds.Spec.Template.Spec.Containers[0].SecurityContext)
+	assert.Len(t, ds.Spec.Template.Spec.Volumes, 3)
+	assert.Len(t, ds.Spec.Template.Spec.Containers[0].VolumeMounts, 3)
 
 	ds = DaemonSet("velero", WithPrivilegedNodeAgent(true))
-	assert.Equal(t, corev1.SecurityContext{Privileged: &boolTrue}, *ds.Spec.Template.Spec.Containers[0].SecurityContext)
+	assert.Equal(t, corev1api.SecurityContext{Privileged: &boolTrue}, *ds.Spec.Template.Spec.Containers[0].SecurityContext)
 
 	ds = DaemonSet("velero", WithImage("velero/velero:v0.11"))
 	assert.Equal(t, "velero/velero:v0.11", ds.Spec.Template.Spec.Containers[0].Image)
-	assert.Equal(t, corev1.PullIfNotPresent, ds.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	assert.Equal(t, corev1api.PullIfNotPresent, ds.Spec.Template.Spec.Containers[0].ImagePullPolicy)
 
 	ds = DaemonSet("velero", WithSecret(true))
 	assert.Len(t, ds.Spec.Template.Spec.Containers[0].Env, 7)
@@ -58,8 +60,20 @@ func TestDaemonSet(t *testing.T) {
 	assert.Len(t, ds.Spec.Template.Spec.Containers[0].Args, 3)
 	assert.Equal(t, "--node-agent-configmap=node-agent-config-map", ds.Spec.Template.Spec.Containers[0].Args[2])
 
+	ds = DaemonSet("velero", WithBackupRepoConfigMap("backup-repo-config-map"))
+	assert.Len(t, ds.Spec.Template.Spec.Containers[0].Args, 3)
+	assert.Equal(t, "--backup-repository-configmap=backup-repo-config-map", ds.Spec.Template.Spec.Containers[0].Args[2])
+
 	ds = DaemonSet("velero", WithServiceAccountName("test-sa"))
 	assert.Equal(t, "test-sa", ds.Spec.Template.Spec.ServiceAccountName)
+
+	ds = DaemonSet("velero", WithKubeletRootDir("/data/test/kubelet"))
+	assert.Equal(t, "/data/test/kubelet/pods", ds.Spec.Template.Spec.Volumes[0].HostPath.Path)
+	assert.Equal(t, "/data/test/kubelet/plugins", ds.Spec.Template.Spec.Volumes[1].HostPath.Path)
+
+	ds = DaemonSet("velero", WithNodeAgentDisableHostPath(true))
+	assert.Len(t, ds.Spec.Template.Spec.Volumes, 1)
+	assert.Len(t, ds.Spec.Template.Spec.Containers[0].VolumeMounts, 1)
 
 	ds = DaemonSet("velero", WithForWindows())
 	assert.Equal(t, "node-agent-windows", ds.Spec.Template.Spec.Containers[0].Name)
@@ -68,6 +82,40 @@ func TestDaemonSet(t *testing.T) {
 	assert.Equal(t, "node-agent", ds.Spec.Template.ObjectMeta.Labels["role"])
 	assert.Equal(t, "windows", ds.Spec.Template.Spec.NodeSelector["kubernetes.io/os"])
 	assert.Equal(t, "windows", string(ds.Spec.Template.Spec.OS.Name))
-	assert.Equal(t, (*corev1.PodSecurityContext)(nil), ds.Spec.Template.Spec.SecurityContext)
-	assert.Equal(t, (*corev1.SecurityContext)(nil), ds.Spec.Template.Spec.Containers[0].SecurityContext)
+	assert.Equal(t, (*corev1api.PodSecurityContext)(nil), ds.Spec.Template.Spec.SecurityContext)
+	assert.Equal(t, (*corev1api.SecurityContext)(nil), ds.Spec.Template.Spec.Containers[0].SecurityContext)
+}
+
+func TestDaemonSetWithPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		name              string
+		priorityClassName string
+		expectedValue     string
+	}{
+		{
+			name:              "with priority class name",
+			priorityClassName: "high-priority",
+			expectedValue:     "high-priority",
+		},
+		{
+			name:              "without priority class name",
+			priorityClassName: "",
+			expectedValue:     "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a daemonset with the priority class name option
+			var opts []podTemplateOption
+			if tc.priorityClassName != "" {
+				opts = append(opts, WithPriorityClassName(tc.priorityClassName))
+			}
+
+			daemonset := DaemonSet("velero", opts...)
+
+			// Verify the priority class name is set correctly
+			assert.Equal(t, tc.expectedValue, daemonset.Spec.Template.Spec.PriorityClassName)
+		})
+	}
 }

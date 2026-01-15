@@ -28,20 +28,21 @@ import (
 	"github.com/petar/GoLLRB/llrb"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	corev1api "k8s.io/api/core/v1"
-
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
 	"github.com/vmware-tanzu/velero/pkg/repository/maintenance"
 	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
@@ -57,22 +58,30 @@ const (
 
 type BackupRepoReconciler struct {
 	client.Client
-	namespace                 string
-	logger                    logrus.FieldLogger
-	clock                     clocks.WithTickerAndDelayedExecution
-	maintenanceFrequency      time.Duration
-	backupRepoConfig          string
-	repositoryManager         repomanager.Manager
-	keepLatestMaintenanceJobs int
-	repoMaintenanceConfig     string
-	maintenanceJobResources   kube.PodResources
-	logLevel                  logrus.Level
-	logFormat                 *logging.FormatFlag
+	namespace             string
+	logger                logrus.FieldLogger
+	clock                 clocks.WithTickerAndDelayedExecution
+	maintenanceFrequency  time.Duration
+	backupRepoConfig      string
+	repositoryManager     repomanager.Manager
+	repoMaintenanceConfig string
+	logLevel              logrus.Level
+	logFormat             *logging.FormatFlag
+	metrics               *metrics.ServerMetrics
 }
 
-func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client, repositoryManager repomanager.Manager,
-	maintenanceFrequency time.Duration, backupRepoConfig string, keepLatestMaintenanceJobs int, repoMaintenanceConfig string, maintenanceJobResources kube.PodResources,
-	logLevel logrus.Level, logFormat *logging.FormatFlag) *BackupRepoReconciler {
+func NewBackupRepoReconciler(
+	namespace string,
+	logger logrus.FieldLogger,
+	client client.Client,
+	repositoryManager repomanager.Manager,
+	maintenanceFrequency time.Duration,
+	backupRepoConfig string,
+	repoMaintenanceConfig string,
+	logLevel logrus.Level,
+	logFormat *logging.FormatFlag,
+	metrics *metrics.ServerMetrics,
+) *BackupRepoReconciler {
 	c := &BackupRepoReconciler{
 		client,
 		namespace,
@@ -81,11 +90,10 @@ func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client
 		maintenanceFrequency,
 		backupRepoConfig,
 		repositoryManager,
-		keepLatestMaintenanceJobs,
 		repoMaintenanceConfig,
-		maintenanceJobResources,
 		logLevel,
 		logFormat,
+		metrics,
 	}
 
 	return c
@@ -104,13 +112,25 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&velerov1api.BackupRepository{}, builder.WithPredicates(kube.SpecChangePredicate{})).
 		WatchesRawSource(s).
 		Watches(
+			// mark BackupRepository as invalid when BSL is created, updated or deleted.
+			// BSL may be recreated after deleting, so also include the create event
 			&velerov1api.BackupStorageLocation{},
 			kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
 			builder.WithPredicates(
-				// When BSL updates, check if the backup repositories need to be invalidated
-				kube.NewUpdateEventPredicate(r.needInvalidBackupRepo),
-				// When BSL is created, invalidate any backup repositories that reference it
-				kube.NewCreateEventPredicate(func(client.Object) bool { return true }),
+				// Combine three predicates together to guarantee
+				// only BSL's Delete Event and Update Event can enqueue.
+				// We don't care about BSL's Generic Event and Create Event,
+				// because BSL's periodical enqueue triggers Generic Event,
+				// and the BackupRepository controller restart will triggers BSL create event.
+				kube.NewUpdateEventPredicate(
+					r.needInvalidBackupRepo,
+				),
+				kube.NewGenericEventPredicate(
+					func(client.Object) bool { return false },
+				),
+				kube.NewCreateEventPredicate(
+					func(client.Object) bool { return false },
+				),
 			),
 		).
 		Complete(r)
@@ -130,14 +150,17 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(ctx context.Context, 
 		return []reconcile.Request{}
 	}
 
+	requests := []reconcile.Request{}
 	for i := range list.Items {
 		r.logger.WithField("BSL", bsl.Name).Infof("Invalidating Backup Repository %s", list.Items[i].Name)
-		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change or create")); err != nil {
+		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change, create or delete")); err != nil {
 			r.logger.WithField("BSL", bsl.Name).WithError(err).Errorf("fail to patch BackupRepository %s", list.Items[i].Name)
+			continue
 		}
+		requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{Namespace: list.Items[i].Namespace, Name: list.Items[i].Name}})
 	}
 
-	return []reconcile.Request{}
+	return requests
 }
 
 // needInvalidBackupRepo returns true if the BSL's storage type, bucket, prefix, CACert, or config has changed
@@ -178,8 +201,19 @@ func (r *BackupRepoReconciler) needInvalidBackupRepo(oldObj client.Object, newOb
 		return true
 	}
 
+	// Check if either CACert or CACertRef has changed
 	if !bytes.Equal(oldStorage.CACert, newStorage.CACert) {
 		logger.Info("BSL's CACert has changed, invalid backup repositories")
+		return true
+	}
+
+	// Check if CACertRef has changed
+	if (oldStorage.CACertRef == nil && newStorage.CACertRef != nil) ||
+		(oldStorage.CACertRef != nil && newStorage.CACertRef == nil) ||
+		(oldStorage.CACertRef != nil && newStorage.CACertRef != nil &&
+			(oldStorage.CACertRef.Name != newStorage.CACertRef.Name ||
+				oldStorage.CACertRef.Key != newStorage.CACertRef.Key)) {
+		logger.Info("BSL's CACertRef has changed, invalid backup repositories")
 		return true
 	}
 
@@ -250,7 +284,13 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, errors.Wrap(err, "error check and run repo maintenance jobs")
 		}
 
-		if err := maintenance.DeleteOldJobs(r.Client, req.Name, r.keepLatestMaintenanceJobs); err != nil {
+		// Get the configured number of maintenance jobs to keep from ConfigMap
+		keepJobs, err := maintenance.GetKeepLatestMaintenanceJobs(ctx, r.Client, log, r.namespace, r.repoMaintenanceConfig, backupRepo)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get keepLatestMaintenanceJobs from ConfigMap, using CLI parameter value")
+		}
+
+		if err := maintenance.DeleteOldJobs(r.Client, *backupRepo, keepJobs, log); err != nil {
 			log.WithError(err).Warn("Failed to delete old maintenance jobs")
 		}
 	}
@@ -283,17 +323,21 @@ func (r *BackupRepoReconciler) getIdentifierByBSL(bsl *velerov1api.BackupStorage
 func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1api.BackupRepository, bsl *velerov1api.BackupStorageLocation, log logrus.FieldLogger) error {
 	log.WithField("repoConfig", r.backupRepoConfig).Info("Initializing backup repository")
 
-	// confirm the repo's BackupStorageLocation is valid
-	repoIdentifier, err := r.getIdentifierByBSL(bsl, req)
-	if err != nil {
-		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
-			rr.Status.Message = err.Error()
-			rr.Status.Phase = velerov1api.BackupRepositoryPhaseNotReady
+	var repoIdentifier string
+	// Only get restic identifier for restic repositories
+	if req.Spec.RepositoryType == "" || req.Spec.RepositoryType == velerov1api.BackupRepositoryTypeRestic {
+		var err error
+		repoIdentifier, err = r.getIdentifierByBSL(bsl, req)
+		if err != nil {
+			return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
+				rr.Status.Message = err.Error()
+				rr.Status.Phase = velerov1api.BackupRepositoryPhaseNotReady
 
-			if rr.Spec.MaintenanceFrequency.Duration <= 0 {
-				rr.Spec.MaintenanceFrequency = metav1.Duration{Duration: r.getRepositoryMaintenanceFrequency(req)}
-			}
-		})
+				if rr.Spec.MaintenanceFrequency.Duration <= 0 {
+					rr.Spec.MaintenanceFrequency = metav1.Duration{Duration: r.getRepositoryMaintenanceFrequency(req)}
+				}
+			})
+		}
 	}
 
 	config, err := getBackupRepositoryConfig(ctx, r, r.backupRepoConfig, r.namespace, req.Name, req.Spec.RepositoryType, log)
@@ -305,7 +349,10 @@ func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 
 	// defaulting - if the patch fails, return an error so the item is returned to the queue
 	if err := r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
-		rr.Spec.ResticIdentifier = repoIdentifier
+		// Only set ResticIdentifier for restic repositories
+		if rr.Spec.RepositoryType == "" || rr.Spec.RepositoryType == velerov1api.BackupRepositoryTypeRestic {
+			rr.Spec.ResticIdentifier = repoIdentifier
+		}
 
 		if rr.Spec.MaintenanceFrequency.Duration <= 0 {
 			rr.Spec.MaintenanceFrequency = metav1.Duration{Duration: r.getRepositoryMaintenanceFrequency(req)}
@@ -365,8 +412,12 @@ func (r *BackupRepoReconciler) recallMaintenance(ctx context.Context, req *veler
 	log.Warn("Updating backup repository because of unrecorded histories")
 
 	return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
-		if lastMaintenanceTime.After(rr.Status.LastMaintenanceTime.Time) {
-			log.Warnf("Updating backup repository last maintenance time (%v) from history (%v)", rr.Status.LastMaintenanceTime.Time, lastMaintenanceTime.Time)
+		if lastMaintenanceTime != nil && (rr.Status.LastMaintenanceTime == nil || lastMaintenanceTime.After(rr.Status.LastMaintenanceTime.Time)) {
+			if rr.Status.LastMaintenanceTime != nil {
+				log.Warnf("Updating backup repository last maintenance time (%v) from history (%v)", rr.Status.LastMaintenanceTime.Time, lastMaintenanceTime.Time)
+			} else {
+				log.Warnf("Setting backup repository last maintenance time from history (%v)", lastMaintenanceTime.Time)
+			}
 			rr.Status.LastMaintenanceTime = lastMaintenanceTime
 		}
 
@@ -452,9 +503,15 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 
 	log.Info("Running maintenance on backup repository")
 
-	job, err := funcStartMaintenanceJob(r.Client, ctx, req, r.repoMaintenanceConfig, r.maintenanceJobResources, r.logLevel, r.logFormat, log)
+	job, err := funcStartMaintenanceJob(r.Client, ctx, req, r.repoMaintenanceConfig, r.logLevel, r.logFormat, log)
 	if err != nil {
 		log.WithError(err).Warn("Starting repo maintenance failed")
+
+		// Record failure metric when job fails to start
+		if r.metrics != nil {
+			r.metrics.RegisterRepoMaintenanceFailure(req.Name)
+		}
+
 		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
 			updateRepoMaintenanceHistory(rr, velerov1api.BackupRepositoryMaintenanceFailed, &metav1.Time{Time: startTime}, nil, fmt.Sprintf("Failed to start maintenance job, err: %v", err))
 		})
@@ -469,9 +526,28 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 
 	if status.Result == velerov1api.BackupRepositoryMaintenanceFailed {
 		log.WithError(err).Warn("Pruning repository failed")
+
+		// Record failure metric
+		if r.metrics != nil {
+			r.metrics.RegisterRepoMaintenanceFailure(req.Name)
+			if status.StartTimestamp != nil && status.CompleteTimestamp != nil {
+				duration := status.CompleteTimestamp.Sub(status.StartTimestamp.Time).Seconds()
+				r.metrics.ObserveRepoMaintenanceDuration(req.Name, duration)
+			}
+		}
+
 		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
 			updateRepoMaintenanceHistory(rr, velerov1api.BackupRepositoryMaintenanceFailed, status.StartTimestamp, status.CompleteTimestamp, status.Message)
 		})
+	}
+
+	// Record success metric
+	if r.metrics != nil {
+		r.metrics.RegisterRepoMaintenanceSuccess(req.Name)
+		if status.StartTimestamp != nil && status.CompleteTimestamp != nil {
+			duration := status.CompleteTimestamp.Sub(status.StartTimestamp.Time).Seconds()
+			r.metrics.ObserveRepoMaintenanceDuration(req.Name, duration)
+		}
 	}
 
 	return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
@@ -503,16 +579,19 @@ func dueForMaintenance(req *velerov1api.BackupRepository, now time.Time) bool {
 func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *velerov1api.BackupRepository, bsl *velerov1api.BackupStorageLocation, log logrus.FieldLogger) (bool, error) {
 	log.Info("Checking backup repository for readiness")
 
-	repoIdentifier, err := r.getIdentifierByBSL(bsl, req)
-	if err != nil {
-		return false, r.patchBackupRepository(ctx, req, repoNotReady(err.Error()))
-	}
+	// Only check and update restic identifier for restic repositories
+	if req.Spec.RepositoryType == "" || req.Spec.RepositoryType == velerov1api.BackupRepositoryTypeRestic {
+		repoIdentifier, err := r.getIdentifierByBSL(bsl, req)
+		if err != nil {
+			return false, r.patchBackupRepository(ctx, req, repoNotReady(err.Error()))
+		}
 
-	if repoIdentifier != req.Spec.ResticIdentifier {
-		if err := r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
-			rr.Spec.ResticIdentifier = repoIdentifier
-		}); err != nil {
-			return false, err
+		if repoIdentifier != req.Spec.ResticIdentifier {
+			if err := r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
+				rr.Spec.ResticIdentifier = repoIdentifier
+			}); err != nil {
+				return false, err
+			}
 		}
 	}
 
@@ -521,7 +600,7 @@ func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *veler
 	if err := ensureRepo(req, r.repositoryManager); err != nil {
 		return false, r.patchBackupRepository(ctx, req, repoNotReady(err.Error()))
 	}
-	err = r.patchBackupRepository(ctx, req, repoReady())
+	err := r.patchBackupRepository(ctx, req, repoReady())
 	if err != nil {
 		return false, err
 	}
@@ -569,7 +648,7 @@ func getBackupRepositoryConfig(ctx context.Context, ctrlClient client.Client, co
 
 	jsonData, found := loc.Data[repoType]
 	if !found {
-		log.Info("No data for repo type %s in config map %s", repoType, configName)
+		log.Infof("No data for repo type %s in config map %s", repoType, configName)
 		return nil, nil
 	}
 

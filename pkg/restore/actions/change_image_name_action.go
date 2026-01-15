@@ -23,7 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -144,7 +144,7 @@ func (a *ChangeImageNameAction) Execute(input *velero.RestoreItemActionExecuteIn
 	return velero.NewRestoreItemActionExecuteOutput(obj), nil
 }
 
-func (a *ChangeImageNameAction) replaceImageName(obj *unstructured.Unstructured, config *corev1.ConfigMap, filed ...string) error {
+func (a *ChangeImageNameAction) replaceImageName(obj *unstructured.Unstructured, config *corev1api.ConfigMap, filed ...string) error {
 	log := a.logger.WithFields(map[string]any{
 		"kind":      obj.GetKind(),
 		"namespace": obj.GetNamespace(),
@@ -179,7 +179,7 @@ func (a *ChangeImageNameAction) replaceImageName(obj *unstructured.Unstructured,
 	return nil
 }
 
-func (a *ChangeImageNameAction) isImageReplaceRuleExist(log *logrus.Entry, oldImageName string, cm *corev1.ConfigMap) (exists bool, newImageName string, err error) {
+func (a *ChangeImageNameAction) isImageReplaceRuleExist(log *logrus.Entry, oldImageName string, cm *corev1api.ConfigMap) (exists bool, newImageName string, err error) {
 	if oldImageName == "" {
 		log.Infoln("Item has no old image name specified")
 		return false, "", nil

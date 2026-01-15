@@ -25,10 +25,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -77,11 +78,6 @@ func (v *BackupVolumeInfo) Init() error {
 }
 
 func (v *BackupVolumeInfo) Start() error {
-	if v.VeleroCfg.CloudProvider == Vsphere && (!strings.Contains(v.CaseBaseName, "fs-upload") && !strings.Contains(v.CaseBaseName, "skipped")) {
-		fmt.Printf("Skip snapshot case %s for vsphere environment.\n", v.CaseBaseName)
-		Skip("Skip snapshot case due to vsphere environment doesn't cover the CSI test, and it doesn't have a Velero native snapshot plugin.")
-	}
-
 	if strings.Contains(v.VeleroCfg.Features, FeatureCSI) {
 		if strings.Contains(v.CaseBaseName, "native-snapshot") {
 			fmt.Printf("Skip native snapshot case %s when the CSI feature is enabled.\n", v.CaseBaseName)
@@ -100,6 +96,12 @@ func (v *BackupVolumeInfo) CreateResources() error {
 	labels := map[string]string{
 		"volume-info": "true",
 	}
+
+	if v.VeleroCfg.WorkerOS == common.WorkerOSWindows {
+		labels["pod-security.kubernetes.io/enforce"] = "privileged"
+		labels["pod-security.kubernetes.io/enforce-version"] = "latest"
+	}
+
 	for nsNum := 0; nsNum < v.NamespacesTotal; nsNum++ {
 		fmt.Printf("Creating namespaces ...\n")
 		createNSName := v.CaseBaseName
@@ -113,7 +115,7 @@ func (v *BackupVolumeInfo) CreateResources() error {
 		pvcCount := 4
 		Expect(pvcCount).To(BeNumerically(">", 3))
 
-		var vols []*v1.Volume
+		var vols []*corev1api.Volume
 		for i := 0; i <= pvcCount-1; i++ {
 			pvcName := fmt.Sprintf("volume-info-pvc-%d", i)
 			pvc, err := CreatePVC(v.Client, createNSName, pvcName, StorageClassName, nil)
@@ -121,7 +123,14 @@ func (v *BackupVolumeInfo) CreateResources() error {
 			volumeName := fmt.Sprintf("volume-info-pv-%d", i)
 			vols = append(vols, CreateVolumes(pvc.Name, []string{volumeName})...)
 		}
-		deployment := NewDeployment(v.CaseBaseName, createNSName, 1, labels, nil).WithVolume(vols).Result()
+		deployment := NewDeployment(
+			v.CaseBaseName,
+			createNSName,
+			1,
+			labels,
+			v.VeleroCfg.ImageRegistryProxy,
+			v.VeleroCfg.WorkerOS,
+		).WithVolume(vols).Result()
 		deployment, err := CreateDeployment(v.Client.ClientGo, createNSName, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", createNSName))
@@ -138,8 +147,15 @@ func (v *BackupVolumeInfo) CreateResources() error {
 				// Hitting issue https://github.com/vmware-tanzu/velero/issues/7388
 				// So populate data only to some of pods, leave other pods empty to verify empty PV datamover
 				if i%2 == 0 {
-					Expect(CreateFileToPod(v.Ctx, createNSName, pod.Name, DefaultContainerName, vols[i].Name,
-						fmt.Sprintf("file-%s", pod.Name), CreateFileContent(createNSName, pod.Name, vols[i].Name))).To(Succeed())
+					Expect(CreateFileToPod(
+						createNSName,
+						pod.Name,
+						DefaultContainerName,
+						vols[i].Name,
+						fmt.Sprintf("file-%s", pod.Name),
+						CreateFileContent(createNSName, pod.Name, vols[i].Name),
+						v.VeleroCfg.WorkerOS,
+					)).To(Succeed())
 				}
 			}
 		}

@@ -31,34 +31,73 @@ Take the following as an example:
 ```
 
 ## Set the proxy required certificates
-In some cases, the proxy requires certificate to connect. Set the certificate in the BSL's `Spec.ObjectStorage.CACert`.
-It's possible that the object storage also requires certificate, and it's also set in `Spec.ObjectStorage.CACert`, then set both certificates in `Spec.ObjectStorage.CACert` field.
+In some cases, the proxy requires certificate to connect. You can provide certificates in the BSL configuration.
+It's possible that the object storage also requires certificate, then include both certificates together.
 
-The following is an example file contains two certificates, then encode its content with base64, and set the encode result in the BSL.
+### Method 1: Using Kubernetes Secrets (Recommended)
+
+The recommended approach is to store certificates in a Kubernetes Secret and reference them using `caCertRef`:
+
+1. Create a file containing all required certificates:
+
+   ``` bash
+   cat certs
+   -----BEGIN CERTIFICATE-----
+   certificates first content
+   -----END CERTIFICATE-----
+
+   -----BEGIN CERTIFICATE-----
+   certificates second content
+   -----END CERTIFICATE-----
+   ```
+
+2. Create a Secret from the certificate file:
+
+   ``` bash
+   kubectl create secret generic proxy-ca-certs \
+     --from-file=ca-bundle.crt=certs \
+     -n velero
+   ```
+
+3. Reference the Secret in your BackupStorageLocation:
+
+``` yaml
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+spec:
+  provider: <YOUR_PROVIDER>
+  default: true
+  objectStorage:
+    bucket: velero
+    caCertRef:
+      name: proxy-ca-certs
+      key: ca-bundle.crt
+  # ... other configuration
+```
+
+### Method 2: Using inline certificates (Deprecated)
+
+**Note:** The `caCert` field is deprecated. Use `caCertRef` for better security and management.
+
+If you must use the inline method, encode the certificate content with base64:
 
 ``` bash
-cat certs
------BEGIN CERTIFICATE-----
-certificates first content
------END CERTIFICATE-----
-
------BEGIN CERTIFICATE-----
-certificates second content
------END CERTIFICATE-----
-
 cat certs | base64
 LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCmNlcnRpZmljYXRlcyBmaXJzdCBjb250ZW50Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0KCi0tLS0tQkVHSU4gQ0VSVElGSUNBVEUtLS0tLQpjZXJ0aWZpY2F0ZXMgc2Vjb25kIGNvbnRlbnQKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
 ```
 
 ``` yaml
-  apiVersion: velero.io/v1
-  kind: BackupStorageLocation
-  ...
-  spec:
-    ...
-    default: true
-    objectStorage:
-      bucket: velero
-      caCert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCmNlcnRpZmljYXRlcyBmaXJzdCBjb250ZW50Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0KCi0tLS0tQkVHSU4gQ0VSVElGSUNBVEUtLS0tLQpjZXJ0aWZpY2F0ZXMgc2Vjb25kIGNvbnRlbnQKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
-  ...
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+# ...
+spec:
+  # ...
+  default: true
+  objectStorage:
+    bucket: velero
+    caCert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCmNlcnRpZmljYXRlcyBmaXJzdCBjb250ZW50Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0KCi0tLS0tQkVHSU4gQ0VSVElGSUNBVEUtLS0tLQpjZXJ0aWZpY2F0ZXMgc2Vjb25kIGNvbnRlbnQKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+  # ...
 ```

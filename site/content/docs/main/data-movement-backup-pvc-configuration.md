@@ -37,6 +37,9 @@ default the source PVC's storage class will be used.
 The users can specify the ConfigMap name during velero installation by CLI:
 `velero install --node-agent-configmap=<ConfigMap-Name>`
 
+- `annotations`: permits to set annotations on the backupPVC itself. typically useful for some CSI provider which cannot mount
+  a VolumeSnapshot without a custom annotation.
+
 A sample of `backupPVC` config as part of the ConfigMap would look like:
 ```json
 {
@@ -49,8 +52,11 @@ A sample of `backupPVC` config as part of the ConfigMap would look like:
             "storageClass": "backupPVC-storage-class"
         },
         "storage-class-3": {
-            "readOnly": true
-        }        
+            "readOnly": true,
+            "annotations": {
+              "some-csi.provider.io/readOnlyClone": true
+            }
+        },
         "storage-class-4": {
             "readOnly": true,
             "spcNoRelabeling": true
@@ -69,3 +75,13 @@ timeout (data movement prepare timeout value is 30m by default).
 if the volume is not readOnly.
 - If any of the above problems occur, then the DataUpload CR is `canceled` after timeout, and the backupPod and backupPVC will be deleted, and the backup
 will be marked as `PartiallyFailed`.
+
+## Related Documentation
+
+- [Node-agent Configuration](supported-configmaps/node-agent-configmap.md) - Complete reference for all configuration options
+- [Node-agent Concurrency](node-agent-concurrency.md) - Configure concurrent operations per node
+- [Node Selection for Data Movement](data-movement-node-selection.md) - Configure which nodes run data movement
+- [Data Movement Pod Resource Configuration](data-movement-pod-resource-configuration.md) - Configure pod resources
+- [BackupPVC Configuration](data-movement-backup-pvc-configuration.md) - Configure backup storage
+- [RestorePVC Configuration](data-movement-restore-pvc-configuration.md) - Configure restore storage
+- [Cache PVC Configuration](data-movement-cache-volume.md) - Configure restore data mover storage

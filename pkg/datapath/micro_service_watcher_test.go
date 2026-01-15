@@ -29,7 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	kubeclientfake "k8s.io/client-go/kubernetes/fake"
@@ -61,7 +61,7 @@ func TestReEnsureThisPod(t *testing.T) {
 			namespace: "velero",
 			thisPod:   "fake-pod-1",
 			kubeClientObj: []runtime.Object{
-				builder.ForPod("velero", "fake-pod-1").Phase(v1.PodRunning).Result(),
+				builder.ForPod("velero", "fake-pod-1").Phase(corev1api.PodRunning).Result(),
 			},
 		},
 		{
@@ -69,7 +69,7 @@ func TestReEnsureThisPod(t *testing.T) {
 			namespace: "velero",
 			thisPod:   "fake-pod-1",
 			kubeClientObj: []runtime.Object{
-				builder.ForPod("velero", "fake-pod-1").Phase(v1.PodSucceeded).Result(),
+				builder.ForPod("velero", "fake-pod-1").Phase(corev1api.PodSucceeded).Result(),
 			},
 			expectChan: true,
 		},
@@ -78,7 +78,7 @@ func TestReEnsureThisPod(t *testing.T) {
 			namespace: "velero",
 			thisPod:   "fake-pod-1",
 			kubeClientObj: []runtime.Object{
-				builder.ForPod("velero", "fake-pod-1").Phase(v1.PodFailed).Result(),
+				builder.ForPod("velero", "fake-pod-1").Phase(corev1api.PodFailed).Result(),
 			},
 			expectChan: true,
 		},
@@ -87,7 +87,7 @@ func TestReEnsureThisPod(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			scheme := runtime.NewScheme()
-			v1.AddToScheme(scheme)
+			corev1api.AddToScheme(scheme)
 			fakeClientBuilder := fake.NewClientBuilder()
 			fakeClientBuilder = fakeClientBuilder.WithScheme(scheme)
 
@@ -97,11 +97,11 @@ func TestReEnsureThisPod(t *testing.T) {
 				namespace: test.namespace,
 				thisPod:   test.thisPod,
 				client:    fakeClient,
-				podCh:     make(chan *v1.Pod, 2),
+				podCh:     make(chan *corev1api.Pod, 2),
 				log:       velerotest.NewLogger(),
 			}
 
-			err := ms.reEnsureThisPod(context.Background())
+			err := ms.reEnsureThisPod(t.Context())
 			if test.expectErr != "" {
 				assert.EqualError(t, err, test.expectErr)
 			} else {
@@ -124,7 +124,7 @@ type startWatchFake struct {
 	progress           int
 }
 
-func (sw *startWatchFake) getPodContainerTerminateMessage(pod *v1.Pod, container string) string {
+func (sw *startWatchFake) getPodContainerTerminateMessage(pod *corev1api.Pod, container string) string {
 	return sw.terminationMessage
 }
 
@@ -153,7 +153,7 @@ func (sw *startWatchFake) OnProgress(ctx context.Context, namespace string, task
 }
 
 type insertEvent struct {
-	event *v1.Event
+	event *corev1api.Event
 	after time.Duration
 	delay time.Duration
 }
@@ -166,7 +166,7 @@ func TestStartWatch(t *testing.T) {
 		thisContainer        string
 		terminationMessage   string
 		redirectLogErr       error
-		insertPod            *v1.Pod
+		insertPod            *corev1api.Pod
 		insertEventsBefore   []insertEvent
 		insertEventsAfter    []insertEvent
 		ctxCancel            bool
@@ -187,16 +187,16 @@ func TestStartWatch(t *testing.T) {
 			name:          "completed with rantional sequence",
 			thisPod:       "fak-pod-1",
 			thisContainer: "fake-container-1",
-			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(v1.PodSucceeded).Result(),
+			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(corev1api.PodSucceeded).Result(),
 			insertEventsBefore: []insertEvent{
 				{
-					event: &v1.Event{Reason: EventReasonStarted},
+					event: &corev1api.Event{Reason: EventReasonStarted},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonCompleted},
+					event: &corev1api.Event{Reason: EventReasonCompleted},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonStopped},
+					event: &corev1api.Event{Reason: EventReasonStopped},
 					delay: time.Second,
 				},
 			},
@@ -209,16 +209,16 @@ func TestStartWatch(t *testing.T) {
 			name:          "completed",
 			thisPod:       "fak-pod-1",
 			thisContainer: "fake-container-1",
-			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(v1.PodSucceeded).Result(),
+			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(corev1api.PodSucceeded).Result(),
 			insertEventsBefore: []insertEvent{
 				{
-					event: &v1.Event{Reason: EventReasonStarted},
+					event: &corev1api.Event{Reason: EventReasonStarted},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonCompleted},
+					event: &corev1api.Event{Reason: EventReasonCompleted},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonStopped},
+					event: &corev1api.Event{Reason: EventReasonStopped},
 				},
 			},
 			expectStartEvent:     true,
@@ -230,16 +230,16 @@ func TestStartWatch(t *testing.T) {
 			name:          "completed with redirect error",
 			thisPod:       "fak-pod-1",
 			thisContainer: "fake-container-1",
-			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(v1.PodSucceeded).Result(),
+			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(corev1api.PodSucceeded).Result(),
 			insertEventsBefore: []insertEvent{
 				{
-					event: &v1.Event{Reason: EventReasonStarted},
+					event: &corev1api.Event{Reason: EventReasonStarted},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonCompleted},
+					event: &corev1api.Event{Reason: EventReasonCompleted},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonStopped},
+					event: &corev1api.Event{Reason: EventReasonStopped},
 				},
 			},
 			redirectLogErr:       errors.New("fake-error"),
@@ -252,15 +252,15 @@ func TestStartWatch(t *testing.T) {
 			name:          "complete but terminated event not received in time",
 			thisPod:       "fak-pod-1",
 			thisContainer: "fake-container-1",
-			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(v1.PodSucceeded).Result(),
+			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(corev1api.PodSucceeded).Result(),
 			insertEventsBefore: []insertEvent{
 				{
-					event: &v1.Event{Reason: EventReasonStarted},
+					event: &corev1api.Event{Reason: EventReasonStarted},
 				},
 			},
 			insertEventsAfter: []insertEvent{
 				{
-					event: &v1.Event{Reason: EventReasonStarted},
+					event: &corev1api.Event{Reason: EventReasonStarted},
 					after: time.Second * 6,
 				},
 			},
@@ -272,18 +272,18 @@ func TestStartWatch(t *testing.T) {
 			name:          "complete but terminated event not received immediately",
 			thisPod:       "fak-pod-1",
 			thisContainer: "fake-container-1",
-			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(v1.PodSucceeded).Result(),
+			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(corev1api.PodSucceeded).Result(),
 			insertEventsBefore: []insertEvent{
 				{
-					event: &v1.Event{Reason: EventReasonStarted},
+					event: &corev1api.Event{Reason: EventReasonStarted},
 				},
 			},
 			insertEventsAfter: []insertEvent{
 				{
-					event: &v1.Event{Reason: EventReasonCompleted},
+					event: &corev1api.Event{Reason: EventReasonCompleted},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonStopped},
+					event: &corev1api.Event{Reason: EventReasonStopped},
 					delay: time.Second,
 				},
 			},
@@ -296,22 +296,22 @@ func TestStartWatch(t *testing.T) {
 			name:          "completed with progress",
 			thisPod:       "fak-pod-1",
 			thisContainer: "fake-container-1",
-			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(v1.PodSucceeded).Result(),
+			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(corev1api.PodSucceeded).Result(),
 			insertEventsBefore: []insertEvent{
 				{
-					event: &v1.Event{Reason: EventReasonStarted},
+					event: &corev1api.Event{Reason: EventReasonStarted},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonProgress, Message: "fake-progress-1"},
+					event: &corev1api.Event{Reason: EventReasonProgress, Message: "fake-progress-1"},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonProgress, Message: "fake-progress-2"},
+					event: &corev1api.Event{Reason: EventReasonProgress, Message: "fake-progress-2"},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonCompleted},
+					event: &corev1api.Event{Reason: EventReasonCompleted},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonStopped},
+					event: &corev1api.Event{Reason: EventReasonStopped},
 					delay: time.Second,
 				},
 			},
@@ -324,16 +324,16 @@ func TestStartWatch(t *testing.T) {
 			name:          "failed",
 			thisPod:       "fak-pod-1",
 			thisContainer: "fake-container-1",
-			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(v1.PodFailed).Result(),
+			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(corev1api.PodFailed).Result(),
 			insertEventsBefore: []insertEvent{
 				{
-					event: &v1.Event{Reason: EventReasonStarted},
+					event: &corev1api.Event{Reason: EventReasonStarted},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonCancelled},
+					event: &corev1api.Event{Reason: EventReasonCancelled},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonStopped},
+					event: &corev1api.Event{Reason: EventReasonStopped},
 				},
 			},
 			terminationMessage:   "fake-termination-message-1",
@@ -345,7 +345,7 @@ func TestStartWatch(t *testing.T) {
 			name:               "pod crash",
 			thisPod:            "fak-pod-1",
 			thisContainer:      "fake-container-1",
-			insertPod:          builder.ForPod("velero", "fake-pod-1").Phase(v1.PodFailed).Result(),
+			insertPod:          builder.ForPod("velero", "fake-pod-1").Phase(corev1api.PodFailed).Result(),
 			terminationMessage: "fake-termination-message-2",
 			expectFail:         true,
 		},
@@ -353,16 +353,16 @@ func TestStartWatch(t *testing.T) {
 			name:          "canceled",
 			thisPod:       "fak-pod-1",
 			thisContainer: "fake-container-1",
-			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(v1.PodFailed).Result(),
+			insertPod:     builder.ForPod("velero", "fake-pod-1").Phase(corev1api.PodFailed).Result(),
 			insertEventsBefore: []insertEvent{
 				{
-					event: &v1.Event{Reason: EventReasonStarted},
+					event: &corev1api.Event{Reason: EventReasonStarted},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonCancelled},
+					event: &corev1api.Event{Reason: EventReasonCancelled},
 				},
 				{
-					event: &v1.Event{Reason: EventReasonStopped},
+					event: &corev1api.Event{Reason: EventReasonStopped},
 				},
 			},
 			terminationMessage:   fmt.Sprintf("Failed to init data path service for DataUpload %s: %v", "fake-du-name", errors.New(ErrCancelled)),
@@ -374,7 +374,7 @@ func TestStartWatch(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			eventWaitTimeout = time.Second * 5
 
 			sw := startWatchFake{
@@ -390,8 +390,8 @@ func TestStartWatch(t *testing.T) {
 				namespace:     test.namespace,
 				thisPod:       test.thisPod,
 				thisContainer: test.thisContainer,
-				podCh:         make(chan *v1.Pod, 2),
-				eventCh:       make(chan *v1.Event, 10),
+				podCh:         make(chan *corev1api.Pod, 2),
+				eventCh:       make(chan *corev1api.Event, 10),
 				log:           velerotest.NewLogger(),
 				callbacks: Callbacks{
 					OnCompleted: sw.OnCompleted,
@@ -615,11 +615,11 @@ func TestRedirectDataMoverLogs(t *testing.T) {
 
 			fakeKubeClient := kubeclientfake.NewSimpleClientset()
 
-			err = redirectDataMoverLogs(context.Background(), fakeKubeClient, "", test.thisPod, "", test.logger)
+			err = redirectDataMoverLogs(t.Context(), fakeKubeClient, "", test.thisPod, "", test.logger)
 			if test.expectErr != "" {
 				assert.EqualError(t, err, test.expectErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				assert.Contains(t, buffer, test.logMessage)
 			}

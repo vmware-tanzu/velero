@@ -33,6 +33,12 @@ spec:
       jsonPath: .status.progress.totalBytes
       name: Total Bytes
       type: integer
+    - description: Incremental bytes
+      format: int64
+      jsonPath: .status.incrementalBytes
+      name: Incremental Bytes
+      priority: 10
+      type: integer
     - description: Name of the Backup Storage Location where this backup should be
         stored
       jsonPath: .spec.backupStorageLocation
@@ -87,6 +93,9 @@ spec:
                   of the CSI snapshot.
                 nullable: true
                 properties:
+                  driver:
+                    description: Driver is the driver used by the VolumeSnapshotContent
+                    type: string
                   snapshotClass:
                     description: SnapshotClass is the name of the snapshot class that
                       the volume snapshot is created with
@@ -170,6 +179,11 @@ spec:
                   as a result of the DataUpload.
                 nullable: true
                 type: object
+              incrementalBytes:
+                description: IncrementalBytes holds the number of bytes new or changed
+                  since the last backup
+                format: int64
+                type: integer
               message:
                 description: Message is a message about the DataUpload's status.
                 type: string

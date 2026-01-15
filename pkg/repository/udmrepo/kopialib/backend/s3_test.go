@@ -17,8 +17,9 @@ limitations under the License.
 package backend
 
 import (
-	"context"
 	"testing"
+
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 
 	"github.com/kopia/kopia/repo/blob/s3"
 	"github.com/stretchr/testify/assert"
@@ -115,11 +116,12 @@ func TestS3Setup(t *testing.T) {
 		},
 	}
 
+	logger := velerotest.NewLogger()
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			s3Flags := S3Backend{}
 
-			err := s3Flags.Setup(context.Background(), tc.flags)
+			err := s3Flags.Setup(t.Context(), tc.flags, logger)
 
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)

@@ -28,7 +28,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -1028,15 +1028,15 @@ func TestInvalidTarballContents(t *testing.T) {
 func assertWantErrsOrWarnings(t *testing.T, wantRes Result, res Result) {
 	t.Helper()
 	if wantRes.Velero != nil {
-		assert.Equal(t, len(wantRes.Velero), len(res.Velero))
+		assert.Len(t, res.Velero, len(wantRes.Velero))
 		for i := range res.Velero {
 			assert.Contains(t, res.Velero[i], wantRes.Velero[i])
 		}
 	}
 	if wantRes.Namespaces != nil {
-		assert.Equal(t, len(wantRes.Namespaces), len(res.Namespaces))
+		assert.Len(t, res.Namespaces, len(wantRes.Namespaces))
 		for ns := range res.Namespaces {
-			assert.Equal(t, len(wantRes.Namespaces[ns]), len(res.Namespaces[ns]))
+			assert.Len(t, res.Namespaces[ns], len(wantRes.Namespaces[ns]))
 			for i := range res.Namespaces[ns] {
 				assert.Contains(t, res.Namespaces[ns][i], wantRes.Namespaces[ns][i])
 			}
@@ -1091,8 +1091,8 @@ func TestRestoreItems(t *testing.T) {
 				),
 			},
 			expectedRestoreItems: map[itemKey]restoredItemStatus{
-				{resource: "v1/Namespace", namespace: "", name: "ns-1"}: {action: "created", itemExists: true},
-				{resource: "v1/Pod", namespace: "ns-1", name: "pod-1"}:  {action: "created", itemExists: true},
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}: {action: "created", itemExists: true, createdName: "ns-1"},
+				{resource: "v1/Pod", namespace: "ns-1", name: "pod-1"}:  {action: "created", itemExists: true, createdName: "pod-1"},
 			},
 		},
 		{
@@ -1201,7 +1201,7 @@ func TestRestoreItems(t *testing.T) {
 				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
 			},
 			expectedRestoreItems: map[itemKey]restoredItemStatus{
-				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:          {action: "created", itemExists: true},
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:          {action: "created", itemExists: true, createdName: "ns-1"},
 				{resource: "v1/ServiceAccount", namespace: "ns-1", name: "sa-1"}: {action: "skipped", itemExists: true},
 			},
 		},
@@ -1220,7 +1220,7 @@ func TestRestoreItems(t *testing.T) {
 				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
 			},
 			expectedRestoreItems: map[itemKey]restoredItemStatus{
-				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:  {action: "created", itemExists: true},
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:  {action: "created", itemExists: true, createdName: "ns-1"},
 				{resource: "v1/Secret", namespace: "ns-1", name: "sa-1"}: {action: "updated", itemExists: true},
 			},
 		},
@@ -1239,7 +1239,7 @@ func TestRestoreItems(t *testing.T) {
 				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
 			},
 			expectedRestoreItems: map[itemKey]restoredItemStatus{
-				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:  {action: "created", itemExists: true},
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:  {action: "created", itemExists: true, createdName: "ns-1"},
 				{resource: "v1/Secret", namespace: "ns-1", name: "sa-1"}: {action: "updated", itemExists: true},
 			},
 		},
@@ -1411,7 +1411,7 @@ func TestRestoreItems(t *testing.T) {
 			assertEmptyResults(t, warnings, errs)
 			assertRestoredItems(t, h, tc.want)
 			if len(tc.expectedRestoreItems) > 0 {
-				assert.EqualValues(t, tc.expectedRestoreItems, data.RestoredItems)
+				assert.Equal(t, tc.expectedRestoreItems, data.RestoredItems)
 			}
 		})
 	}
@@ -2308,7 +2308,7 @@ func TestShouldRestore(t *testing.T) {
 			}
 
 			for _, ns := range tc.namespaces {
-				_, err := ctx.namespaceClient.Create(context.TODO(), ns, metav1.CreateOptions{})
+				_, err := ctx.namespaceClient.Create(t.Context(), ns, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
@@ -2345,20 +2345,20 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 				client = resourceClient
 			}
 
-			res, err := client.Get(context.TODO(), item.GetName(), metav1.GetOptions{})
-			if !assert.NoError(t, err) {
+			res, err := client.Get(t.Context(), item.GetName(), metav1.GetOptions{})
+			if !assert.NoError(t, err) { //nolint:testifylint // require is inappropriate
 				continue
 			}
 
 			itemJSON, err := json.Marshal(item)
-			if !assert.NoError(t, err) {
+			if !assert.NoError(t, err) { //nolint:testifylint // require is inappropriate
 				continue
 			}
 
 			t.Logf("%v", string(itemJSON))
 
 			u := make(map[string]any)
-			if !assert.NoError(t, json.Unmarshal(itemJSON, &u)) {
+			if !assert.NoError(t, json.Unmarshal(itemJSON, &u)) { //nolint:testifylint // require is inappropriate
 				continue
 			}
 			want := &unstructured.Unstructured{Object: u}
@@ -3206,11 +3206,11 @@ func TestRestorePersistentVolumes(t *testing.T) {
 
 			// set up the VolumeSnapshotLocation client and add test data to it
 			for _, vsl := range tc.volumeSnapshotLocations {
-				require.NoError(t, h.restorer.kbClient.Create(context.Background(), vsl))
+				require.NoError(t, h.restorer.kbClient.Create(t.Context(), vsl))
 			}
 
 			if tc.dataUploadResult != nil {
-				require.NoError(t, h.restorer.kbClient.Create(context.TODO(), tc.dataUploadResult))
+				require.NoError(t, h.restorer.kbClient.Create(t.Context(), tc.dataUploadResult))
 			}
 
 			for _, r := range tc.apiResources {
@@ -3630,7 +3630,7 @@ func (cr *createRecorder) reactor() func(kubetesting.Action) (bool, runtime.Obje
 		}
 
 		accessor, err := meta.Accessor(createAction.GetObject())
-		assert.NoError(cr.t, err)
+		require.NoError(cr.t, err)
 
 		cr.resources = append(cr.resources, resourceID{
 			groupResource: action.GetResource().GroupResource().String(),
@@ -3652,8 +3652,8 @@ func assertAPIContents(t *testing.T, h *harness, want map[*test.APIResource][]st
 	t.Helper()
 
 	for r, want := range want {
-		res, err := h.DynamicClient.Resource(r.GVR()).List(context.TODO(), metav1.ListOptions{})
-		assert.NoError(t, err)
+		res, err := h.DynamicClient.Resource(r.GVR()).List(t.Context(), metav1.ListOptions{})
+		require.NoError(t, err)
 		if err != nil {
 			continue
 		}
@@ -3743,9 +3743,9 @@ func (h *harness) AddItems(t *testing.T, resource *test.APIResource) {
 		unstructured.RemoveNestedField(unstructuredObj.Object, "status")
 
 		if resource.Namespaced {
-			_, err = h.DynamicClient.Resource(resource.GVR()).Namespace(item.GetNamespace()).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
+			_, err = h.DynamicClient.Resource(resource.GVR()).Namespace(item.GetNamespace()).Create(t.Context(), unstructuredObj, metav1.CreateOptions{})
 		} else {
-			_, err = h.DynamicClient.Resource(resource.GVR()).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
+			_, err = h.DynamicClient.Resource(resource.GVR()).Create(t.Context(), unstructuredObj, metav1.CreateOptions{})
 		}
 		require.NoError(t, err)
 	}
@@ -4134,7 +4134,7 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		}
 
 		if tc.duResult != nil {
-			require.NoError(t, ctx.kbClient.Create(context.TODO(), tc.duResult))
+			require.NoError(t, ctx.kbClient.Create(t.Context(), tc.duResult))
 		}
 
 		t.Run(tc.name, func(t *testing.T) {

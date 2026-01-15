@@ -149,6 +149,11 @@ func getCloudConfiguration(locationCfg, creds map[string]string) (cloud.Configur
 	case "AZUREUSGOVERNMENT", "AZUREUSGOVERNMENTCLOUD":
 		cfg = cloud.AzureGovernment
 	default:
+		// Validate that we have either a ResourceManagerEndpoint or CloudConfig file to load the information from
+		if creds[CredentialKeyResourceManagerEndpoint] == "" && os.Getenv(azclient.EnvironmentFilepathName) == "" {
+			return cloud.Configuration{}, fmt.Errorf("custom cloud must set either %s or %s", CredentialKeyResourceManagerEndpoint, azclient.EnvironmentFilepathName)
+		}
+
 		var env *azclient.Environment
 		var err error
 		cfg, env, err = azclient.GetAzureCloudConfigAndEnvConfig(&azclient.ARMClientConfig{
@@ -157,11 +162,6 @@ func getCloudConfiguration(locationCfg, creds map[string]string) (cloud.Configur
 		})
 		if err != nil {
 			return cloud.Configuration{}, err
-		}
-		// GetAzureCloudConfigAndEnvConfig will only return env.StorageEndpointSuffix if the Cloud configuration was loaded either
-		// through the resourceManagerEndpoint or environment file
-		if env.StorageEndpointSuffix == "" {
-			return cloud.Configuration{}, fmt.Errorf("unknown cloud: %s", name)
 		}
 		cfg.Services[serviceNameBlob] = cloud.ServiceConfiguration{
 			Endpoint: fmt.Sprintf("blob.%s", env.StorageEndpointSuffix),

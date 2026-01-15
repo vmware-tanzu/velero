@@ -47,3 +47,31 @@ func NewFakeCredentialsFileStore(path string, err error) FileStore {
 		err:  err,
 	}
 }
+
+// SecretStore defines operations for interacting with credentials
+// that are stored in Secret.
+type SecretStore interface {
+	// Get returns the secret key defined by the given selector
+	Get(selector *corev1api.SecretKeySelector) (string, error)
+}
+
+type fakeCredentialsSecretStore struct {
+	data string
+	err  error
+}
+
+// Get returns the secret data.
+func (f *fakeCredentialsSecretStore) Get(*corev1api.SecretKeySelector) (string, error) {
+	return f.data, f.err
+}
+
+// NewFakeCredentialsSecretStore creates a SecretStore which will return the given data
+// and error when Get is called.
+// data is the secret value to return (e.g., certificate content).
+// err is the error to return, if any.
+func NewFakeCredentialsSecretStore(data string, err error) SecretStore {
+	return &fakeCredentialsSecretStore{
+		data: data,
+		err:  err,
+	}
+}

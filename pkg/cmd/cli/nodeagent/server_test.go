@@ -24,7 +24,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -33,19 +34,22 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	testutil "github.com/vmware-tanzu/velero/pkg/test"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 func Test_validatePodVolumesHostPath(t *testing.T) {
 	tests := []struct {
 		name      string
-		pods      []*corev1.Pod
+		pods      []*corev1api.Pod
 		dirs      []string
 		createDir bool
 		wantErr   bool
 	}{
 		{
 			name: "no error when pod volumes are present",
-			pods: []*corev1.Pod{
+			pods: []*corev1api.Pod{
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
 				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo")).Result(),
 			},
@@ -55,9 +59,9 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 		},
 		{
 			name: "no error when pod volumes are present and there are mirror pods",
-			pods: []*corev1.Pod{
+			pods: []*corev1api.Pod{
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
-				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo"), builder.WithAnnotations(corev1.MirrorPodAnnotationKey, "baz")).Result(),
+				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo"), builder.WithAnnotations(corev1api.MirrorPodAnnotationKey, "baz")).Result(),
 			},
 			dirs:      []string{"foo", "baz"},
 			createDir: true,
@@ -65,7 +69,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 		},
 		{
 			name: "error when all pod volumes missing",
-			pods: []*corev1.Pod{
+			pods: []*corev1api.Pod{
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
 				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo")).Result(),
 			},
@@ -75,7 +79,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 		},
 		{
 			name: "error when some pod volumes missing",
-			pods: []*corev1.Pod{
+			pods: []*corev1api.Pod{
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
 				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo")).Result(),
 			},
@@ -85,7 +89,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 		},
 		{
 			name: "no error when pod volumes are not present",
-			pods: []*corev1.Pod{
+			pods: []*corev1api.Pod{
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
 			},
 			dirs:      []string{"foo"},
@@ -99,7 +103,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 
 			for _, dir := range tt.dirs {
 				if tt.createDir {
-					err := fs.MkdirAll(filepath.Join(defaultHostPodsPath, dir), os.ModePerm)
+					err := fs.MkdirAll(filepath.Join(nodeagent.HostPodVolumeMountPath(), dir), os.ModePerm)
 					if err != nil {
 						t.Error(err)
 					}
@@ -108,7 +112,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 
 			kubeClient := fake.NewSimpleClientset()
 			for _, pod := range tt.pods {
-				_, err := kubeClient.CoreV1().Pods(pod.GetNamespace()).Create(context.TODO(), pod, metav1.CreateOptions{})
+				_, err := kubeClient.CoreV1().Pods(pod.GetNamespace()).Create(t.Context(), pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Error(err)
 				}
@@ -130,44 +134,43 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 }
 
 func Test_getDataPathConfigs(t *testing.T) {
-	configs := &nodeagent.Configs{
-		LoadConcurrency: &nodeagent.LoadConcurrency{
+	configs := &velerotypes.NodeAgentConfigs{
+		LoadConcurrency: &velerotypes.LoadConcurrency{
 			GlobalConfig: -1,
 		},
 	}
 
 	tests := []struct {
 		name          string
-		getFunc       func(context.Context, string, kubernetes.Interface, string) (*nodeagent.Configs, error)
+		getFunc       func(context.Context, string, kubernetes.Interface, string) (*velerotypes.NodeAgentConfigs, error)
 		configMapName string
-		expectConfigs *nodeagent.Configs
-		expectLog     string
+		expectConfigs *velerotypes.NodeAgentConfigs
+		expectedErr   string
 	}{
 		{
-			name:      "no config specified",
-			expectLog: "No node-agent configMap is specified",
+			name: "no config specified",
 		},
 		{
 			name:          "failed to get configs",
 			configMapName: "node-agent-config",
-			getFunc: func(context.Context, string, kubernetes.Interface, string) (*nodeagent.Configs, error) {
+			getFunc: func(context.Context, string, kubernetes.Interface, string) (*velerotypes.NodeAgentConfigs, error) {
 				return nil, errors.New("fake-get-error")
 			},
-			expectLog: "Failed to get node agent configs from configMap node-agent-config, ignore it",
+			expectedErr: "error getting node agent configs from configMap node-agent-config: fake-get-error",
 		},
 		{
 			name:          "configs cm not found",
 			configMapName: "node-agent-config",
-			getFunc: func(context.Context, string, kubernetes.Interface, string) (*nodeagent.Configs, error) {
+			getFunc: func(context.Context, string, kubernetes.Interface, string) (*velerotypes.NodeAgentConfigs, error) {
 				return nil, errors.New("fake-not-found-error")
 			},
-			expectLog: "Failed to get node agent configs from configMap node-agent-config, ignore it",
+			expectedErr: "error getting node agent configs from configMap node-agent-config: fake-not-found-error",
 		},
 
 		{
 			name:          "succeed",
 			configMapName: "node-agent-config",
-			getFunc: func(context.Context, string, kubernetes.Interface, string) (*nodeagent.Configs, error) {
+			getFunc: func(context.Context, string, kubernetes.Interface, string) (*velerotypes.NodeAgentConfigs, error) {
 				return configs, nil
 			},
 			expectConfigs: configs,
@@ -176,23 +179,21 @@ func Test_getDataPathConfigs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logBuffer := ""
-
 			s := &nodeAgentServer{
 				config: nodeAgentServerConfig{
 					nodeAgentConfig: test.configMapName,
 				},
-				logger: testutil.NewSingleLogger(&logBuffer),
+				logger: testutil.NewLogger(),
 			}
 
 			getConfigsFunc = test.getFunc
 
-			s.getDataPathConfigs()
-			assert.Equal(t, test.expectConfigs, s.dataPathConfigs)
-			if test.expectLog == "" {
-				assert.Equal(t, "", logBuffer)
+			err := s.getDataPathConfigs()
+			if test.expectedErr == "" {
+				require.NoError(t, err)
+				assert.Equal(t, test.expectConfigs, s.dataPathConfigs)
 			} else {
-				assert.Contains(t, logBuffer, test.expectLog)
+				require.EqualError(t, err, test.expectedErr)
 			}
 		})
 	}
@@ -226,7 +227,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		configs       nodeagent.Configs
+		configs       velerotypes.NodeAgentConfigs
 		setKubeClient bool
 		kubeClientObj []runtime.Object
 		expectNum     int
@@ -239,8 +240,8 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "global number is invalid",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: -1,
 				},
 			},
@@ -249,8 +250,8 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "global number is valid",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
 				},
 			},
@@ -258,10 +259,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "node is not found",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							Number: 100,
 						},
@@ -274,10 +275,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "failed to get selector",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							NodeSelector: invalidLabelSelector,
 							Number:       100,
@@ -292,10 +293,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "rule number is invalid",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							NodeSelector: validLabelSelector1,
 							Number:       -1,
@@ -310,10 +311,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "label doesn't match",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							NodeSelector: validLabelSelector1,
 							Number:       -1,
@@ -328,10 +329,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "match one rule",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							NodeSelector: validLabelSelector1,
 							Number:       66,
@@ -346,10 +347,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "match multiple rules",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							NodeSelector: validLabelSelector1,
 							Number:       66,
@@ -368,10 +369,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "match multiple rules 2",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							NodeSelector: validLabelSelector1,
 							Number:       36,
@@ -408,9 +409,123 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			num := s.getDataPathConcurrentNum(defaultNum)
 			assert.Equal(t, test.expectNum, num)
 			if test.expectLog == "" {
-				assert.Equal(t, "", logBuffer)
+				assert.Empty(t, logBuffer)
 			} else {
 				assert.Contains(t, logBuffer, test.expectLog)
+			}
+		})
+	}
+}
+
+func TestGetBackupRepoConfigs(t *testing.T) {
+	cmNoData := builder.ForConfigMap(velerov1api.DefaultNamespace, "backup-repo-config").Result()
+	cmWithData := builder.ForConfigMap(velerov1api.DefaultNamespace, "backup-repo-config").Data("cacheLimit", "100").Result()
+
+	tests := []struct {
+		name          string
+		configMapName string
+		kubeClientObj []runtime.Object
+		expectConfigs map[string]string
+		expectedErr   string
+	}{
+		{
+			name: "no config specified",
+		},
+		{
+			name:          "failed to get configs",
+			configMapName: "backup-repo-config",
+			expectedErr:   "error getting backup repo configs from configMap backup-repo-config: configmaps \"backup-repo-config\" not found",
+		},
+		{
+			name:          "configs data not found",
+			kubeClientObj: []runtime.Object{cmNoData},
+			configMapName: "backup-repo-config",
+			expectedErr:   "no data is in the backup repo configMap backup-repo-config",
+		},
+		{
+			name:          "succeed",
+			configMapName: "backup-repo-config",
+			kubeClientObj: []runtime.Object{cmWithData},
+			expectConfigs: map[string]string{"cacheLimit": "100"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			s := &nodeAgentServer{
+				namespace:  velerov1api.DefaultNamespace,
+				kubeClient: fakeKubeClient,
+				config: nodeAgentServerConfig{
+					backupRepoConfig: test.configMapName,
+				},
+				logger: testutil.NewLogger(),
+			}
+
+			err := s.getBackupRepoConfigs()
+			if test.expectedErr == "" {
+				require.NoError(t, err)
+				require.Equal(t, test.expectConfigs, s.backupRepoConfigs)
+			} else {
+				require.EqualError(t, err, test.expectedErr)
+			}
+		})
+	}
+}
+
+func TestValidateCachePVCConfig(t *testing.T) {
+	scWithRetainPolicy := builder.ForStorageClass("fake-storage-class").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result()
+	scWithDeletePolicy := builder.ForStorageClass("fake-storage-class").ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).Result()
+	scWithNoPolicy := builder.ForStorageClass("fake-storage-class").Result()
+
+	tests := []struct {
+		name          string
+		config        velerotypes.CachePVC
+		kubeClientObj []runtime.Object
+		expectedErr   string
+	}{
+		{
+			name:        "no storage class",
+			expectedErr: "storage class is absent",
+		},
+		{
+			name:        "failed to get storage class",
+			config:      velerotypes.CachePVC{StorageClass: "fake-storage-class"},
+			expectedErr: "error getting storage class fake-storage-class: storageclasses.storage.k8s.io \"fake-storage-class\" not found",
+		},
+		{
+			name:          "storage class reclaim policy is not expected",
+			config:        velerotypes.CachePVC{StorageClass: "fake-storage-class"},
+			kubeClientObj: []runtime.Object{scWithRetainPolicy},
+			expectedErr:   "unexpected storage class reclaim policy Retain",
+		},
+		{
+			name:          "storage class reclaim policy is delete",
+			config:        velerotypes.CachePVC{StorageClass: "fake-storage-class"},
+			kubeClientObj: []runtime.Object{scWithDeletePolicy},
+		},
+		{
+			name:          "storage class with no reclaim policy",
+			config:        velerotypes.CachePVC{StorageClass: "fake-storage-class"},
+			kubeClientObj: []runtime.Object{scWithNoPolicy},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			s := &nodeAgentServer{
+				kubeClient: fakeKubeClient,
+			}
+
+			err := s.validateCachePVCConfig(test.config)
+
+			if test.expectedErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, test.expectedErr)
 			}
 		})
 	}

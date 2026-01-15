@@ -13,14 +13,12 @@ toc:
         url: /basic-install
       - page: Customize Installation
         url: /customize-installation
-      - page: Upgrade to 1.15
-        url: /upgrade-to-1.15
+      - page: Upgrade to 1.17
+        url: /upgrade-to-1.17
       - page: Supported providers
         url: /supported-providers
       - page: Evaluation install
         url: /contributions/minio
-      - page: File system backup
-        url: /file-system-backup
       - page: Examples
         url: /examples
       - page: Uninstalling
@@ -46,19 +44,11 @@ toc:
       - page: Restore Resource Modifiers
         url: /restore-resource-modifiers
       - page: Run in any namespace
-        url: /namespace
+        url: /namespace       
       - page: CSI Support
         url: /csi
-      - page: CSI Snapshot Data Movement
-        url: /csi-snapshot-data-movement
-      - page: Node-agent Concurrency
-        url: /node-agent-concurrency
-      - page: Data Movement Backup PVC Configuration
-        url: /data-movement-backup-pvc-configuration
-      - page: Data Movement Restore PVC Configuration
-        url: /data-movement-restore-pvc-configuration        
-      - page: Data Movement Pod Resource Configuration
-        url: /data-movement-pod-resource-configuration        
+      - page: Volume Group Snapshots
+        url: /volume-group-snapshots
       - page: Backup Repository Configuration
         url: /backup-repository-configuration
       - page: Verifying Self-signed Certificates
@@ -71,6 +61,24 @@ toc:
         url: /repository-maintenance
       - page: Backup Restore Windows Workloads
         url: /backup-restore-windows        
+  - title: Data Mover
+    subfolderitems:
+      - page: CSI Snapshot Data Mover
+        url: /csi-snapshot-data-movement
+      - page: File system backup
+        url: /file-system-backup        
+      - page: Data Movement Backup PVC Configuration
+        url: /data-movement-backup-pvc-configuration
+      - page: Data Movement Restore PVC Configuration
+        url: /data-movement-restore-pvc-configuration        
+      - page: Data Movement Pod Resource Configuration
+        url: /data-movement-pod-resource-configuration        
+      - page: Data Movement Node Selection Configuration
+        url: /data-movement-node-selection
+      - page: Data Movement Cache PVC Configuration
+        url: /data-movement-cache-volume
+      - page: Node-agent Concurrency
+        url: /node-agent-concurrency
   - title: Plugins
     subfolderitems:
       - page: Overview
@@ -111,6 +119,8 @@ toc:
         url: /output-file-format
       - page: API types
         url: /api-types
+      - page: Supported ConfigMap
+        url: /supported-configmaps
       - page: Support process
         url: /support-process
       - page: For maintainers

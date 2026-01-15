@@ -20,12 +20,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	coreV1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestResourceKey(t *testing.T) {
-	namespace := &coreV1.Namespace{
+	namespace := &corev1api.Namespace{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Namespace",
@@ -33,7 +33,7 @@ func TestResourceKey(t *testing.T) {
 	}
 	assert.Equal(t, "v1/Namespace", resourceKey(namespace))
 
-	cr := &coreV1.Namespace{
+	cr := &corev1api.Namespace{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "customized/v1",
 			Kind:       "Cron",
@@ -63,5 +63,5 @@ func TestRestoredResourceList(t *testing.T) {
 		"v1/Namespace": {"default(created)"},
 	}
 
-	assert.EqualValues(t, expected, request.RestoredResourceList())
+	assert.Equal(t, expected, request.RestoredResourceList())
 }

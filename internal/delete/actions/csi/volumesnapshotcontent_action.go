@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -102,6 +102,14 @@ func (p *volumeSnapshotContentDeleteItemAction) Execute(
 	}
 
 	snapCont.ResourceVersion = ""
+
+	if snapCont.Spec.VolumeSnapshotClassName != nil {
+		// Delete VolumeSnapshotClass from the VolumeSnapshotContent.
+		// This is necessary to make the deletion independent of the VolumeSnapshotClass.
+		snapCont.Spec.VolumeSnapshotClassName = nil
+		p.log.Debugf("Deleted VolumeSnapshotClassName from VolumeSnapshotContent %s to make deletion independent of VolumeSnapshotClass",
+			snapCont.Name)
+	}
 
 	if err := p.crClient.Create(context.TODO(), &snapCont); err != nil {
 		return errors.Wrapf(err, "fail to create VolumeSnapshotContent %s", snapCont.Name)

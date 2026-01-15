@@ -15,7 +15,7 @@
 ARG OS_VERSION=1809
 
 # Velero binary build section
-FROM --platform=$BUILDPLATFORM golang:1.23-bookworm AS velero-builder
+FROM --platform=$BUILDPLATFORM golang:1.25-bookworm AS velero-builder
 
 ARG GOPROXY
 ARG BIN
@@ -44,6 +44,8 @@ RUN mkdir -p /output/usr/bin && \
     export GOARM=$( echo "${GOARM}" | cut -c2-) && \
     go build -o /output/${BIN}.exe \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN} && \
+    go build -o /output/velero-restore-helper.exe \
+    -ldflags "${LDFLAGS}" ${PKG}/cmd/velero-restore-helper && \    
     go build -o /output/velero-helper.exe \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/velero-helper && \
     go clean -modcache -cache

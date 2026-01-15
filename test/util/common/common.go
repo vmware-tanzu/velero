@@ -9,6 +9,17 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
+)
+
+const (
+	WorkerOSLinux   string = "linux"
+	WorkerOSWindows string = "windows"
+)
+
+const (
+	DefaultBSLName    string = "default"
+	AdditionalBSLName string = "add-bsl"
 )
 
 type OsCommandLine struct {
@@ -16,13 +27,13 @@ type OsCommandLine struct {
 	Args []string
 }
 
-func GetListByCmdPipes(ctx context.Context, cmdlines []*OsCommandLine) ([]string, error) {
+func GetListByCmdPipes(ctx context.Context, cmdLines []*OsCommandLine) ([]string, error) {
 	var buf bytes.Buffer
 	var err error
 	var cmds []*exec.Cmd
 
-	for _, cmdline := range cmdlines {
-		cmd := exec.Command(cmdline.Cmd, cmdline.Args...)
+	for _, cmdline := range cmdLines {
+		cmd := exec.CommandContext(ctx, cmdline.Cmd, cmdline.Args...)
 		cmds = append(cmds, cmd)
 	}
 	fmt.Println(cmds)
@@ -57,6 +68,32 @@ func GetListByCmdPipes(ctx context.Context, cmdlines []*OsCommandLine) ([]string
 		return nil, err
 	}
 	return ret, nil
+}
+
+func GetResourceWithLabel(ctx context.Context, namespace, resourceName string, labels map[string]string) ([]string, error) {
+	labelStr := ""
+	parts := make([]string, 0, len(labels))
+
+	for key, value := range labels {
+		strings.Join([]string{labelStr, key + "=" + value}, ",")
+		parts = append(parts, key+"="+value)
+	}
+	labelStr = strings.Join(parts, ",")
+
+	cmds := []*OsCommandLine{}
+	cmd := &OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"get", resourceName, "--no-headers", "-n", namespace, "-l", labelStr},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+	cmds = append(cmds, cmd)
+
+	return GetListByCmdPipes(ctx, cmds)
 }
 
 func CMDExecWithOutput(checkCMD *exec.Cmd) (*[]byte, error) {

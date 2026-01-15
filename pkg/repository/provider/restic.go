@@ -28,9 +28,9 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
-func NewResticRepositoryProvider(store credentials.FileStore, fs filesystem.Interface, log logrus.FieldLogger) Provider {
+func NewResticRepositoryProvider(credGetter credentials.CredentialGetter, fs filesystem.Interface, log logrus.FieldLogger) Provider {
 	return &resticRepositoryProvider{
-		svc: restic.NewRepositoryService(store, fs, log),
+		svc: restic.NewRepositoryService(credGetter, fs, log),
 	}
 }
 
@@ -90,6 +90,10 @@ func (r *resticRepositoryProvider) BatchForget(ctx context.Context, snapshotIDs 
 	return errs
 }
 
-func (r *resticRepositoryProvider) DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration {
+func (r *resticRepositoryProvider) DefaultMaintenanceFrequency() time.Duration {
 	return r.svc.DefaultMaintenanceFrequency()
+}
+
+func (r *resticRepositoryProvider) ClientSideCacheLimit(repoOption map[string]string) int64 {
+	return 0
 }

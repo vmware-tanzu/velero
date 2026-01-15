@@ -62,21 +62,21 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			if len(args) > 0 {
 				for _, name := range args {
 					backup := new(velerov1api.Backup)
-					err := kbClient.Get(context.TODO(), controllerclient.ObjectKey{Namespace: f.Namespace(), Name: name}, backup)
+					err := kbClient.Get(context.Background(), controllerclient.ObjectKey{Namespace: f.Namespace(), Name: name}, backup)
 					cmd.CheckError(err)
 					backups.Items = append(backups.Items, *backup)
 				}
 			} else {
 				parsedSelector, err := labels.Parse(listOptions.LabelSelector)
 				cmd.CheckError(err)
-				err = kbClient.List(context.TODO(), backups, &controllerclient.ListOptions{LabelSelector: parsedSelector, Namespace: f.Namespace()})
+				err = kbClient.List(context.Background(), backups, &controllerclient.ListOptions{LabelSelector: parsedSelector, Namespace: f.Namespace()})
 				cmd.CheckError(err)
 			}
 
 			first := true
 			for i, backup := range backups.Items {
 				deleteRequestList := new(velerov1api.DeleteBackupRequestList)
-				err := kbClient.List(context.TODO(), deleteRequestList, &controllerclient.ListOptions{
+				err := kbClient.List(context.Background(), deleteRequestList, &controllerclient.ListOptions{
 					Namespace:     f.Namespace(),
 					LabelSelector: labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: label.GetValidName(backup.Name), velerov1api.BackupUIDLabel: string(backup.UID)}),
 				})
@@ -85,7 +85,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 				}
 
 				podVolumeBackupList := new(velerov1api.PodVolumeBackupList)
-				err = kbClient.List(context.TODO(), podVolumeBackupList, &controllerclient.ListOptions{
+				err = kbClient.List(context.Background(), podVolumeBackupList, &controllerclient.ListOptions{
 					Namespace:     f.Namespace(),
 					LabelSelector: labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: label.GetValidName(backup.Name)}),
 				})
@@ -115,7 +115,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "Only show items matching this label selector.")
 	c.Flags().BoolVar(&details, "details", details, "Display additional detail in the command output.")
 	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
-	c.Flags().StringVar(&caCertFile, "cacert", caCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
+	c.Flags().StringVar(&caCertFile, "cacert", caCertFile, "Path to a certificate bundle to use when verifying TLS connections. If not specified, the CA certificate from the BackupStorageLocation will be used if available.")
 	c.Flags().StringVarP(&outputFormat, "output", "o", outputFormat, "Output display format. Valid formats are 'plaintext, json'. 'json' only applies to a single backup")
 
 	return c

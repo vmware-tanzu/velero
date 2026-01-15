@@ -32,6 +32,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	framework "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
 	veleroutil "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -92,14 +93,29 @@ func (o *OrderedResources) CreateResources() error {
 		"orderedresources": "true",
 	}
 	fmt.Printf("Creating resources in %s namespace ...\n", o.Namespace)
-	if err := k8sutil.CreateNamespace(o.Ctx, o.Client, o.Namespace); err != nil {
+
+	nsLabels := make(map[string]string)
+	if o.VeleroCfg.WorkerOS == common.WorkerOSWindows {
+		nsLabels = map[string]string{
+			"pod-security.kubernetes.io/enforce":         "privileged",
+			"pod-security.kubernetes.io/enforce-version": "latest",
+		}
+	}
+	if err := k8sutil.CreateNamespaceWithLabel(o.Ctx, o.Client, o.Namespace, nsLabels); err != nil {
 		return errors.Wrapf(err, "failed to create namespace %s", o.Namespace)
 	}
 
 	//Create deployment
 	deploymentName := fmt.Sprintf("deploy-%s", o.CaseBaseName)
 	fmt.Printf("Creating deployment %s in %s namespaces ...\n", deploymentName, o.Namespace)
-	deployment := k8sutil.NewDeployment(deploymentName, o.Namespace, 1, label, nil).Result()
+	deployment := k8sutil.NewDeployment(
+		deploymentName,
+		o.Namespace,
+		1,
+		label,
+		o.VeleroCfg.ImageRegistryProxy,
+		o.VeleroCfg.WorkerOS,
+	).Result()
 	_, err := k8sutil.CreateDeployment(o.Client.ClientGo, o.Namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create namespace %q with err %v", o.Namespace, err))

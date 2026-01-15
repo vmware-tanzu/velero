@@ -17,14 +17,13 @@ limitations under the License.
 package backup
 
 import (
-	"os"
 	"testing"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -154,18 +153,19 @@ func TestFilterNamespaces(t *testing.T) {
 func TestItemCollectorBackupNamespaces(t *testing.T) {
 	tests := []struct {
 		name              string
-		ie                *collections.IncludesExcludes
-		namespaces        []*corev1.Namespace
+		ie                *collections.NamespaceIncludesExcludes
+		namespaces        []*corev1api.Namespace
 		backup            *velerov1api.Backup
 		expectedTrackedNS []string
+		converter         runtime.UnstructuredConverter
 	}{
 		{
 			name:   "ns filter by namespace IE filter",
 			backup: builder.ForBackup("velero", "backup").Result(),
-			ie:     collections.NewIncludesExcludes().Includes("ns1"),
-			namespaces: []*corev1.Namespace{
-				builder.ForNamespace("ns1").Result(),
-				builder.ForNamespace("ns2").Result(),
+			ie:     collections.NewNamespaceIncludesExcludes().Includes("ns1"),
+			namespaces: []*corev1api.Namespace{
+				builder.ForNamespace("ns1").Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1"},
 		},
@@ -174,10 +174,10 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 			backup: builder.ForBackup("velero", "backup").LabelSelector(&metav1.LabelSelector{
 				MatchLabels: map[string]string{"name": "ns1"},
 			}).Result(),
-			ie: collections.NewIncludesExcludes().Includes("*"),
-			namespaces: []*corev1.Namespace{
-				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
-				builder.ForNamespace("ns2").Result(),
+			ie: collections.NewNamespaceIncludesExcludes().Includes("*"),
+			namespaces: []*corev1api.Namespace{
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1"},
 		},
@@ -186,10 +186,10 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 			backup: builder.ForBackup("velero", "backup").OrLabelSelector([]*metav1.LabelSelector{
 				{MatchLabels: map[string]string{"name": "ns1"}},
 			}).Result(),
-			ie: collections.NewIncludesExcludes().Includes("*"),
-			namespaces: []*corev1.Namespace{
-				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
-				builder.ForNamespace("ns2").Result(),
+			ie: collections.NewNamespaceIncludesExcludes().Includes("*"),
+			namespaces: []*corev1api.Namespace{
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1"},
 		},
@@ -198,10 +198,10 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 			backup: builder.ForBackup("velero", "backup").LabelSelector(&metav1.LabelSelector{
 				MatchLabels: map[string]string{"name": "ns1"},
 			}).Result(),
-			ie: collections.NewIncludesExcludes().Excludes("ns1"),
-			namespaces: []*corev1.Namespace{
-				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
-				builder.ForNamespace("ns2").Result(),
+			ie: collections.NewNamespaceIncludesExcludes().Excludes("ns1"),
+			namespaces: []*corev1api.Namespace{
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1"},
 		},
@@ -210,41 +210,50 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 			backup: builder.ForBackup("velero", "backup").OrLabelSelector([]*metav1.LabelSelector{
 				{MatchLabels: map[string]string{"name": "ns1"}},
 			}).Result(),
-			ie: collections.NewIncludesExcludes().Excludes("ns1", "ns2"),
-			namespaces: []*corev1.Namespace{
-				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
-				builder.ForNamespace("ns2").Result(),
-				builder.ForNamespace("ns3").Result(),
+			ie: collections.NewNamespaceIncludesExcludes().Excludes("ns1", "ns2"),
+			namespaces: []*corev1api.Namespace{
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns3").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1", "ns3"},
 		},
 		{
 			name:   "No ns filters",
 			backup: builder.ForBackup("velero", "backup").Result(),
-			ie:     collections.NewIncludesExcludes().Includes("*"),
-			namespaces: []*corev1.Namespace{
-				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
-				builder.ForNamespace("ns2").Result(),
+			ie:     collections.NewNamespaceIncludesExcludes().Includes("*"),
+			namespaces: []*corev1api.Namespace{
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1", "ns2"},
 		},
 		{
 			name:   "ns specified by the IncludeNamespaces cannot be found",
 			backup: builder.ForBackup("velero", "backup").IncludedNamespaces("ns1", "invalid", "*").Result(),
-			ie:     collections.NewIncludesExcludes().Includes("ns1", "invalid", "*"),
-			namespaces: []*corev1.Namespace{
-				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
-				builder.ForNamespace("ns2").Result(),
-				builder.ForNamespace("ns3").Result(),
+			ie:     collections.NewNamespaceIncludesExcludes().Includes("ns1", "invalid", "*"),
+			namespaces: []*corev1api.Namespace{
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns3").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1"},
+		},
+		{
+			name:   "terminating ns should not tracked",
+			backup: builder.ForBackup("velero", "backup").Result(),
+			ie:     collections.NewNamespaceIncludesExcludes().Includes("ns1", "ns2"),
+			namespaces: []*corev1api.Namespace{
+				builder.ForNamespace("ns1").Phase(corev1api.NamespaceTerminating).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
+			},
+			expectedTrackedNS: []string{"ns2"},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(*testing.T) {
-			tempDir, err := os.MkdirTemp("", "")
-			require.NoError(t, err)
+			tempDir := t.TempDir()
 
 			var unstructuredNSList unstructured.UnstructuredList
 			for _, ns := range tc.namespaces {
@@ -272,6 +281,10 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 				},
 				dynamicFactory: factory,
 				dir:            tempDir,
+			}
+
+			if tc.converter == nil {
+				tc.converter = runtime.DefaultUnstructuredConverter
 			}
 
 			r.collectNamespaces(

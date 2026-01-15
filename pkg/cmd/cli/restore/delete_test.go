@@ -17,7 +17,6 @@ limitations under the License.
 package restore
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -43,8 +42,8 @@ func TestDeleteCommand(t *testing.T) {
 	f := &factorymocks.Factory{}
 
 	client := velerotest.NewFakeControllerRuntimeClient(t)
-	client.Create(context.Background(), builder.ForRestore(cmdtest.VeleroNameSpace, restore1).Result(), &controllerclient.CreateOptions{})
-	client.Create(context.Background(), builder.ForRestore("default", restore2).Result(), &controllerclient.CreateOptions{})
+	client.Create(t.Context(), builder.ForRestore(cmdtest.VeleroNameSpace, restore1).Result(), &controllerclient.CreateOptions{})
+	client.Create(t.Context(), builder.ForRestore("default", restore2).Result(), &controllerclient.CreateOptions{})
 
 	f.On("KubebuilderClient").Return(client, nil)
 	f.On("Namespace").Return(cmdtest.VeleroNameSpace)
@@ -76,7 +75,7 @@ func TestDeleteCommand(t *testing.T) {
 		return
 	}
 
-	cmd := exec.Command(os.Args[0], []string{"-test.run=TestDeleteCommand"}...)
+	cmd := exec.CommandContext(t.Context(), os.Args[0], []string{"-test.run=TestDeleteCommand"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
 	stdout, _, err := veleroexec.RunCommand(cmd)
 	if err != nil {

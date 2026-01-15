@@ -17,7 +17,7 @@ limitations under the License.
 package csi
 
 import (
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -106,6 +106,14 @@ func (p *volumeSnapshotContentRestoreItemAction) Execute(
 	} else {
 		p.log.Errorf("fail to get snapshot handle from VSC %s status", vsc.Name)
 		return nil, errors.Errorf("fail to get snapshot handle from VSC %s status", vsc.Name)
+	}
+
+	if vsc.Spec.VolumeSnapshotClassName != nil {
+		// Delete VolumeSnapshotClass from the VolumeSnapshotContent.
+		// This is necessary to make the restore independent of the VolumeSnapshotClass.
+		vsc.Spec.VolumeSnapshotClassName = nil
+		p.log.Debugf("Deleted VolumeSnapshotClassName from VolumeSnapshotContent %s to make restore independent of VolumeSnapshotClass",
+			vsc.Name)
 	}
 
 	additionalItems := []velero.ResourceIdentifier{}

@@ -25,6 +25,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
@@ -52,20 +53,20 @@ func TestNewDeleteCommand(t *testing.T) {
 
 	args := []string{"bk-loc-1", "bk-loc-2"}
 	e := o.Complete(f, args)
-	assert.NoError(t, e)
+	require.NoError(t, e)
 	e = o.Validate(c, f, args)
-	assert.NoError(t, e)
+	require.NoError(t, e)
 	c.SetArgs([]string{"bk-1", "--confirm"})
 	e = c.Execute()
-	assert.NoError(t, e)
+	require.NoError(t, e)
 
 	e = Run(f, o)
-	assert.NoError(t, e)
+	require.NoError(t, e)
 	if os.Getenv(cmdtest.CaptureFlag) == "1" {
 		return
 	}
 
-	cmd := exec.Command(os.Args[0], []string{"-test.run=TestNewDeleteCommand"}...)
+	cmd := exec.CommandContext(t.Context(), os.Args[0], []string{"-test.run=TestNewDeleteCommand"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
 	stdout, _, err := veleroexec.RunCommand(cmd)
 

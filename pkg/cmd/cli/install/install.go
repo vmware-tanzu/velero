@@ -23,8 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -37,6 +35,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	"github.com/vmware-tanzu/velero/pkg/install"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
@@ -89,6 +89,12 @@ type Options struct {
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
+	ConcurrentBackups               int
+	NodeAgentDisableHostPath        bool
+	kubeletRootDir                  string
+	Apply                           bool
+	ServerPriorityClassName         string
+	NodeAgentPriorityClassName      string
 }
 
 // BindFlags adds command line values to the options struct.
@@ -97,6 +103,7 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.BucketName, "bucket", o.BucketName, "Name of the object storage bucket where backups should be stored")
 	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "File containing credentials for backup and volume provider. If not specified, --no-secret must be used for confirmation. Optional.")
 	flags.BoolVar(&o.NoSecret, "no-secret", o.NoSecret, "Flag indicating if a secret should be created. Must be used as confirmation if --secret-file is not provided. Optional.")
+	flags.BoolVar(&o.Apply, "apply", o.Apply, "Flag indicating if resources should be applied instead of created. This can be used for updating existing resources.")
 	flags.BoolVar(&o.NoDefaultBackupLocation, "no-default-backup-location", o.NoDefaultBackupLocation, "Flag indicating if a default backup location should be created. Must be used as confirmation if --bucket or --provider are not provided. Optional.")
 	flags.StringVar(&o.Image, "image", o.Image, "Image to use for the Velero and node agent pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
@@ -113,6 +120,8 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.NodeAgentPodMemRequest, "node-agent-pod-mem-request", o.NodeAgentPodMemRequest, `Memory request for node-agent pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.NodeAgentPodCPULimit, "node-agent-pod-cpu-limit", o.NodeAgentPodCPULimit, `CPU limit for node-agent pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.NodeAgentPodMemLimit, "node-agent-pod-mem-limit", o.NodeAgentPodMemLimit, `Memory limit for node-agent pod. A value of "0" is treated as unbounded. Optional.`)
+	flags.StringVar(&o.kubeletRootDir, "kubelet-root-dir", o.kubeletRootDir, `Kubelet root directory for the node agent. Optional.`)
+
 	flags.Var(&o.BackupStorageConfig, "backup-location-config", "Configuration to use for the backup storage location. Format is key1=value1,key2=value2")
 	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "Configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flags.BoolVar(&o.UseVolumeSnapshots, "use-volume-snapshots", o.UseVolumeSnapshots, "Whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.")
@@ -130,10 +139,11 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
 	flags.StringVar(&o.Features, "features", o.Features, "Comma separated list of Velero feature flags to be set on the Velero deployment and the node-agent daemonset, if node-agent is enabled")
 	flags.BoolVar(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", o.DefaultVolumesToFsBackup, "Bool flag to configure Velero server to use pod volume file system backup by default for all volumes on all backups. Optional.")
-	flags.StringVar(&o.UploaderType, "uploader-type", o.UploaderType, fmt.Sprintf("The type of uploader to transfer the data of pod volumes, the supported values are '%s', '%s'", uploader.ResticType, uploader.KopiaType))
+	flags.StringVar(&o.UploaderType, "uploader-type", o.UploaderType, fmt.Sprintf("The type of uploader to transfer the data of pod volumes, supported value: '%s'", uploader.KopiaType))
 	flags.BoolVar(&o.DefaultSnapshotMoveData, "default-snapshot-move-data", o.DefaultSnapshotMoveData, "Bool flag to configure Velero server to move data by default for all snapshots supporting data movement. Optional.")
 	flags.BoolVar(&o.DisableInformerCache, "disable-informer-cache", o.DisableInformerCache, "Disable informer cache for Get calls on restore. With this enabled, it will speed up restore in cases where there are backup resources which already exist in the cluster, but for very large clusters this will increase velero memory usage. Default is false (don't disable). Optional.")
 	flags.BoolVar(&o.ScheduleSkipImmediately, "schedule-skip-immediately", o.ScheduleSkipImmediately, "Skip the first scheduled backup immediately after creating a schedule. Default is false (don't skip).")
+	flags.BoolVar(&o.NodeAgentDisableHostPath, "node-agent-disable-host-path", o.NodeAgentDisableHostPath, "Don't mount the pod volume host path to node-agent. Optional. Pod volume host path mount is required by fs-backup but could be disabled for other backup methods.")
 
 	flags.IntVar(
 		&o.KeepLatestMaintenanceJobs,
@@ -189,6 +199,24 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		o.ItemBlockWorkerCount,
 		"Number of worker threads to process ItemBlocks. Default is one. Optional.",
 	)
+	flags.IntVar(
+		&o.ConcurrentBackups,
+		"concurrent-backups",
+		o.ConcurrentBackups,
+		"Number of backups to process concurrently. Default is one. Optional.",
+	)
+	flags.StringVar(
+		&o.ServerPriorityClassName,
+		"server-priority-class-name",
+		o.ServerPriorityClassName,
+		"Priority class name for the Velero server deployment. Optional.",
+	)
+	flags.StringVar(
+		&o.NodeAgentPriorityClassName,
+		"node-agent-priority-class-name",
+		o.NodeAgentPriorityClassName,
+		"Priority class name for the node agent daemonset. Optional.",
+	)
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -218,6 +246,8 @@ func NewInstallOptions() *Options {
 		DefaultSnapshotMoveData:  false,
 		DisableInformerCache:     false,
 		ScheduleSkipImmediately:  false,
+		kubeletRootDir:           install.DefaultKubeletRootDir,
+		NodeAgentDisableHostPath: false,
 	}
 }
 
@@ -292,6 +322,11 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		RepoMaintenanceJobConfigMap:     o.RepoMaintenanceJobConfigMap,
 		NodeAgentConfigMap:              o.NodeAgentConfigMap,
 		ItemBlockWorkerCount:            o.ItemBlockWorkerCount,
+		ConcurrentBackups:               o.ConcurrentBackups,
+		KubeletRootDir:                  o.kubeletRootDir,
+		NodeAgentDisableHostPath:        o.NodeAgentDisableHostPath,
+		ServerPriorityClassName:         o.ServerPriorityClassName,
+		NodeAgentPriorityClassName:      o.NodeAgentPriorityClassName,
 	}, nil
 }
 
@@ -380,9 +415,10 @@ func (o *Options) Run(c *cobra.Command, f client.Factory) error {
 	if err != nil {
 		return err
 	}
+
 	errorMsg := fmt.Sprintf("\n\nError installing Velero. Use `kubectl logs deploy/velero -n %s` to check the deploy logs", o.Namespace)
 
-	err = install.Install(dynamicFactory, kbClient, resources, os.Stdout)
+	err = install.Install(dynamicFactory, kbClient, resources, os.Stdout, o.Apply)
 	if err != nil {
 		return errors.Wrap(err, errorMsg)
 	}
@@ -512,6 +548,30 @@ func (o *Options) Validate(c *cobra.Command, args []string, f client.Factory) er
 
 	if o.PodVolumeOperationTimeout < 0 {
 		return errors.New("--pod-volume-operation-timeout must be non-negative")
+	}
+
+	crClient, err := f.KubebuilderClient()
+	if err != nil {
+		return fmt.Errorf("fail to create go-client %w", err)
+	}
+
+	if len(o.NodeAgentConfigMap) > 0 {
+		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.NodeAgentConfigMap, &velerotypes.NodeAgentConfigs{}); err != nil {
+			return fmt.Errorf("--node-agent-configmap specified ConfigMap %s is invalid: %w", o.NodeAgentConfigMap, err)
+		}
+	}
+
+	if len(o.RepoMaintenanceJobConfigMap) > 0 {
+		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.RepoMaintenanceJobConfigMap, &velerotypes.JobConfigs{}); err != nil {
+			return fmt.Errorf("--repo-maintenance-job-configmap specified ConfigMap %s is invalid: %w", o.RepoMaintenanceJobConfigMap, err)
+		}
+	}
+
+	if len(o.BackupRepoConfigMap) > 0 {
+		config := make(map[string]any)
+		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.BackupRepoConfigMap, &config); err != nil {
+			return fmt.Errorf("--backup-repository-configmap specified ConfigMap %s is invalid: %w", o.BackupRepoConfigMap, err)
+		}
 	}
 
 	return nil

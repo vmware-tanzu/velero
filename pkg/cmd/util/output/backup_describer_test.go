@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -50,7 +50,7 @@ func TestDescribeUploaderConfig(t *testing.T) {
 }
 
 func TestDescribeResourcePolicies(t *testing.T) {
-	input := &v1.TypedLocalObjectReference{
+	input := &corev1api.TypedLocalObjectReference{
 		Kind: "configmap",
 		Name: "test-resource-policy",
 	}
@@ -235,9 +235,10 @@ Hooks:  <none>
   Excluded:  <none>
 
 Resources:
-  Included:        *
-  Excluded:        <none>
-  Cluster-scoped:  auto
+  Included cluster-scoped:    <none>
+  Excluded cluster-scoped:    <none>
+  Included namespace-scoped:  *
+  Excluded namespace-scoped:  <none>
 
 Label selector:  <none>
 
@@ -282,6 +283,73 @@ Hooks:
 OrderedResources:
   kind1: rs1-1, rs1-2
 `
+	input4 := builder.ForBackup("test-ns", "test-backup-4").
+		DefaultVolumesToFsBackup(true).
+		StorageLocation("backup-location").
+		Result().Spec
+
+	expect4 := `Namespaces:
+  Included:  *
+  Excluded:  <none>
+
+Resources:
+  Included cluster-scoped:    <none>
+  Excluded cluster-scoped:    <none>
+  Included namespace-scoped:  *
+  Excluded namespace-scoped:  <none>
+
+Label selector:  <none>
+
+Or label selector:  <none>
+
+Storage Location:  backup-location
+
+Velero-Native Snapshot PVs:    auto
+File System Backup (Default):  true
+Snapshot Move Data:            auto
+Data Mover:                    velero
+
+TTL:  0s
+
+CSISnapshotTimeout:    0s
+ItemOperationTimeout:  0s
+
+Hooks:  <none>
+`
+
+	input5 := builder.ForBackup("test-ns", "test-backup-5").
+		DefaultVolumesToFsBackup(false).
+		StorageLocation("backup-location").
+		Result().Spec
+
+	expect5 := `Namespaces:
+  Included:  *
+  Excluded:  <none>
+
+Resources:
+  Included cluster-scoped:    <none>
+  Excluded cluster-scoped:    <none>
+  Included namespace-scoped:  *
+  Excluded namespace-scoped:  <none>
+
+Label selector:  <none>
+
+Or label selector:  <none>
+
+Storage Location:  backup-location
+
+Velero-Native Snapshot PVs:    auto
+File System Backup (Default):  false
+Snapshot Move Data:            auto
+Data Mover:                    velero
+
+TTL:  0s
+
+CSISnapshotTimeout:    0s
+ItemOperationTimeout:  0s
+
+Hooks:  <none>
+`
 
 	testcases := []struct {
 		name   string
@@ -302,6 +370,16 @@ OrderedResources:
 			name:   "old resource filter with hooks and ordered resources",
 			input:  input3,
 			expect: expect3,
+		},
+		{
+			name:   "DefaultVolumesToFsBackup is true",
+			input:  input4,
+			expect: expect4,
+		},
+		{
+			name:   "DefaultVolumesToFsBackup is false",
+			input:  input5,
+			expect: expect5,
 		},
 	}
 
@@ -519,11 +597,12 @@ func TestCSISnapshots(t *testing.T) {
 					Result:            volume.VolumeResultFailed,
 					SnapshotDataMoved: true,
 					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
-						UploaderType:   "fake-uploader",
-						SnapshotHandle: "fake-repo-id-5",
-						OperationID:    "fake-operation-5",
-						Size:           100,
-						Phase:          velerov2alpha1.DataUploadPhaseFailed,
+						UploaderType:    "fake-uploader",
+						SnapshotHandle:  "fake-repo-id-5",
+						OperationID:     "fake-operation-5",
+						Size:            100,
+						IncrementalSize: 50,
+						Phase:           velerov2alpha1.DataUploadPhaseFailed,
 					},
 				},
 			},
@@ -535,6 +614,7 @@ func TestCSISnapshots(t *testing.T) {
         Data Mover: velero
         Uploader Type: fake-uploader
         Moved data Size (bytes): 100
+        Incremental data Size (bytes): 50
         Result: failed
 `,
 		},
@@ -572,6 +652,54 @@ func TestDescribePodVolumeBackups(t *testing.T) {
 		PodName("pod-2").
 		PodNamespace("pod-ns-1").
 		SnapshotID("snap-2").Result()
+	pvb3 := builder.ForPodVolumeBackup("test-ns1", "test-pvb3").
+		UploaderType("kopia").
+		Phase(velerov1api.PodVolumeBackupPhaseFailed).
+		BackupStorageLocation("bsl-1").
+		Volume("vol-3").
+		PodName("pod-3").
+		PodNamespace("pod-ns-1").
+		SnapshotID("snap-3").Result()
+	pvb4 := builder.ForPodVolumeBackup("test-ns1", "test-pvb4").
+		UploaderType("kopia").
+		Phase(velerov1api.PodVolumeBackupPhaseCanceled).
+		BackupStorageLocation("bsl-1").
+		Volume("vol-4").
+		PodName("pod-4").
+		PodNamespace("pod-ns-1").
+		SnapshotID("snap-4").Result()
+	pvb5 := builder.ForPodVolumeBackup("test-ns1", "test-pvb5").
+		UploaderType("kopia").
+		Phase(velerov1api.PodVolumeBackupPhaseInProgress).
+		BackupStorageLocation("bsl-1").
+		Volume("vol-5").
+		PodName("pod-5").
+		PodNamespace("pod-ns-1").
+		SnapshotID("snap-5").Result()
+	pvb6 := builder.ForPodVolumeBackup("test-ns1", "test-pvb6").
+		UploaderType("kopia").
+		Phase(velerov1api.PodVolumeBackupPhaseCanceling).
+		BackupStorageLocation("bsl-1").
+		Volume("vol-6").
+		PodName("pod-6").
+		PodNamespace("pod-ns-1").
+		SnapshotID("snap-6").Result()
+	pvb7 := builder.ForPodVolumeBackup("test-ns1", "test-pvb7").
+		UploaderType("kopia").
+		Phase(velerov1api.PodVolumeBackupPhasePrepared).
+		BackupStorageLocation("bsl-1").
+		Volume("vol-7").
+		PodName("pod-7").
+		PodNamespace("pod-ns-1").
+		SnapshotID("snap-7").Result()
+	pvb8 := builder.ForPodVolumeBackup("test-ns1", "test-pvb6").
+		UploaderType("kopia").
+		Phase(velerov1api.PodVolumeBackupPhaseAccepted).
+		BackupStorageLocation("bsl-1").
+		Volume("vol-8").
+		PodName("pod-8").
+		PodNamespace("pod-ns-1").
+		SnapshotID("snap-8").Result()
 
 	testcases := []struct {
 		name         string
@@ -602,6 +730,28 @@ func TestDescribePodVolumeBackups(t *testing.T) {
     Completed:
       pod-ns-1/pod-1: vol-1
       pod-ns-1/pod-2: vol-2
+`,
+		},
+		{
+			name:         "all phases with details",
+			inputPVBList: []velerov1api.PodVolumeBackup{*pvb1, *pvb2, *pvb3, *pvb4, *pvb5, *pvb6, *pvb7, *pvb8},
+			inputDetails: true,
+			expect: `  Pod Volume Backups - kopia:
+    Completed:
+      pod-ns-1/pod-1: vol-1
+      pod-ns-1/pod-2: vol-2
+    Failed:
+      pod-ns-1/pod-3: vol-3
+    Canceled:
+      pod-ns-1/pod-4: vol-4
+    In Progress:
+      pod-ns-1/pod-5: vol-5
+    Canceling:
+      pod-ns-1/pod-6: vol-6
+    Prepared:
+      pod-ns-1/pod-7: vol-7
+    Accepted:
+      pod-ns-1/pod-8: vol-8
 `,
 		},
 	}

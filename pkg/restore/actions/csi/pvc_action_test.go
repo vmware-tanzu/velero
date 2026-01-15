@@ -17,14 +17,13 @@ limitations under the License.
 package csi
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -155,7 +154,7 @@ func TestResetPVCSpec(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			before := tc.pvc.DeepCopy()
-			resetPVCSpec(&tc.pvc, tc.vsName)
+			resetPVCSourceToVolumeSnapshot(&tc.pvc, tc.vsName)
 
 			assert.Equalf(t, tc.pvc.Name, before.Name, "unexpected change to Object.Name, Want: %s; Got %s", before.Name, tc.pvc.Name)
 			assert.Equalf(t, tc.pvc.Namespace, before.Namespace, "unexpected change to Object.Namespace, Want: %s; Got %s", before.Namespace, tc.pvc.Namespace)
@@ -167,101 +166,6 @@ func TestResetPVCSpec(t *testing.T) {
 			assert.NotNil(t, tc.pvc.Spec.DataSource, "expected change to Spec.DataSource missing")
 			assert.Equalf(t, "VolumeSnapshot", tc.pvc.Spec.DataSource.Kind, "expected change to Spec.DataSource.Kind missing, Want: VolumeSnapshot, Got: %s", tc.pvc.Spec.DataSource.Kind)
 			assert.Equalf(t, tc.pvc.Spec.DataSource.Name, tc.vsName, "expected change to Spec.DataSource.Name missing, Want: %s, Got: %s", tc.vsName, tc.pvc.Spec.DataSource.Name)
-		})
-	}
-}
-
-func TestResetPVCResourceRequest(t *testing.T) {
-	var storageReq50Mi, storageReq1Gi, cpuQty resource.Quantity
-
-	storageReq50Mi, err := resource.ParseQuantity("50Mi")
-	assert.NoError(t, err)
-	storageReq1Gi, err = resource.ParseQuantity("1Gi")
-	assert.NoError(t, err)
-	cpuQty, err = resource.ParseQuantity("100m")
-	assert.NoError(t, err)
-
-	testCases := []struct {
-		name                      string
-		pvc                       corev1api.PersistentVolumeClaim
-		restoreSize               resource.Quantity
-		expectedStorageRequestQty string
-	}{
-		{
-			name: "should set storage resource request from volumesnapshot, pvc has nil resource requests",
-			pvc: corev1api.PersistentVolumeClaim{
-				Spec: corev1api.PersistentVolumeClaimSpec{
-					Resources: corev1api.VolumeResourceRequirements{
-						Requests: nil,
-					},
-				},
-			},
-			restoreSize:               storageReq50Mi,
-			expectedStorageRequestQty: "50Mi",
-		},
-		{
-			name: "should set storage resource request from volumesnapshot, pvc has empty resource requests",
-			pvc: corev1api.PersistentVolumeClaim{
-				Spec: corev1api.PersistentVolumeClaimSpec{
-					Resources: corev1api.VolumeResourceRequirements{
-						Requests: corev1api.ResourceList{},
-					},
-				},
-			},
-			restoreSize:               storageReq50Mi,
-			expectedStorageRequestQty: "50Mi",
-		},
-		{
-			name: "should merge resource requests from volumesnapshot into pvc with no storage resource requests",
-			pvc: corev1api.PersistentVolumeClaim{
-				Spec: corev1api.PersistentVolumeClaimSpec{
-					Resources: corev1api.VolumeResourceRequirements{
-						Requests: corev1api.ResourceList{
-							corev1api.ResourceCPU: cpuQty,
-						},
-					},
-				},
-			},
-			restoreSize:               storageReq50Mi,
-			expectedStorageRequestQty: "50Mi",
-		},
-		{
-			name: "should set storage resource request from volumesnapshot, pvc requests less storage",
-			pvc: corev1api.PersistentVolumeClaim{
-				Spec: corev1api.PersistentVolumeClaimSpec{
-					Resources: corev1api.VolumeResourceRequirements{
-						Requests: corev1api.ResourceList{
-							corev1api.ResourceStorage: storageReq50Mi,
-						},
-					},
-				},
-			},
-			restoreSize:               storageReq1Gi,
-			expectedStorageRequestQty: "1Gi",
-		},
-		{
-			name: "should not set storage resource request from volumesnapshot, pvc requests more storage",
-			pvc: corev1api.PersistentVolumeClaim{
-				Spec: corev1api.PersistentVolumeClaimSpec{
-					Resources: corev1api.VolumeResourceRequirements{
-						Requests: corev1api.ResourceList{
-							corev1api.ResourceStorage: storageReq1Gi,
-						},
-					},
-				},
-			},
-			restoreSize:               storageReq50Mi,
-			expectedStorageRequestQty: "1Gi",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			log := logrus.New().WithField("unit-test", tc.name)
-			setPVCStorageResourceRequest(&tc.pvc, tc.restoreSize, log)
-			expected, err := resource.ParseQuantity(tc.expectedStorageRequestQty)
-			assert.NoError(t, err)
-			assert.Equal(t, expected, tc.pvc.Spec.Resources.Requests[corev1api.ResourceStorage])
 		})
 	}
 }
@@ -348,7 +252,7 @@ func TestProgress(t *testing.T) {
 				crClient: velerotest.NewFakeControllerRuntimeClient(t),
 			}
 			if tc.dataDownload != nil {
-				err := pvcRIA.crClient.Create(context.Background(), tc.dataDownload)
+				err := pvcRIA.crClient.Create(t.Context(), tc.dataDownload)
 				require.NoError(t, err)
 			}
 
@@ -440,7 +344,7 @@ func TestCancel(t *testing.T) {
 				crClient: velerotest.NewFakeControllerRuntimeClient(t),
 			}
 			if tc.dataDownload != nil {
-				err := pvcRIA.crClient.Create(context.Background(), tc.dataDownload)
+				err := pvcRIA.crClient.Create(t.Context(), tc.dataDownload)
 				require.NoError(t, err)
 			}
 
@@ -452,7 +356,7 @@ func TestCancel(t *testing.T) {
 			require.NoError(t, err)
 
 			resultDataDownload := new(velerov2alpha1.DataDownload)
-			err = pvcRIA.crClient.Get(context.Background(), crclient.ObjectKey{Namespace: tc.dataDownload.Namespace, Name: tc.dataDownload.Name}, resultDataDownload)
+			err = pvcRIA.crClient.Get(t.Context(), crclient.ObjectKey{Namespace: tc.dataDownload.Namespace, Name: tc.dataDownload.Name}, resultDataDownload)
 			require.NoError(t, err)
 
 			require.True(t, cmp.Equal(tc.expectedDataDownload, *resultDataDownload, cmpopts.IgnoreFields(velerov2alpha1.DataDownload{}, "ResourceVersion", "Name")))
@@ -485,13 +389,6 @@ func TestExecute(t *testing.T) {
 			restore:     builder.ForRestore("velero", "testRestore").Backup("testBackup").Result(),
 			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").Result(),
 			expectedErr: "fail to get backup for restore: backups.velero.io \"testBackup\" not found",
-		},
-		{
-			name:        "VolumeSnapshot cannot be found",
-			backup:      builder.ForBackup("velero", "testBackup").Result(),
-			restore:     builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("restoreUID")).Backup("testBackup").Result(),
-			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations(velerov1api.VolumeSnapshotLabel, "vsName")).Result(),
-			expectedErr: fmt.Sprintf("Failed to get Volumesnapshot velero/%s to restore PVC velero/testPVC: volumesnapshots.snapshot.storage.k8s.io \"%s\" not found", vsName, vsName),
 		},
 		{
 			name:    "Restore from VolumeSnapshot",
@@ -622,7 +519,7 @@ func TestExecute(t *testing.T) {
 			}
 			if tc.expectedDataDownload != nil {
 				dataDownloadList := new(velerov2alpha1.DataDownloadList)
-				err := pvcRIA.crClient.List(context.Background(), dataDownloadList, &crclient.ListOptions{
+				err := pvcRIA.crClient.List(t.Context(), dataDownloadList, &crclient.ListOptions{
 					LabelSelector: labels.SelectorFromSet(tc.expectedDataDownload.Labels),
 				})
 				require.NoError(t, err)

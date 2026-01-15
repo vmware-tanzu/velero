@@ -21,7 +21,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
+	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,7 +32,7 @@ import (
 )
 
 func TestGetResourceModifiersFromConfig(t *testing.T) {
-	cm1 := &v1.ConfigMap{
+	cm1 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -64,7 +65,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			},
 		},
 	}
-	cm2 := &v1.ConfigMap{
+	cm2 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -99,7 +100,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
-	cm3 := &v1.ConfigMap{
+	cm3 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -109,7 +110,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
-	cm4 := &v1.ConfigMap{
+	cm4 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -135,7 +136,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
-	cm5 := &v1.ConfigMap{
+	cm5 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -170,7 +171,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
-	cm6 := &v1.ConfigMap{
+	cm6 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -199,7 +200,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
-	cm7 := &v1.ConfigMap{
+	cm7 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -228,7 +229,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
-	cm8 := &v1.ConfigMap{
+	cm8 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -256,7 +257,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			},
 		},
 	}
-	cm9 := &v1.ConfigMap{
+	cm9 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -285,7 +286,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			},
 		},
 	}
-	cm10 := &v1.ConfigMap{
+	cm10 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -316,7 +317,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 	}
 
 	type args struct {
-		cm *v1.ConfigMap
+		cm *corev1api.ConfigMap
 	}
 	tests := []struct {
 		name    string
@@ -1303,27 +1304,27 @@ func TestResourceModifiers_ApplyResourceModifierRules_StrategicMergePatch(t *tes
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	unstructuredSerializer := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	o1, _, err := unstructuredSerializer.Decode([]byte(podYAMLWithNFSVolume), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	podWithNFSVolume := o1.(*unstructured.Unstructured)
 
 	o2, _, err := unstructuredSerializer.Decode([]byte(podYAMLWithPVCVolume), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	podWithPVCVolume := o2.(*unstructured.Unstructured)
 
 	o3, _, err := unstructuredSerializer.Decode([]byte(svcYAMLWithPort8000), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	svcWithPort8000 := o3.(*unstructured.Unstructured)
 
 	o4, _, err := unstructuredSerializer.Decode([]byte(svcYAMLWithPort9000), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	svcWithPort9000 := o4.(*unstructured.Unstructured)
 
 	o5, _, err := unstructuredSerializer.Decode([]byte(podYAMLWithNginxImage), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	podWithNginxImage := o5.(*unstructured.Unstructured)
 
 	o6, _, err := unstructuredSerializer.Decode([]byte(podYAMLWithNginx1Image), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	podWithNginx1Image := o6.(*unstructured.Unstructured)
 
 	tests := []struct {
@@ -1467,15 +1468,15 @@ func TestResourceModifiers_ApplyResourceModifierRules_StrategicMergePatch(t *tes
 func TestResourceModifiers_ApplyResourceModifierRules_JSONMergePatch(t *testing.T) {
 	unstructuredSerializer := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	o1, _, err := unstructuredSerializer.Decode([]byte(cmYAMLWithLabelAToB), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cmWithLabelAToB := o1.(*unstructured.Unstructured)
 
 	o2, _, err := unstructuredSerializer.Decode([]byte(cmYAMLWithLabelAToC), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cmWithLabelAToC := o2.(*unstructured.Unstructured)
 
 	o3, _, err := unstructuredSerializer.Decode([]byte(cmYAMLWithoutLabelA), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cmWithoutLabelA := o3.(*unstructured.Unstructured)
 
 	tests := []struct {
@@ -1618,11 +1619,11 @@ func TestResourceModifiers_ApplyResourceModifierRules_JSONMergePatch(t *testing.
 func TestResourceModifiers_wildcard_in_GroupResource(t *testing.T) {
 	unstructuredSerializer := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	o1, _, err := unstructuredSerializer.Decode([]byte(cmYAMLWithLabelAToB), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cmWithLabelAToB := o1.(*unstructured.Unstructured)
 
 	o2, _, err := unstructuredSerializer.Decode([]byte(cmYAMLWithLabelAToC), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cmWithLabelAToC := o2.(*unstructured.Unstructured)
 
 	tests := []struct {
@@ -1694,11 +1695,11 @@ func TestResourceModifiers_wildcard_in_GroupResource(t *testing.T) {
 func TestResourceModifiers_conditional_patches(t *testing.T) {
 	unstructuredSerializer := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	o1, _, err := unstructuredSerializer.Decode([]byte(cmYAMLWithLabelAToB), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cmWithLabelAToB := o1.(*unstructured.Unstructured)
 
 	o2, _, err := unstructuredSerializer.Decode([]byte(cmYAMLWithLabelAToC), nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cmWithLabelAToC := o2.(*unstructured.Unstructured)
 
 	tests := []struct {

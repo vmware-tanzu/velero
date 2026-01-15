@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -240,6 +240,55 @@ func TestDescribePodVolumeBackupsInSF(t *testing.T) {
 		PodNamespace("pod-ns-1").
 		SnapshotID("snap-2").Result()
 
+	pvb3 := builder.ForPodVolumeBackup("test-ns1", "test-pvb3").
+		UploaderType("kopia").
+		Phase(velerov1api.PodVolumeBackupPhaseFailed).
+		BackupStorageLocation("bsl-1").
+		Volume("vol-3").
+		PodName("pod-3").
+		PodNamespace("pod-ns-1").
+		SnapshotID("snap-3").Result()
+	pvb4 := builder.ForPodVolumeBackup("test-ns1", "test-pvb4").
+		UploaderType("kopia").
+		Phase(velerov1api.PodVolumeBackupPhaseCanceled).
+		BackupStorageLocation("bsl-1").
+		Volume("vol-4").
+		PodName("pod-4").
+		PodNamespace("pod-ns-1").
+		SnapshotID("snap-4").Result()
+	pvb5 := builder.ForPodVolumeBackup("test-ns1", "test-pvb5").
+		UploaderType("kopia").
+		Phase(velerov1api.PodVolumeBackupPhaseInProgress).
+		BackupStorageLocation("bsl-1").
+		Volume("vol-5").
+		PodName("pod-5").
+		PodNamespace("pod-ns-1").
+		SnapshotID("snap-5").Result()
+	pvb6 := builder.ForPodVolumeBackup("test-ns1", "test-pvb6").
+		UploaderType("kopia").
+		Phase(velerov1api.PodVolumeBackupPhaseCanceling).
+		BackupStorageLocation("bsl-1").
+		Volume("vol-6").
+		PodName("pod-6").
+		PodNamespace("pod-ns-1").
+		SnapshotID("snap-6").Result()
+	pvb7 := builder.ForPodVolumeBackup("test-ns1", "test-pvb7").
+		UploaderType("kopia").
+		Phase(velerov1api.PodVolumeBackupPhasePrepared).
+		BackupStorageLocation("bsl-1").
+		Volume("vol-7").
+		PodName("pod-7").
+		PodNamespace("pod-ns-1").
+		SnapshotID("snap-7").Result()
+	pvb8 := builder.ForPodVolumeBackup("test-ns1", "test-pvb6").
+		UploaderType("kopia").
+		Phase(velerov1api.PodVolumeBackupPhaseAccepted).
+		BackupStorageLocation("bsl-1").
+		Volume("vol-8").
+		PodName("pod-8").
+		PodNamespace("pod-ns-1").
+		SnapshotID("snap-8").Result()
+
 	testcases := []struct {
 		name         string
 		inputPVBList []velerov1api.PodVolumeBackup
@@ -262,6 +311,40 @@ func TestDescribePodVolumeBackupsInSF(t *testing.T) {
 						"Completed": []map[string]string{
 							{"pod-ns-1/pod-1": "vol-1"},
 							{"pod-ns-1/pod-2": "vol-2"},
+						},
+					},
+					"uploderType": "kopia",
+				},
+			},
+		},
+		{
+			name:         "all phases",
+			inputPVBList: []velerov1api.PodVolumeBackup{*pvb1, *pvb2, *pvb3, *pvb4, *pvb5, *pvb6, *pvb7, *pvb8},
+			inputDetails: true,
+			expect: map[string]any{
+				"podVolumeBackups": map[string]any{
+					"podVolumeBackupsDetails": map[string]any{
+						"Completed": []map[string]string{
+							{"pod-ns-1/pod-1": "vol-1"},
+							{"pod-ns-1/pod-2": "vol-2"},
+						},
+						"Failed": []map[string]string{
+							{"pod-ns-1/pod-3": "vol-3"},
+						},
+						"Canceled": []map[string]string{
+							{"pod-ns-1/pod-4": "vol-4"},
+						},
+						"In Progress": []map[string]string{
+							{"pod-ns-1/pod-5": "vol-5"},
+						},
+						"Canceling": []map[string]string{
+							{"pod-ns-1/pod-6": "vol-6"},
+						},
+						"Prepared": []map[string]string{
+							{"pod-ns-1/pod-7": "vol-7"},
+						},
+						"Accepted": []map[string]string{
+							{"pod-ns-1/pod-8": "vol-8"},
 						},
 					},
 					"uploderType": "kopia",
@@ -523,7 +606,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 }
 
 func TestDescribeResourcePoliciesInSF(t *testing.T) {
-	input := &v1.TypedLocalObjectReference{
+	input := &corev1api.TypedLocalObjectReference{
 		Kind: "configmap",
 		Name: "resource-policy-1",
 	}

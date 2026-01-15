@@ -34,11 +34,9 @@ REGISTRY ?= velero
 #        docker buildx create --name=velero-builder --driver=docker-container --bootstrap --use --config ./buildkitd.toml
 #      Refer to https://github.com/docker/buildx/issues/1370#issuecomment-1288516840 for more details
 INSECURE_REGISTRY ?= false
-GCR_REGISTRY ?= gcr.io/velero-gcp
 
 # Image name
 IMAGE ?= $(REGISTRY)/$(BIN)
-GCR_IMAGE ?= $(GCR_REGISTRY)/$(BIN)
 
 # We allow the Dockerfile to be configurable to enable the use of custom Dockerfiles
 # that pull base images from different registries.
@@ -67,7 +65,7 @@ endif
 BUILDER_IMAGE := $(REGISTRY)/build-image:$(BUILDER_IMAGE_TAG)
 BUILDER_IMAGE_CACHED := $(shell docker images -q ${BUILDER_IMAGE} 2>/dev/null )
 
-HUGO_IMAGE := hugo-builder
+HUGO_IMAGE := ghcr.io/gohugoio/hugo
 
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
@@ -81,10 +79,8 @@ TAG_LATEST ?= false
 
 ifeq ($(TAG_LATEST), true)
 	IMAGE_TAGS ?= $(IMAGE):$(VERSION) $(IMAGE):latest
-	GCR_IMAGE_TAGS ?= $(GCR_IMAGE):$(VERSION) $(GCR_IMAGE):latest
 else
 	IMAGE_TAGS ?= $(IMAGE):$(VERSION)
-	GCR_IMAGE_TAGS ?= $(GCR_IMAGE):$(VERSION)
 endif
 
 # check buildx is enabled only if docker is in path
@@ -112,11 +108,10 @@ comma=,
 # The version of restic binary to be downloaded
 RESTIC_VERSION ?= 0.15.0
 
-CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le
+CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le linux-s390x
 BUILD_OUTPUT_TYPE ?= docker
 BUILD_OS ?= linux
 BUILD_ARCH ?= amd64
-BUILD_TAG_GCR ?= false
 BUILD_WINDOWS_VERSION ?= ltsc2022
 
 ifeq ($(BUILD_OUTPUT_TYPE), docker)
@@ -134,9 +129,6 @@ ALL_OS_ARCH.windows = $(foreach os, $(filter windows,$(ALL_OS)), $(foreach arch,
 ALL_OS_ARCH = $(ALL_OS_ARCH.linux)$(ALL_OS_ARCH.windows)
 
 ALL_IMAGE_TAGS = $(IMAGE_TAGS)
-ifeq ($(BUILD_TAG_GCR), true)
-	ALL_IMAGE_TAGS += $(GCR_IMAGE_TAGS)
-endif
 
 # set git sha and tree state
 GIT_SHA = $(shell git rev-parse HEAD)
@@ -459,7 +451,7 @@ release:
 serve-docs: build-image-hugo
 	docker run \
 	--rm \
-	-v "$$(pwd)/site:/srv/hugo" \
+	-v "$$(pwd)/site:/project" \
 	-it -p 1313:1313 \
 	$(HUGO_IMAGE) \
 	server --bind=0.0.0.0 --enableGitInfo=false

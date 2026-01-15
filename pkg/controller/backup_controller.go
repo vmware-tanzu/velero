@@ -21,9 +21,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -31,10 +32,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
@@ -56,11 +62,26 @@ import (
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 const (
 	backupResyncPeriod = time.Minute
 )
+
+var autoExcludeNamespaceScopedResources = []string{
+	// CSI VolumeSnapshot and VolumeSnapshotContent are intermediate resources.
+	// Velero only handle the VS and VSC created during backup,
+	// not during resource collecting.
+	"volumesnapshots.snapshot.storage.k8s.io",
+}
+
+var autoExcludeClusterScopedResources = []string{
+	// CSI VolumeSnapshot and VolumeSnapshotContent are intermediate resources.
+	// Velero only handle the VS and VSC created during backup,
+	// not during resource collecting.
+	"volumesnapshotcontents.snapshot.storage.k8s.io",
+}
 
 type backupReconciler struct {
 	ctx                         context.Context
@@ -75,6 +96,7 @@ type backupReconciler struct {
 	defaultBackupLocation       string
 	defaultVolumesToFsBackup    bool
 	defaultBackupTTL            time.Duration
+	defaultVGSLabelKey          string
 	defaultCSISnapshotTimeout   time.Duration
 	resourceTimeout             time.Duration
 	defaultItemOperationTimeout time.Duration
@@ -87,7 +109,7 @@ type backupReconciler struct {
 	defaultSnapshotMoveData     bool
 	globalCRClient              kbclient.Client
 	itemBlockWorkerCount        int
-	workerPool                  *pkgbackup.ItemBlockWorkerPool
+	concurrentBackups           int
 }
 
 func NewBackupReconciler(
@@ -102,6 +124,7 @@ func NewBackupReconciler(
 	defaultBackupLocation string,
 	defaultVolumesToFsBackup bool,
 	defaultBackupTTL time.Duration,
+	defaultVGSLabelKey string,
 	defaultCSISnapshotTimeout time.Duration,
 	resourceTimeout time.Duration,
 	defaultItemOperationTimeout time.Duration,
@@ -113,6 +136,7 @@ func NewBackupReconciler(
 	maxConcurrentK8SConnections int,
 	defaultSnapshotMoveData bool,
 	itemBlockWorkerCount int,
+	concurrentBackups int,
 	globalCRClient kbclient.Client,
 ) *backupReconciler {
 	b := &backupReconciler{
@@ -128,6 +152,7 @@ func NewBackupReconciler(
 		defaultBackupLocation:       defaultBackupLocation,
 		defaultVolumesToFsBackup:    defaultVolumesToFsBackup,
 		defaultBackupTTL:            defaultBackupTTL,
+		defaultVGSLabelKey:          defaultVGSLabelKey,
 		defaultCSISnapshotTimeout:   defaultCSISnapshotTimeout,
 		resourceTimeout:             resourceTimeout,
 		defaultItemOperationTimeout: defaultItemOperationTimeout,
@@ -139,8 +164,8 @@ func NewBackupReconciler(
 		maxConcurrentK8SConnections: maxConcurrentK8SConnections,
 		defaultSnapshotMoveData:     defaultSnapshotMoveData,
 		itemBlockWorkerCount:        itemBlockWorkerCount,
+		concurrentBackups:           max(concurrentBackups, 1),
 		globalCRClient:              globalCRClient,
-		workerPool:                  pkgbackup.StartItemBlockWorkerPool(ctx, itemBlockWorkerCount, logger),
 	}
 	b.updateTotalBackupMetric()
 	return b
@@ -148,7 +173,24 @@ func NewBackupReconciler(
 
 func (b *backupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&velerov1api.Backup{}).
+		For(&velerov1api.Backup{}, builder.WithPredicates(predicate.Funcs{
+			UpdateFunc: func(ue event.UpdateEvent) bool {
+				backup := ue.ObjectNew.(*velerov1api.Backup)
+				return backup.Status.Phase == velerov1api.BackupPhaseReadyToStart
+			},
+			CreateFunc: func(ce event.CreateEvent) bool {
+				return false
+			},
+			DeleteFunc: func(de event.DeleteEvent) bool {
+				return false
+			},
+			GenericFunc: func(ge event.GenericEvent) bool {
+				return false
+			},
+		})).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: b.concurrentBackups,
+		}).
 		Named(constant.ControllerBackup).
 		Complete(b)
 }
@@ -234,8 +276,8 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// InProgress, we still need this check so we can return nil to indicate we've finished processing
 	// this key (even though it was a no-op).
 	switch original.Status.Phase {
-	case "", velerov1api.BackupPhaseNew:
-		// only process new backups
+	case velerov1api.BackupPhaseReadyToStart:
+		// only process ReadytToStart backups
 	default:
 		b.logger.WithFields(logrus.Fields{
 			"backup": kubeutil.NamespaceAndName(original),
@@ -245,7 +287,9 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	log.Debug("Preparing backup request")
-	request := b.prepareBackupRequest(original, log)
+	request := b.prepareBackupRequest(ctx, original, log)
+	// delete worker pool after reconcile
+	defer request.StopWorkerPool()
 	if len(request.Status.ValidationErrors) > 0 {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
@@ -279,6 +323,8 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		switch request.Status.Phase {
 		case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed, velerov1api.BackupPhaseFailedValidation:
 			b.backupTracker.Delete(request.Namespace, request.Name)
+		case velerov1api.BackupPhaseWaitingForPluginOperations, velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed, velerov1api.BackupPhaseFinalizing, velerov1api.BackupPhaseFinalizingPartiallyFailed:
+			b.backupTracker.AddPostProcessing(request.Namespace, request.Name)
 		}
 	}()
 
@@ -327,12 +373,12 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, nil
 }
 
-func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logger logrus.FieldLogger) *pkgbackup.Request {
+func (b *backupReconciler) prepareBackupRequest(ctx context.Context, backup *velerov1api.Backup, logger logrus.FieldLogger) *pkgbackup.Request {
 	request := &pkgbackup.Request{
 		Backup:           backup.DeepCopy(), // don't modify items in the cache
 		SkippedPVTracker: pkgbackup.NewSkipPVTracker(),
 		BackedUpItems:    pkgbackup.NewBackedUpItemsMap(),
-		ItemBlockChannel: b.workerPool.GetInputChannel(),
+		WorkerPool:       pkgbackup.StartItemBlockWorkerPool(ctx, b.itemBlockWorkerCount, logger),
 	}
 	request.VolumesInformation.Init()
 
@@ -345,6 +391,10 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	if request.Spec.TTL.Duration == 0 {
 		// set default backup TTL
 		request.Spec.TTL.Duration = b.defaultBackupTTL
+	}
+
+	if len(request.Spec.VolumeGroupSnapshotLabelKey) == 0 {
+		request.Spec.VolumeGroupSnapshotLabelKey = b.defaultVGSLabelKey
 	}
 
 	if request.Spec.CSISnapshotTimeout.Duration == 0 {
@@ -417,6 +467,13 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 			request.Status.ValidationErrors = append(request.Status.ValidationErrors,
 				fmt.Sprintf("backup can't be created because backup storage location %s is currently in read-only mode", request.StorageLocation.Name))
 		}
+
+		if !veleroutil.BSLIsAvailable(*request.StorageLocation) {
+			request.Status.ValidationErrors = append(
+				request.Status.ValidationErrors,
+				fmt.Sprintf("backup can't be created because BackupStorageLocation %s is in Unavailable status.", request.StorageLocation.Name),
+			)
+		}
 	}
 
 	// add the storage location as a label for easy filtering later.
@@ -466,19 +523,51 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, validatedError)
 	}
 
-	// validate the included/excluded resources
-	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {
-		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
-	}
+	if collections.UseOldResourceFilters(request.Spec) {
+		// validate the included/excluded resources
+		ieErr := collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources)
+		if len(ieErr) > 0 {
+			for _, err := range ieErr {
+				request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
+			}
+		} else {
+			request.Spec.IncludedResources, request.Spec.ExcludedResources =
+				modifyResourceIncludeExclude(
+					request.Spec.IncludedResources,
+					request.Spec.ExcludedResources,
+					append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
+				)
+		}
+	} else {
+		// validate the cluster-scoped included/excluded resources
+		clusterErr := collections.ValidateScopedIncludesExcludes(request.Spec.IncludedClusterScopedResources, request.Spec.ExcludedClusterScopedResources)
+		if len(clusterErr) > 0 {
+			for _, err := range clusterErr {
+				request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid cluster-scoped included/excluded resource lists: %s", err))
+			}
+		} else {
+			request.Spec.IncludedClusterScopedResources, request.Spec.ExcludedClusterScopedResources =
+				modifyResourceIncludeExclude(
+					request.Spec.IncludedClusterScopedResources,
+					request.Spec.ExcludedClusterScopedResources,
+					autoExcludeClusterScopedResources,
+				)
+		}
 
-	// validate the cluster-scoped included/excluded resources
-	for _, err := range collections.ValidateScopedIncludesExcludes(request.Spec.IncludedClusterScopedResources, request.Spec.ExcludedClusterScopedResources) {
-		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid cluster-scoped included/excluded resource lists: %s", err))
-	}
-
-	// validate the namespace-scoped included/excluded resources
-	for _, err := range collections.ValidateScopedIncludesExcludes(request.Spec.IncludedNamespaceScopedResources, request.Spec.ExcludedNamespaceScopedResources) {
-		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid namespace-scoped included/excluded resource lists: %s", err))
+		// validate the namespace-scoped included/excluded resources
+		namespaceErr := collections.ValidateScopedIncludesExcludes(request.Spec.IncludedNamespaceScopedResources, request.Spec.ExcludedNamespaceScopedResources)
+		if len(namespaceErr) > 0 {
+			for _, err := range namespaceErr {
+				request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid namespace-scoped included/excluded resource lists: %s", err))
+			}
+		} else {
+			request.Spec.IncludedNamespaceScopedResources, request.Spec.ExcludedNamespaceScopedResources =
+				modifyResourceIncludeExclude(
+					request.Spec.IncludedNamespaceScopedResources,
+					request.Spec.ExcludedNamespaceScopedResources,
+					autoExcludeNamespaceScopedResources,
+				)
+		}
 	}
 
 	// validate the included/excluded namespaces
@@ -495,8 +584,11 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	if err != nil {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, err.Error())
 	}
+	if resourcePolicies != nil && resourcePolicies.GetIncludeExcludePolicy() != nil && collections.UseOldResourceFilters(request.Spec) {
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, "include-resources, exclude-resources and include-cluster-resources are old filter parameters.\n"+
+			"They cannot be used with include-exclude policies.")
+	}
 	request.ResPolicies = resourcePolicies
-
 	return request
 }
 
@@ -668,8 +760,8 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 
 	// native snapshots phase will either be failed or completed right away
 	// https://github.com/vmware-tanzu/velero/blob/de3ea52f0cc478e99efa7b9524c7f353514261a4/pkg/backup/item_backupper.go#L632-L639
-	backup.Status.VolumeSnapshotsAttempted = len(backup.VolumeSnapshots)
-	for _, snap := range backup.VolumeSnapshots {
+	backup.Status.VolumeSnapshotsAttempted = len(backup.VolumeSnapshots.Get())
+	for _, snap := range backup.VolumeSnapshots.Get() {
 		if snap.Status.Phase == volume.SnapshotPhaseCompleted {
 			backup.Status.VolumeSnapshotsCompleted++
 		}
@@ -749,7 +841,6 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 			fatalErrs = append(fatalErrs, errs...)
 		}
 	}
-
 	b.logger.WithField(constant.ControllerBackup, kubeutil.NamespaceAndName(backup)).Infof("Initial backup processing complete, moving to %s", backup.Status.Phase)
 
 	// if we return a non-nil error, the calling function will update
@@ -817,7 +908,7 @@ func persistBackup(backup *pkgbackup.Request,
 	}
 
 	// Velero-native volume snapshots (as opposed to CSI ones)
-	nativeVolumeSnapshots, errs := encode.ToJSONGzip(backup.VolumeSnapshots, "native volumesnapshots list")
+	nativeVolumeSnapshots, errs := encode.ToJSONGzip(backup.VolumeSnapshots.Get(), "native volumesnapshots list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
@@ -833,15 +924,6 @@ func persistBackup(backup *pkgbackup.Request,
 		persistErrs = append(persistErrs, errs...)
 	}
 
-	csiSnapshotJSON, errs := encode.ToJSONGzip(csiVolumeSnapshots, "csi volume snapshots list")
-	if errs != nil {
-		persistErrs = append(persistErrs, errs...)
-	}
-
-	csiSnapshotContentsJSON, errs := encode.ToJSONGzip(csiVolumeSnapshotContents, "csi volume snapshot contents list")
-	if errs != nil {
-		persistErrs = append(persistErrs, errs...)
-	}
 	csiSnapshotClassesJSON, errs := encode.ToJSONGzip(csiVolumeSnapshotClasses, "csi volume snapshot classes list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
@@ -877,27 +959,23 @@ func persistBackup(backup *pkgbackup.Request,
 		nativeVolumeSnapshots = nil
 		backupItemOperations = nil
 		backupResourceList = nil
-		csiSnapshotJSON = nil
-		csiSnapshotContentsJSON = nil
 		csiSnapshotClassesJSON = nil
 		backupResult = nil
 		volumeInfoJSON = nil
 	}
 
 	backupInfo := persistence.BackupInfo{
-		Name:                      backup.Name,
-		Metadata:                  backupJSON,
-		Contents:                  backupContents,
-		Log:                       backupLog,
-		BackupResults:             backupResult,
-		PodVolumeBackups:          podVolumeBackups,
-		VolumeSnapshots:           nativeVolumeSnapshots,
-		BackupItemOperations:      backupItemOperations,
-		BackupResourceList:        backupResourceList,
-		CSIVolumeSnapshots:        csiSnapshotJSON,
-		CSIVolumeSnapshotContents: csiSnapshotContentsJSON,
-		CSIVolumeSnapshotClasses:  csiSnapshotClassesJSON,
-		BackupVolumeInfo:          volumeInfoJSON,
+		Name:                     backup.Name,
+		Metadata:                 backupJSON,
+		Contents:                 backupContents,
+		Log:                      backupLog,
+		BackupResults:            backupResult,
+		PodVolumeBackups:         podVolumeBackups,
+		VolumeSnapshots:          nativeVolumeSnapshots,
+		BackupItemOperations:     backupItemOperations,
+		BackupResourceList:       backupResourceList,
+		CSIVolumeSnapshotClasses: csiSnapshotClassesJSON,
+		BackupVolumeInfo:         volumeInfoJSON,
 	}
 	if err := backupStore.PutBackup(backupInfo); err != nil {
 		persistErrs = append(persistErrs, err)
@@ -929,4 +1007,26 @@ func oldAndNewFilterParametersUsedTogether(backupSpec velerov1api.BackupSpec) bo
 		(len(backupSpec.ExcludedNamespaceScopedResources) > 0)
 
 	return haveOldResourceFilterParameters && haveNewResourceFilterParameters
+}
+
+func modifyResourceIncludeExclude(include, exclude, addedExclude []string) (modifiedInclude, modifiedExclude []string) {
+	modifiedInclude = include
+	modifiedExclude = exclude
+
+	excludeStrSet := sets.NewString(exclude...)
+	for _, ex := range addedExclude {
+		if !excludeStrSet.Has(ex) {
+			modifiedExclude = append(modifiedExclude, ex)
+		}
+	}
+
+	for _, exElem := range modifiedExclude {
+		for inIndex, inElem := range modifiedInclude {
+			if inElem == exElem {
+				modifiedInclude = slices.Delete(modifiedInclude, inIndex, inIndex+1)
+			}
+		}
+	}
+
+	return modifiedInclude, modifiedExclude
 }

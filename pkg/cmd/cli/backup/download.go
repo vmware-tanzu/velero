@@ -31,6 +31,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/cacert"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 )
 
@@ -80,7 +81,7 @@ func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.Force, "force", o.Force, "Forces the download and will overwrite file if it exists already.")
 	flags.DurationVar(&o.Timeout, "timeout", o.Timeout, "Maximum time to wait to process download request.")
 	flags.BoolVar(&o.InsecureSkipTLSVerify, "insecure-skip-tls-verify", o.InsecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
-	flags.StringVar(&o.caCertFile, "cacert", o.caCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
+	flags.StringVar(&o.caCertFile, "cacert", o.caCertFile, "Path to a certificate bundle to use when verifying TLS connections. If not specified, the CA certificate from the BackupStorageLocation will be used if available.")
 }
 
 func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
@@ -88,7 +89,7 @@ func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Fac
 	cmd.CheckError(err)
 
 	backup := new(velerov1api.Backup)
-	if err := kbClient.Get(context.TODO(), controllerclient.ObjectKey{Namespace: f.Namespace(), Name: o.Name}, backup); err != nil {
+	if err := kbClient.Get(context.Background(), controllerclient.ObjectKey{Namespace: f.Namespace(), Name: o.Name}, backup); err != nil {
 		return err
 	}
 
@@ -118,13 +119,27 @@ func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
 	kbClient, err := f.KubebuilderClient()
 	cmd.CheckError(err)
 
+	// Get the backup to fetch BSL cacert
+	backup := new(velerov1api.Backup)
+	if err := kbClient.Get(context.Background(), controllerclient.ObjectKey{Namespace: f.Namespace(), Name: o.Name}, backup); err != nil {
+		return err
+	}
+
+	// Get BSL cacert if available
+	bslCACert, err := cacert.GetCACertFromBackup(context.Background(), kbClient, f.Namespace(), backup)
+	if err != nil {
+		// Log the error but don't fail - we can still try to download without the BSL cacert
+		fmt.Fprintf(os.Stderr, "WARNING: Error getting cacert from BSL: %v\n", err)
+		bslCACert = ""
+	}
+
 	backupDest, err := os.OpenFile(o.Output, o.writeOptions, 0600)
 	if err != nil {
 		return err
 	}
 	defer backupDest.Close()
 
-	err = downloadrequest.Stream(context.Background(), kbClient, f.Namespace(), o.Name, velerov1api.DownloadTargetKindBackupContents, backupDest, o.Timeout, o.InsecureSkipTLSVerify, o.caCertFile)
+	err = downloadrequest.StreamWithBSLCACert(context.Background(), kbClient, f.Namespace(), o.Name, velerov1api.DownloadTargetKindBackupContents, backupDest, o.Timeout, o.InsecureSkipTLSVerify, o.caCertFile, bslCACert)
 	if err != nil {
 		os.Remove(o.Output)
 		cmd.CheckError(err)

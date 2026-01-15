@@ -102,6 +102,11 @@ type StatusUpdater interface {
 	UpdateStatus(obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error)
 }
 
+// Applier applies changes to an object using server-side apply
+type Applier interface {
+	Apply(name string, obj *unstructured.Unstructured, opts metav1.ApplyOptions) (*unstructured.Unstructured, error)
+}
+
 // Dynamic contains client methods that Velero needs for backing up and restoring resources.
 type Dynamic interface {
 	Creator
@@ -111,6 +116,7 @@ type Dynamic interface {
 	Patcher
 	Deletor
 	StatusUpdater
+	Applier
 }
 
 // dynamicResourceClient implements Dynamic.
@@ -134,6 +140,10 @@ func (d *dynamicResourceClient) Watch(options metav1.ListOptions) (watch.Interfa
 
 func (d *dynamicResourceClient) Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
 	return d.resourceClient.Get(context.TODO(), name, opts)
+}
+
+func (d *dynamicResourceClient) Apply(name string, obj *unstructured.Unstructured, opts metav1.ApplyOptions) (*unstructured.Unstructured, error) {
+	return d.resourceClient.Apply(context.TODO(), name, obj, opts)
 }
 
 func (d *dynamicResourceClient) Patch(name string, data []byte) (*unstructured.Unstructured, error) {

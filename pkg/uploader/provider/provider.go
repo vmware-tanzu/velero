@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -50,7 +50,7 @@ type Provider interface {
 		parentSnapshot string,
 		volMode uploader.PersistentVolumeMode,
 		uploaderCfg map[string]string,
-		updater uploader.ProgressUpdater) (string, bool, int64, error)
+		updater uploader.ProgressUpdater) (string, bool, int64, int64, error)
 	// RunRestore which will do restore for one specific volume with given snapshot id and return error
 	// updater is used for updating backup progress which implement by third-party
 	RunRestore(
@@ -74,7 +74,7 @@ func NewUploaderProvider(
 	bsl *velerov1api.BackupStorageLocation,
 	backupRepo *velerov1api.BackupRepository,
 	credGetter *credentials.CredentialGetter,
-	repoKeySelector *v1.SecretKeySelector,
+	repoKeySelector *corev1api.SecretKeySelector,
 	log logrus.FieldLogger,
 ) (Provider, error) {
 	if requesterType == "" {

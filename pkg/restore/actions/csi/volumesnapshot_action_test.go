@@ -17,11 +17,10 @@ limitations under the License.
 package csi
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -125,14 +124,20 @@ func TestVSExecute(t *testing.T) {
 		},
 		{
 			name: "Normal case, VSC should be created",
-			vs: builder.ForVolumeSnapshot("ns", "vsName").ObjectMeta(
-				builder.WithAnnotationsMap(
-					map[string]string{
-						velerov1api.VolumeSnapshotHandleAnnotation: "vsc",
-						velerov1api.DriverNameAnnotation:           "pd.csi.storage.gke.io",
-					},
-				),
-			).SourceVolumeSnapshotContentName(newVscName).Status().BoundVolumeSnapshotContentName("vscName").Result(),
+			vs: builder.ForVolumeSnapshot("ns", "vsName").
+				ObjectMeta(
+					builder.WithAnnotationsMap(
+						map[string]string{
+							velerov1api.VolumeSnapshotHandleAnnotation: "vsc",
+							velerov1api.DriverNameAnnotation:           "pd.csi.storage.gke.io",
+						},
+					),
+				).
+				SourceVolumeSnapshotContentName(newVscName).
+				VolumeSnapshotClass("vscClass").
+				Status().
+				BoundVolumeSnapshotContentName("vscName").
+				Result(),
 			restore:    builder.ForRestore("velero", "restore").ObjectMeta(builder.WithUID("restoreUID")).Result(),
 			expectErr:  false,
 			expectedVS: builder.ForVolumeSnapshot("ns", "test").SourceVolumeSnapshotContentName(newVscName).Result(),
@@ -155,7 +160,7 @@ func TestVSExecute(t *testing.T) {
 					if newNS, ok := test.restore.Spec.NamespaceMapping[test.vs.Namespace]; ok {
 						test.vs.SetNamespace(newNS)
 					}
-					require.NoError(t, p.crClient.Create(context.TODO(), test.vs))
+					require.NoError(t, p.crClient.Create(t.Context(), test.vs))
 				}
 			}
 

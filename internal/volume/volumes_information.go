@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -170,6 +170,9 @@ type SnapshotDataMovementInfo struct {
 	// Moved snapshot data size.
 	Size int64 `json:"size"`
 
+	// Moved snapshot incremental size.
+	IncrementalSize int64 `json:"incrementalSize,omitempty"`
+
 	// The DataUpload's Status.Phase value
 	Phase velerov2alpha1.DataUploadPhase
 }
@@ -217,6 +220,9 @@ type PodVolumeInfo struct {
 	// The snapshot corresponding volume size.
 	Size int64 `json:"size,omitempty"`
 
+	// The incremental snapshot size.
+	IncrementalSize int64 `json:"incrementalSize,omitempty"`
+
 	// The type of the uploader that uploads the data. The valid values are `kopia` and `restic`.
 	UploaderType string `json:"uploaderType"`
 
@@ -240,14 +246,15 @@ type PodVolumeInfo struct {
 
 func newPodVolumeInfoFromPVB(pvb *velerov1api.PodVolumeBackup) *PodVolumeInfo {
 	return &PodVolumeInfo{
-		SnapshotHandle: pvb.Status.SnapshotID,
-		Size:           pvb.Status.Progress.TotalBytes,
-		UploaderType:   pvb.Spec.UploaderType,
-		VolumeName:     pvb.Spec.Volume,
-		PodName:        pvb.Spec.Pod.Name,
-		PodNamespace:   pvb.Spec.Pod.Namespace,
-		NodeName:       pvb.Spec.Node,
-		Phase:          pvb.Status.Phase,
+		SnapshotHandle:  pvb.Status.SnapshotID,
+		Size:            pvb.Status.Progress.TotalBytes,
+		IncrementalSize: pvb.Status.IncrementalBytes,
+		UploaderType:    pvb.Spec.UploaderType,
+		VolumeName:      pvb.Spec.Volume,
+		PodName:         pvb.Spec.Pod.Name,
+		PodNamespace:    pvb.Spec.Pod.Namespace,
+		NodeName:        pvb.Spec.Node,
+		Phase:           pvb.Status.Phase,
 	}
 }
 
@@ -402,17 +409,11 @@ func (v *BackupVolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 	tmpVolumeInfos := make([]*BackupVolumeInfo, 0)
 
 	for _, volumeSnapshot := range v.volumeSnapshots {
-		var volumeSnapshotClass *snapshotv1api.VolumeSnapshotClass
 		var volumeSnapshotContent *snapshotv1api.VolumeSnapshotContent
 
 		// This is protective logic. The passed-in VS should be all related
 		// to this backup.
 		if volumeSnapshot.Labels[velerov1api.BackupNameLabel] != v.BackupName {
-			continue
-		}
-
-		if volumeSnapshot.Spec.VolumeSnapshotClassName == nil {
-			v.logger.Warnf("Cannot find VolumeSnapshotClass for VolumeSnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
 			continue
 		}
 
@@ -426,20 +427,14 @@ func (v *BackupVolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 			continue
 		}
 
-		for index := range v.volumeSnapshotClasses {
-			if *volumeSnapshot.Spec.VolumeSnapshotClassName == v.volumeSnapshotClasses[index].Name {
-				volumeSnapshotClass = &v.volumeSnapshotClasses[index]
-			}
-		}
-
 		for index := range v.volumeSnapshotContents {
 			if *volumeSnapshot.Status.BoundVolumeSnapshotContentName == v.volumeSnapshotContents[index].Name {
 				volumeSnapshotContent = &v.volumeSnapshotContents[index]
 			}
 		}
 
-		if volumeSnapshotClass == nil || volumeSnapshotContent == nil {
-			v.logger.Warnf("fail to get VolumeSnapshotContent or VolumeSnapshotClass for VolumeSnapshot: %s/%s",
+		if volumeSnapshotContent == nil {
+			v.logger.Warnf("fail to get VolumeSnapshotContent for VolumeSnapshot: %s/%s",
 				volumeSnapshot.Namespace, volumeSnapshot.Name)
 			continue
 		}
@@ -473,7 +468,7 @@ func (v *BackupVolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 				CSISnapshotInfo: &CSISnapshotInfo{
 					VSCName:        *volumeSnapshot.Status.BoundVolumeSnapshotContentName,
 					Size:           size,
-					Driver:         volumeSnapshotClass.Driver,
+					Driver:         volumeSnapshotContent.Spec.Driver,
 					SnapshotHandle: snapshotHandle,
 					OperationID:    operation.Spec.OperationID,
 					ReadyToUse:     volumeSnapshot.Status.ReadyToUse,
@@ -581,14 +576,7 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 		}
 	}
 
-	var vsClassList []snapshotv1api.VolumeSnapshotClass
-	if len(duOperationMap) > 0 {
-		var err error
-		vsClassList, err = v.getVolumeSnapshotClasses()
-		if err != nil {
-			return
-		}
-	} else {
+	if len(duOperationMap) <= 0 {
 		// No DataUpload is found. Return early.
 		return
 	}
@@ -607,13 +595,6 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 				err.Error(),
 			)
 			continue
-		}
-
-		driverUsedByVSClass := ""
-		for index := range vsClassList {
-			if vsClassList[index].Name == dataUpload.Spec.CSISnapshot.SnapshotClass {
-				driverUsedByVSClass = vsClassList[index].Driver
-			}
 		}
 
 		if pvcPVInfo := v.pvMap.retrieve(
@@ -637,7 +618,7 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 					SnapshotHandle: FieldValueIsUnknown,
 					VSCName:        FieldValueIsUnknown,
 					OperationID:    FieldValueIsUnknown,
-					Driver:         driverUsedByVSClass,
+					Driver:         dataUpload.Spec.CSISnapshot.Driver,
 				},
 				SnapshotDataMovementInfo: &SnapshotDataMovementInfo{
 					DataMover:    dataMover,

@@ -179,14 +179,6 @@ func TestSpecChangePredicate(t *testing.T) {
 	}
 }
 
-func TestNewGenericEventPredicate(t *testing.T) {
-	predicate := NewGenericEventPredicate(func(object client.Object) bool {
-		return false
-	})
-
-	assert.False(t, predicate.Generic(event.GenericEvent{}))
-}
-
 func TestNewAllEventPredicate(t *testing.T) {
 	predicate := NewAllEventPredicate(func(object client.Object) bool {
 		return false
@@ -196,4 +188,41 @@ func TestNewAllEventPredicate(t *testing.T) {
 	assert.False(t, predicate.Update(event.UpdateEvent{}))
 	assert.False(t, predicate.Delete(event.DeleteEvent{}))
 	assert.False(t, predicate.Generic(event.GenericEvent{}))
+}
+
+func TestNewGenericEventPredicate(t *testing.T) {
+	predicate := NewGenericEventPredicate(func(object client.Object) bool {
+		return false
+	})
+
+	assert.False(t, predicate.Generic(event.GenericEvent{}))
+	assert.True(t, predicate.Update(event.UpdateEvent{}))
+	assert.True(t, predicate.Create(event.CreateEvent{}))
+	assert.True(t, predicate.Delete(event.DeleteEvent{}))
+}
+
+func TestNewUpdateEventPredicate(t *testing.T) {
+	predicate := NewUpdateEventPredicate(
+		func(client.Object, client.Object) bool {
+			return false
+		},
+	)
+
+	assert.False(t, predicate.Update(event.UpdateEvent{}))
+	assert.True(t, predicate.Create(event.CreateEvent{}))
+	assert.True(t, predicate.Delete(event.DeleteEvent{}))
+	assert.True(t, predicate.Generic(event.GenericEvent{}))
+}
+
+func TestNewCreateEventPredicate(t *testing.T) {
+	predicate := NewCreateEventPredicate(
+		func(client.Object) bool {
+			return false
+		},
+	)
+
+	assert.False(t, predicate.Create(event.CreateEvent{}))
+	assert.True(t, predicate.Update(event.UpdateEvent{}))
+	assert.True(t, predicate.Generic(event.GenericEvent{}))
+	assert.True(t, predicate.Delete(event.DeleteEvent{}))
 }

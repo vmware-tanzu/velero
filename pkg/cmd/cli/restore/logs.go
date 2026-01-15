@@ -29,6 +29,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/cacert"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 )
 
@@ -53,7 +54,7 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 			cmd.CheckError(err)
 
 			restore := new(velerov1api.Restore)
-			err = kbClient.Get(context.TODO(), ctrlclient.ObjectKey{Namespace: f.Namespace(), Name: restoreName}, restore)
+			err = kbClient.Get(context.Background(), ctrlclient.ObjectKey{Namespace: f.Namespace(), Name: restoreName}, restore)
 			if apierrors.IsNotFound(err) {
 				cmd.Exit("Restore %q does not exist.", restoreName)
 			} else if err != nil {
@@ -68,14 +69,22 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 					"until the restore has a phase of Completed or Failed and try again.", restoreName)
 			}
 
-			err = downloadrequest.Stream(context.Background(), kbClient, f.Namespace(), restoreName, velerov1api.DownloadTargetKindRestoreLog, os.Stdout, timeout, insecureSkipTLSVerify, caCertFile)
+			// Get BSL cacert if available
+			bslCACert, err := cacert.GetCACertFromRestore(context.Background(), kbClient, f.Namespace(), restore)
+			if err != nil {
+				// Log the error but don't fail - we can still try to download without the BSL cacert
+				fmt.Fprintf(os.Stderr, "WARNING: Error getting cacert from BSL: %v\n", err)
+				bslCACert = ""
+			}
+
+			err = downloadrequest.StreamWithBSLCACert(context.Background(), kbClient, f.Namespace(), restoreName, velerov1api.DownloadTargetKindRestoreLog, os.Stdout, timeout, insecureSkipTLSVerify, caCertFile, bslCACert)
 			cmd.CheckError(err)
 		},
 	}
 
 	c.Flags().DurationVar(&timeout, "timeout", timeout, "How long to wait to receive logs.")
 	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
-	c.Flags().StringVar(&caCertFile, "cacert", caCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
+	c.Flags().StringVar(&caCertFile, "cacert", caCertFile, "Path to a certificate bundle to use when verifying TLS connections. If not specified, the CA certificate from the BackupStorageLocation will be used if available.")
 
 	return c
 }

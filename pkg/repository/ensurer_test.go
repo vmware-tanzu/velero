@@ -17,11 +17,12 @@ limitations under the License.
 package repository
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -80,7 +81,7 @@ func TestEnsureRepo(t *testing.T) {
 			namespace:      "fake-ns",
 			bsl:            "fake-bsl",
 			repositoryType: "fake-repo-type",
-			err:            "error getting backup repository list: no kind is registered for the type v1.BackupRepositoryList in scheme \"pkg/runtime/scheme.go:100\"",
+			err:            "error getting backup repository list: no kind is registered for the type v1.BackupRepositoryList in scheme",
 		},
 		{
 			name:           "success on existing repo",
@@ -125,11 +126,11 @@ func TestEnsureRepo(t *testing.T) {
 
 			ensurer := NewEnsurer(fakeClient, velerotest.NewLogger(), time.Millisecond)
 
-			repo, err := ensurer.EnsureRepo(context.Background(), velerov1.DefaultNamespace, test.namespace, test.bsl, test.repositoryType)
+			repo, err := ensurer.EnsureRepo(t.Context(), velerov1.DefaultNamespace, test.namespace, test.bsl, test.repositoryType)
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.ErrorContains(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.expectedRepo, repo)
@@ -138,13 +139,38 @@ func TestEnsureRepo(t *testing.T) {
 }
 
 func TestCreateBackupRepositoryAndWait(t *testing.T) {
-	bkRepoObj := NewBackupRepository(velerov1.DefaultNamespace, BackupRepositoryKey{
+	existingRepoReady := NewBackupRepository(velerov1.DefaultNamespace, BackupRepositoryKey{
 		VolumeNamespace: "fake-ns",
 		BackupLocation:  "fake-bsl",
 		RepositoryType:  "fake-repo-type",
 	})
 
-	bkRepoObj.Status.Phase = velerov1.BackupRepositoryPhaseReady
+	existingRepoReady.Status.Phase = velerov1.BackupRepositoryPhaseReady
+
+	existingRepoNotReady := NewBackupRepository(velerov1.DefaultNamespace, BackupRepositoryKey{
+		VolumeNamespace: "fake-ns",
+		BackupLocation:  "fake-bsl",
+		RepositoryType:  "fake-repo-type",
+	})
+
+	key := BackupRepositoryKey{
+		VolumeNamespace: "fake-ns",
+		BackupLocation:  "fake-bsl",
+		RepositoryType:  "fake-repo-type",
+	}
+
+	existingRepoWithUnexpectedName := &velerov1.BackupRepository{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "ake-ns-fake-bsl-fake-repo-type-xxx00",
+			Labels:    repoLabelsFromKey(key),
+		},
+		Spec: velerov1.BackupRepositorySpec{
+			VolumeNamespace:       key.VolumeNamespace,
+			BackupStorageLocation: key.BackupLocation,
+			RepositoryType:        key.RepositoryType,
+		},
+	}
 
 	scheme := runtime.NewScheme()
 	velerov1.AddToScheme(scheme)
@@ -164,7 +190,7 @@ func TestCreateBackupRepositoryAndWait(t *testing.T) {
 			namespace:      "fake-ns",
 			bsl:            "fake-bsl",
 			repositoryType: "fake-repo-type",
-			err:            "unable to create backup repository resource: no kind is registered for the type v1.BackupRepository in scheme \"pkg/runtime/scheme.go:100\"",
+			err:            "unable to create backup repository resource: no kind is registered for the type v1.BackupRepository in scheme",
 		},
 		{
 			name:           "get repo fail",
@@ -172,7 +198,7 @@ func TestCreateBackupRepositoryAndWait(t *testing.T) {
 			bsl:            "fake-bsl",
 			repositoryType: "fake-repo-type",
 			kubeClientObj: []runtime.Object{
-				bkRepoObj,
+				existingRepoWithUnexpectedName,
 			},
 			runtimeScheme: scheme,
 			err:           "failed to wait BackupRepository, errored early: more than one BackupRepository found for workload namespace \"fake-ns\", backup storage location \"fake-bsl\", repository type \"fake-repo-type\"",
@@ -184,6 +210,28 @@ func TestCreateBackupRepositoryAndWait(t *testing.T) {
 			repositoryType: "fake-repo-type",
 			runtimeScheme:  scheme,
 			err:            "failed to wait BackupRepository, timeout exceeded: backup repository not provisioned",
+		},
+		{
+			name:           "repo already exists and ready",
+			namespace:      "fake-ns",
+			bsl:            "fake-bsl",
+			repositoryType: "fake-repo-type",
+			kubeClientObj: []runtime.Object{
+				existingRepoReady,
+			},
+			runtimeScheme: scheme,
+			expectedRepo:  existingRepoReady,
+		},
+		{
+			name:           "repo already exists but not ready",
+			namespace:      "fake-ns",
+			bsl:            "fake-bsl",
+			repositoryType: "fake-repo-type",
+			kubeClientObj: []runtime.Object{
+				existingRepoNotReady,
+			},
+			runtimeScheme: scheme,
+			err:           "failed to wait BackupRepository, timeout exceeded: backup repository not provisioned",
 		},
 	}
 
@@ -198,15 +246,15 @@ func TestCreateBackupRepositoryAndWait(t *testing.T) {
 
 			ensurer := NewEnsurer(fakeClient, velerotest.NewLogger(), time.Millisecond)
 
-			repo, err := ensurer.createBackupRepositoryAndWait(context.Background(), velerov1.DefaultNamespace, BackupRepositoryKey{
+			repo, err := ensurer.createBackupRepositoryAndWait(t.Context(), velerov1.DefaultNamespace, BackupRepositoryKey{
 				VolumeNamespace: test.namespace,
 				BackupLocation:  test.bsl,
 				RepositoryType:  test.repositoryType,
 			})
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.ErrorContains(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.expectedRepo, repo)

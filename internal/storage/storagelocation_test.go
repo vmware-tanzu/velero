@@ -16,7 +16,6 @@ limitations under the License.
 package storage
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -165,10 +164,10 @@ func TestListBackupStorageLocations(t *testing.T) {
 
 			client := fake.NewClientBuilder().WithScheme(util.VeleroScheme).WithRuntimeObjects(tt.backupLocations).Build()
 			if tt.expectError {
-				_, err := ListBackupStorageLocations(context.Background(), client, "ns-1")
+				_, err := ListBackupStorageLocations(t.Context(), client, "ns-1")
 				g.Expect(err).To(HaveOccurred())
 			} else {
-				_, err := ListBackupStorageLocations(context.Background(), client, "ns-1")
+				_, err := ListBackupStorageLocations(t.Context(), client, "ns-1")
 				g.Expect(err).ToNot(HaveOccurred())
 			}
 		})

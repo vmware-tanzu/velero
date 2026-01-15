@@ -27,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -111,10 +112,10 @@ func TestOnDataUploadFailed(t *testing.T) {
 	expectedEventReason := datapath.EventReasonFailed
 	expectedEventMsg := "Data path for data upload fake-data-upload failed, error fake-error"
 
-	go bs.OnDataUploadFailed(context.TODO(), velerov1api.DefaultNamespace, dataUploadName, errors.New("fake-error"))
+	go bs.OnDataUploadFailed(t.Context(), velerov1api.DefaultNamespace, dataUploadName, errors.New("fake-error"))
 
 	result := <-bs.resultSignal
-	assert.EqualError(t, result.err, expectedErr)
+	require.EqualError(t, result.err, expectedErr)
 	assert.Equal(t, expectedEventReason, bt.EventReason())
 	assert.Equal(t, expectedEventMsg, bt.EventMessage())
 }
@@ -135,10 +136,10 @@ func TestOnDataUploadCancelled(t *testing.T) {
 	expectedEventReason := datapath.EventReasonCancelled
 	expectedEventMsg := "Data path for data upload fake-data-upload canceled"
 
-	go bs.OnDataUploadCancelled(context.TODO(), velerov1api.DefaultNamespace, dataUploadName)
+	go bs.OnDataUploadCancelled(t.Context(), velerov1api.DefaultNamespace, dataUploadName)
 
 	result := <-bs.resultSignal
-	assert.EqualError(t, result.err, expectedErr)
+	require.EqualError(t, result.err, expectedErr)
 	assert.Equal(t, expectedEventReason, bt.EventReason())
 	assert.Equal(t, expectedEventMsg, bt.EventMessage())
 }
@@ -155,7 +156,7 @@ func TestOnDataUploadCompleted(t *testing.T) {
 		{
 			name:        "marshal fail",
 			marshalErr:  errors.New("fake-marshal-error"),
-			expectedErr: "Failed to marshal backup result { false { } 0}: fake-marshal-error",
+			expectedErr: "Failed to marshal backup result { false { } 0 0}: fake-marshal-error",
 		},
 		{
 			name:                "succeed",
@@ -183,13 +184,13 @@ func TestOnDataUploadCompleted(t *testing.T) {
 
 			funcMarshal = bt.Marshal
 
-			go bs.OnDataUploadCompleted(context.TODO(), velerov1api.DefaultNamespace, dataUploadName, datapath.Result{})
+			go bs.OnDataUploadCompleted(t.Context(), velerov1api.DefaultNamespace, dataUploadName, datapath.Result{})
 
 			result := <-bs.resultSignal
 			if test.marshalErr != nil {
 				assert.EqualError(t, result.err, test.expectedErr)
 			} else {
-				assert.NoError(t, result.err)
+				require.NoError(t, result.err)
 				assert.Equal(t, test.expectedEventReason, bt.EventReason())
 				assert.Equal(t, test.expectedEventMsg, bt.EventMessage())
 			}
@@ -236,7 +237,7 @@ func TestOnDataUploadProgress(t *testing.T) {
 
 			funcMarshal = bt.Marshal
 
-			bs.OnDataUploadProgress(context.TODO(), velerov1api.DefaultNamespace, dataUploadName, &uploader.Progress{})
+			bs.OnDataUploadProgress(t.Context(), velerov1api.DefaultNamespace, dataUploadName, &uploader.Progress{})
 
 			if test.marshalErr != nil {
 				assert.False(t, bt.withEvent)
@@ -282,7 +283,7 @@ func TestCancelDataUpload(t *testing.T) {
 
 			result := <-bs.resultSignal
 
-			assert.EqualError(t, result.err, test.expectedErr)
+			require.EqualError(t, result.err, test.expectedErr)
 			assert.True(t, bt.withEvent)
 			assert.Equal(t, test.expectedEventReason, bt.EventReason())
 			assert.Equal(t, test.expectedEventMsg, bt.EventMessage())
@@ -294,7 +295,7 @@ func TestRunCancelableDataPath(t *testing.T) {
 	dataUploadName := "fake-data-upload"
 	du := builder.ForDataUpload(velerov1api.DefaultNamespace, dataUploadName).Phase(velerov2alpha1api.DataUploadPhaseNew).Result()
 	duInProgress := builder.ForDataUpload(velerov1api.DefaultNamespace, dataUploadName).Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result()
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctxTimeout, cancel := context.WithTimeout(t.Context(), time.Second)
 
 	tests := []struct {
 		name             string
@@ -321,21 +322,21 @@ func TestRunCancelableDataPath(t *testing.T) {
 		},
 		{
 			name:          "create data path fail",
-			ctx:           context.Background(),
+			ctx:           t.Context(),
 			kubeClientObj: []runtime.Object{duInProgress},
 			dataPathMgr:   datapath.NewManager(0),
 			expectedErr:   "error to create data path: Concurrent number exceeds",
 		},
 		{
 			name:          "init data path fail",
-			ctx:           context.Background(),
+			ctx:           t.Context(),
 			kubeClientObj: []runtime.Object{duInProgress},
 			initErr:       errors.New("fake-init-error"),
 			expectedErr:   "error to initialize data path: fake-init-error",
 		},
 		{
 			name:          "start data path fail",
-			ctx:           context.Background(),
+			ctx:           t.Context(),
 			kubeClientObj: []runtime.Object{duInProgress},
 			startErr:      errors.New("fake-start-error"),
 			expectedErr:   "error starting data path backup: fake-start-error",
@@ -350,7 +351,7 @@ func TestRunCancelableDataPath(t *testing.T) {
 		},
 		{
 			name:            "data path returns error",
-			ctx:             context.Background(),
+			ctx:             t.Context(),
 			kubeClientObj:   []runtime.Object{duInProgress},
 			dataPathStarted: true,
 			result: &dataPathResult{
@@ -361,7 +362,7 @@ func TestRunCancelableDataPath(t *testing.T) {
 		},
 		{
 			name:            "succeed",
-			ctx:             context.Background(),
+			ctx:             t.Context(),
 			kubeClientObj:   []runtime.Object{duInProgress},
 			dataPathStarted: true,
 			result: &dataPathResult{
@@ -386,7 +387,7 @@ func TestRunCancelableDataPath(t *testing.T) {
 			bs := &BackupMicroService{
 				namespace:      velerov1api.DefaultNamespace,
 				dataUploadName: dataUploadName,
-				ctx:            context.Background(),
+				ctx:            t.Context(),
 				client:         fakeClient,
 				dataPathMgr:    datapath.NewManager(1),
 				eventRecorder:  bt,
@@ -431,9 +432,9 @@ func TestRunCancelableDataPath(t *testing.T) {
 			result, err := bs.RunCancelableDataPath(test.ctx)
 
 			if test.expectedErr != "" {
-				assert.EqualError(t, err, test.expectedErr)
+				require.EqualError(t, err, test.expectedErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, test.result.result, result)
 			}
 

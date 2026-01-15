@@ -1,1 +1,0 @@
-Fix backup post hook issue #8159 (caused by #7571): always execute backup post hooks after PVBs are handled

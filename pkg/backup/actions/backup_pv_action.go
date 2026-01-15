@@ -76,14 +76,8 @@ func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 		pvc.Spec.Selector = nil
 	}
 
-	// remove label selectors with "velero.io/" prefixing in the key which is left by Velero restore
-	if pvc.Spec.Selector != nil && pvc.Spec.Selector.MatchLabels != nil {
-		for k := range pvc.Spec.Selector.MatchLabels {
-			if strings.HasPrefix(k, "velero.io/") {
-				delete(pvc.Spec.Selector.MatchLabels, k)
-			}
-		}
-	}
+	// Clean stale Velero labels from PVC metadata and selector
+	a.cleanupStaleVeleroLabels(pvc, backup)
 
 	pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pvc)
 	if err != nil {
@@ -91,4 +85,51 @@ func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 	}
 
 	return &unstructured.Unstructured{Object: pvcMap}, actionhelpers.RelatedItemsForPVC(pvc, a.log), nil
+}
+
+// cleanupStaleVeleroLabels removes stale Velero labels from both the PVC metadata
+// and the selector's match labels to ensure clean backups
+func (a *PVCAction) cleanupStaleVeleroLabels(pvc *corev1api.PersistentVolumeClaim, backup *v1.Backup) {
+	// Clean stale Velero labels from selector match labels
+	if pvc.Spec.Selector != nil && pvc.Spec.Selector.MatchLabels != nil {
+		for k := range pvc.Spec.Selector.MatchLabels {
+			if strings.HasPrefix(k, "velero.io/") {
+				a.log.Infof("Deleting stale Velero label %s from PVC %s selector", k, pvc.Name)
+				delete(pvc.Spec.Selector.MatchLabels, k)
+			}
+		}
+	}
+
+	// Clean stale Velero labels from main metadata
+	if pvc.Labels != nil {
+		for k, v := range pvc.Labels {
+			// Only remove labels that are clearly stale from previous operations
+			shouldRemove := false
+
+			// Always remove restore-name labels as these are from previous restores
+			if k == v1.RestoreNameLabel {
+				shouldRemove = true
+			}
+
+			if k == v1.MustIncludeAdditionalItemAnnotation {
+				shouldRemove = true
+			}
+
+			// Remove backup-name labels that don't match current backup
+			if k == v1.BackupNameLabel && v != backup.Name {
+				shouldRemove = true
+			}
+
+			// Remove volume-snapshot-name labels from previous CSI backups
+			// Note: If this backup creates new CSI snapshots, the CSI action will add them back
+			if k == v1.VolumeSnapshotLabel {
+				shouldRemove = true
+			}
+
+			if shouldRemove {
+				a.log.Infof("Deleting stale Velero label %s=%s from PVC %s", k, v, pvc.Name)
+				delete(pvc.Labels, k)
+			}
+		}
+	}
 }

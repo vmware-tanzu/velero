@@ -9,26 +9,24 @@ on:
       - '*'
 
 jobs:
+  get-go-version:
+    uses: ./.github/workflows/get-go-version.yaml
+    with:
+      ref: ${{ github.ref_name }}
 
   build:
     name: Build
     runs-on: ubuntu-latest
+    needs: get-go-version
     steps:
       - name: Check out the code
-        uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/checkout@v6
+
+      - name: Set up Go version
+        uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
-      - id: 'auth'
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: '${{ secrets.GCS_SA_KEY }}'
-      - name: 'set up GCloud SDK'
-        uses: google-github-actions/setup-gcloud@v2
-      - name: 'use gcloud CLI'
-        run: |
-          gcloud info
+          go-version: ${{ needs.get-go-version.outputs.version }}
+
       - name: Set up QEMU
         id: qemu
         uses: docker/setup-qemu-action@v3
@@ -52,12 +50,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.out
           verbose: true
-      # Use the JSON key in secret to login gcr.io
-      - uses: 'docker/login-action@v3'
-        with:
-          registry: 'gcr.io' # or REGION.docker.pkg.dev
-          username: '_json_key'
-          password: '${{ secrets.GCR_SA_KEY }}'
       # Only try to publish the container image from the root repo; forks don't have permission to do so and will always get failures.
       - name: Publish container image
         if: github.repository == 'vmware-tanzu/velero'

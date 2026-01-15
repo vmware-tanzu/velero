@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStringOfOptionalBool(t *testing.T) {
@@ -25,16 +26,16 @@ func TestStringOfOptionalBool(t *testing.T) {
 func TestSetOfOptionalBool(t *testing.T) {
 	// error
 	ob := NewOptionalBool(nil)
-	assert.Error(t, ob.Set("invalid"))
+	require.Error(t, ob.Set("invalid"))
 
 	// nil
 	ob = NewOptionalBool(nil)
-	assert.NoError(t, ob.Set(""))
+	require.NoError(t, ob.Set(""))
 	assert.Nil(t, ob.Value)
 
 	// true
 	ob = NewOptionalBool(nil)
-	assert.NoError(t, ob.Set("true"))
+	require.NoError(t, ob.Set("true"))
 	assert.True(t, *ob.Value)
 }
 

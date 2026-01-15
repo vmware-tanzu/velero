@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -42,6 +42,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	ctlcache "sigs.k8s.io/controller-runtime/pkg/cache"
@@ -52,6 +53,7 @@ type dataMoverRestoreConfig struct {
 	volumePath      string
 	volumeMode      string
 	ddName          string
+	cacheDir        string
 	resourceTimeout time.Duration
 }
 
@@ -76,7 +78,7 @@ func NewRestoreCommand(f client.Factory) *cobra.Command {
 			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
 			s, err := newdataMoverRestore(logger, f, config)
 			if err != nil {
-				exitWithMessage(logger, false, "Failed to create data mover restore, %v", err)
+				kube.ExitPodWithMessage(logger, false, "Failed to create data mover restore, %v", err)
 			}
 
 			s.run()
@@ -88,6 +90,7 @@ func NewRestoreCommand(f client.Factory) *cobra.Command {
 	command.Flags().StringVar(&config.volumePath, "volume-path", config.volumePath, "The full path of the volume to be restored")
 	command.Flags().StringVar(&config.volumeMode, "volume-mode", config.volumeMode, "The mode of the volume to be restored")
 	command.Flags().StringVar(&config.ddName, "data-download", config.ddName, "The data download name")
+	command.Flags().StringVar(&config.cacheDir, "cache-volume-path", config.cacheDir, "The full path of the cache volume")
 	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters.")
 
 	_ = command.MarkFlagRequired("volume-path")
@@ -134,7 +137,7 @@ func newdataMoverRestore(logger logrus.FieldLogger, factory client.Factory, conf
 		return nil, errors.Wrap(err, "error to add velero v2alpha1 scheme")
 	}
 
-	if err := v1.AddToScheme(scheme); err != nil {
+	if err := corev1api.AddToScheme(scheme); err != nil {
 		cancelFunc()
 		return nil, errors.Wrap(err, "error to add core v1 scheme")
 	}
@@ -145,7 +148,7 @@ func newdataMoverRestore(logger logrus.FieldLogger, factory client.Factory, conf
 	cacheOption := ctlcache.Options{
 		Scheme: scheme,
 		ByObject: map[ctlclient.Object]ctlcache.ByObject{
-			&v1.Pod{}: {
+			&corev1api.Pod{}: {
 				Field: fields.Set{"spec.nodeName": nodeName}.AsSelector(),
 			},
 			&velerov2alpha1api.DataDownload{}: {
@@ -263,7 +266,7 @@ func (s *dataMoverRestore) createDataPathService() (dataPathService, error) {
 	credentialFileStore, err := funcNewCredentialFileStore(
 		s.client,
 		s.namespace,
-		defaultCredentialsDirectory,
+		credentials.DefaultStoreDirectory(),
 		filesystem.NewFileSystem(),
 	)
 	if err != nil {
@@ -287,5 +290,5 @@ func (s *dataMoverRestore) createDataPathService() (dataPathService, error) {
 	return datamover.NewRestoreMicroService(s.ctx, s.client, s.kubeClient, s.config.ddName, s.namespace, s.nodeName, datapath.AccessPoint{
 		ByPath:  s.config.volumePath,
 		VolMode: uploader.PersistentVolumeMode(s.config.volumeMode),
-	}, s.dataPathMgr, repoEnsurer, credGetter, duInformer, s.logger), nil
+	}, s.dataPathMgr, repoEnsurer, credGetter, duInformer, s.config.cacheDir, s.logger), nil
 }

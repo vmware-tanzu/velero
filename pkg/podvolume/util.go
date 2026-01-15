@@ -17,12 +17,14 @@ limitations under the License.
 package podvolume
 
 import (
+	"fmt"
 	"strings"
 
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/podvolume/configs"
 	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
@@ -37,6 +39,7 @@ const (
 // volumeBackupInfo describes the backup info of a volume backed up by PodVolumeBackups
 type volumeBackupInfo struct {
 	snapshotID     string
+	snapshotSize   int64
 	uploaderType   string
 	repositoryType string
 }
@@ -92,6 +95,7 @@ func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, 
 
 		volumes[pvb.Spec.Volume] = volumeBackupInfo{
 			snapshotID:     pvb.Status.SnapshotID,
+			snapshotSize:   pvb.Status.Progress.TotalBytes,
 			uploaderType:   getUploaderTypeOrDefault(pvb.Spec.UploaderType),
 			repositoryType: getRepositoryType(pvb.Spec.UploaderType),
 		}
@@ -107,7 +111,7 @@ func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, 
 	}
 
 	for k, v := range fromAnnntation {
-		volumes[k] = volumeBackupInfo{v, uploader.ResticType, velerov1api.BackupRepositoryTypeRestic}
+		volumes[k] = volumeBackupInfo{v, 0, uploader.ResticType, velerov1api.BackupRepositoryTypeRestic}
 	}
 
 	return volumes
@@ -141,6 +145,19 @@ func GetSnapshotIdentifier(podVolumeBackups *velerov1api.PodVolumeBackupList) ma
 	}
 
 	return res
+}
+
+func GetRealSource(pvb *velerov1api.PodVolumeBackup) string {
+	pvcName := ""
+	if pvb.Annotations != nil {
+		pvcName = pvb.Annotations[configs.PVCNameAnnotation]
+	}
+
+	if pvcName != "" {
+		return fmt.Sprintf("%s/%s/%s", pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name, pvcName)
+	} else {
+		return fmt.Sprintf("%s/%s/%s", pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name, pvb.Spec.Volume)
+	}
 }
 
 func getUploaderTypeOrDefault(uploaderType string) string {

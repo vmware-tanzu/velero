@@ -36,8 +36,9 @@ type BackupRepositorySpec struct {
 	RepositoryType string `json:"repositoryType"`
 
 	// ResticIdentifier is the full restic-compatible string for identifying
-	// this repository.
-	ResticIdentifier string `json:"resticIdentifier"`
+	// this repository. This field is only used when RepositoryType is "restic".
+	// +optional
+	ResticIdentifier string `json:"resticIdentifier,omitempty"`
 
 	// MaintenanceFrequency is how often maintenance should be run.
 	MaintenanceFrequency metav1.Duration `json:"maintenanceFrequency"`

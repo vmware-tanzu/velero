@@ -27,8 +27,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	batchv1 "k8s.io/api/batch/v1"
-	v1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	batchv1api "k8s.io/api/batch/v1"
+	corev1api "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,15 +40,16 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	velerolabel "github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/repository/provider"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
-
-	appsv1 "k8s.io/api/apps/v1"
 )
 
-func TestGenerateJobName1(t *testing.T) {
+func TestGenerateJobName(t *testing.T) {
 	testCases := []struct {
 		repo          string
 		expectedStart string
@@ -80,75 +83,78 @@ func TestGenerateJobName1(t *testing.T) {
 }
 func TestDeleteOldJobs(t *testing.T) {
 	// Set up test repo and keep value
-	repo := "test-repo"
-	keep := 2
-
-	// Create some maintenance jobs for testing
-	var objs []client.Object
-	// Create a newer job
-	newerJob := &batchv1.Job{
+	repo := &velerov1api.BackupRepository{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "job1",
-			Namespace: "default",
-			Labels:    map[string]string{RepositoryNameLabel: repo},
+			Name:      "label with more than 63 characters should be modified",
+			Namespace: velerov1api.DefaultNamespace,
 		},
-		Spec: batchv1.JobSpec{},
 	}
-	objs = append(objs, newerJob)
-	// Create older jobs
-	for i := 2; i <= 3; i++ {
-		olderJob := &batchv1.Job{
+	keep := 1
+
+	jobArray := []client.Object{
+		&batchv1api.Job{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("job%d", i),
-				Namespace: "default",
-				Labels:    map[string]string{RepositoryNameLabel: repo},
-				CreationTimestamp: metav1.Time{
-					Time: metav1.Now().Add(time.Duration(-24*i) * time.Hour),
-				},
+				Name:      "job-0",
+				Namespace: velerov1api.DefaultNamespace,
+				Labels:    map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
 			},
-			Spec: batchv1.JobSpec{},
-		}
-		objs = append(objs, olderJob)
+			Spec: batchv1api.JobSpec{},
+		},
+		&batchv1api.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job-1",
+				Namespace: velerov1api.DefaultNamespace,
+				Labels:    map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
+			},
+			Spec: batchv1api.JobSpec{},
+		},
 	}
-	// Create a fake Kubernetes client
+
+	newJob := &batchv1api.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "job-new",
+			Namespace: velerov1api.DefaultNamespace,
+			Labels:    map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
+		},
+		Spec: batchv1api.JobSpec{},
+	}
+
+	// Create a fake Kubernetes client with 2 jobs.
 	scheme := runtime.NewScheme()
-	_ = batchv1.AddToScheme(scheme)
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
+	_ = batchv1api.AddToScheme(scheme)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(jobArray...).Build()
+
+	// Create a new job
+	require.NoError(t, cli.Create(t.Context(), newJob))
 
 	// Call the function
-	err := DeleteOldJobs(cli, repo, keep)
-	assert.NoError(t, err)
+	require.NoError(t, DeleteOldJobs(cli, *repo, keep, velerotest.NewLogger()))
 
 	// Get the remaining jobs
-	jobList := &batchv1.JobList{}
-	err = cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
-	assert.NoError(t, err)
+	jobList := &batchv1api.JobList{}
+	require.NoError(t, cli.List(t.Context(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo.Name})))
 
 	// We expect the number of jobs to be equal to 'keep'
 	assert.Len(t, jobList.Items, keep)
 
-	// We expect that the oldest jobs were deleted
-	// Job3 should not be present in the remaining list
-	assert.NotContains(t, jobList.Items, objs[2])
-
-	// Job2 should also not be present in the remaining list
-	assert.NotContains(t, jobList.Items, objs[1])
+	// Only the new created job should be left.
+	assert.Equal(t, jobList.Items[0].Name, newJob.Name)
 }
 
 func TestWaitForJobComplete(t *testing.T) {
 	// Set up test job
-	job := &batchv1.Job{
+	job := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-job",
 			Namespace: "default",
 		},
-		Status: batchv1.JobStatus{},
+		Status: batchv1api.JobStatus{},
 	}
 
 	schemeFail := runtime.NewScheme()
 
 	scheme := runtime.NewScheme()
-	batchv1.AddToScheme(scheme)
+	batchv1api.AddToScheme(scheme)
 
 	waitCompletionBackOff1 := wait.Backoff{
 		Duration: time.Second,
@@ -169,7 +175,7 @@ func TestWaitForJobComplete(t *testing.T) {
 		description   string // Test case description
 		kubeClientObj []runtime.Object
 		runtimeScheme *runtime.Scheme
-		jobStatus     batchv1.JobStatus // Job status to set for the test
+		jobStatus     batchv1api.JobStatus // Job status to set for the test
 		logBackOff    wait.Backoff
 		updateAfter   time.Duration
 		expectedLogs  int
@@ -186,7 +192,7 @@ func TestWaitForJobComplete(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				job,
 			},
-			jobStatus: batchv1.JobStatus{
+			jobStatus: batchv1api.JobStatus{
 				Succeeded: 1,
 			},
 			expectError: false,
@@ -197,7 +203,7 @@ func TestWaitForJobComplete(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				job,
 			},
-			jobStatus: batchv1.JobStatus{
+			jobStatus: batchv1api.JobStatus{
 				Failed: 1,
 			},
 			expectError: false,
@@ -245,19 +251,19 @@ func TestWaitForJobComplete(t *testing.T) {
 
 					original := job.DeepCopy()
 					job.Status.Succeeded = 1
-					err := fakeClient.Status().Patch(context.Background(), job, client.MergeFrom(original))
+					err := fakeClient.Status().Patch(t.Context(), job, client.MergeFrom(original))
 					require.NoError(t, err)
 				}()
 			}
 
 			// Call the function
-			_, err := waitForJobComplete(context.Background(), fakeClient, job.Namespace, job.Name, logger)
+			_, err := waitForJobComplete(t.Context(), fakeClient, job.Namespace, job.Name, logger)
 
 			// Check if the error matches the expectation
 			if tc.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.LessOrEqual(t, len(buffer), tc.expectedLogs)
@@ -267,7 +273,7 @@ func TestWaitForJobComplete(t *testing.T) {
 
 func TestGetResultFromJob(t *testing.T) {
 	// Set up test job
-	job := &batchv1.Job{
+	job := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-job",
 			Namespace: "default",
@@ -275,7 +281,7 @@ func TestGetResultFromJob(t *testing.T) {
 	}
 
 	// Set up test pod with no status
-	pod := &v1.Pod{
+	pod := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pod",
 			Namespace: "default",
@@ -288,21 +294,21 @@ func TestGetResultFromJob(t *testing.T) {
 
 	// test an error should be returned
 	result, err := getResultFromJob(cli, job)
-	assert.EqualError(t, err, "no pod found for job test-job")
-	assert.Equal(t, "", result)
+	require.EqualError(t, err, "no pod found for job test-job")
+	assert.Empty(t, result)
 
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 
 	// test an error should be returned
 	result, err = getResultFromJob(cli, job)
-	assert.EqualError(t, err, "no container statuses found for job test-job")
-	assert.Equal(t, "", result)
+	require.EqualError(t, err, "no container statuses found for job test-job")
+	assert.Empty(t, result)
 
 	// Set a non-terminated container status to the pod
-	pod.Status = v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
+	pod.Status = corev1api.PodStatus{
+		ContainerStatuses: []corev1api.ContainerStatus{
 			{
-				State: v1.ContainerState{},
+				State: corev1api.ContainerState{},
 			},
 		},
 	}
@@ -310,15 +316,15 @@ func TestGetResultFromJob(t *testing.T) {
 	// Test an error should be returned
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.EqualError(t, err, "container for job test-job is not terminated")
-	assert.Equal(t, "", result)
+	require.EqualError(t, err, "container for job test-job is not terminated")
+	assert.Empty(t, result)
 
 	// Set a terminated container status to the pod
-	pod.Status = v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
+	pod.Status = corev1api.PodStatus{
+		ContainerStatuses: []corev1api.ContainerStatus{
 			{
-				State: v1.ContainerState{
-					Terminated: &v1.ContainerStateTerminated{},
+				State: corev1api.ContainerState{
+					Terminated: &corev1api.ContainerStateTerminated{},
 				},
 			},
 		},
@@ -327,15 +333,15 @@ func TestGetResultFromJob(t *testing.T) {
 	// This call should return the termination message with no error
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.NoError(t, err)
-	assert.Equal(t, "", result)
+	require.NoError(t, err)
+	assert.Empty(t, result)
 
 	// Set a terminated container status with invalidate message to the pod
-	pod.Status = v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
+	pod.Status = corev1api.PodStatus{
+		ContainerStatuses: []corev1api.ContainerStatus{
 			{
-				State: v1.ContainerState{
-					Terminated: &v1.ContainerStateTerminated{
+				State: corev1api.ContainerState{
+					Terminated: &corev1api.ContainerStateTerminated{
 						Message: "fake-message",
 					},
 				},
@@ -345,15 +351,15 @@ func TestGetResultFromJob(t *testing.T) {
 
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.EqualError(t, err, "error to locate repo maintenance error indicator from termination message")
-	assert.Equal(t, "", result)
+	require.EqualError(t, err, "error to locate repo maintenance error indicator from termination message")
+	assert.Empty(t, result)
 
 	// Set a terminated container status with empty maintenance error to the pod
-	pod.Status = v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
+	pod.Status = corev1api.PodStatus{
+		ContainerStatuses: []corev1api.ContainerStatus{
 			{
-				State: v1.ContainerState{
-					Terminated: &v1.ContainerStateTerminated{
+				State: corev1api.ContainerState{
+					Terminated: &corev1api.ContainerStateTerminated{
 						Message: "Repo maintenance error: ",
 					},
 				},
@@ -363,15 +369,15 @@ func TestGetResultFromJob(t *testing.T) {
 
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.EqualError(t, err, "nothing after repo maintenance error indicator in termination message")
-	assert.Equal(t, "", result)
+	require.EqualError(t, err, "nothing after repo maintenance error indicator in termination message")
+	assert.Empty(t, result)
 
 	// Set a terminated container status with maintenance error to the pod
-	pod.Status = v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
+	pod.Status = corev1api.PodStatus{
+		ContainerStatuses: []corev1api.ContainerStatus{
 			{
-				State: v1.ContainerState{
-					Terminated: &v1.ContainerStateTerminated{
+				State: corev1api.ContainerState{
+					Terminated: &corev1api.ContainerStateTerminated{
 						Message: "Repo maintenance error: fake-error",
 					},
 				},
@@ -381,12 +387,13 @@ func TestGetResultFromJob(t *testing.T) {
 
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "fake-error", result)
 }
 
 func TestGetJobConfig(t *testing.T) {
-	ctx := context.Background()
+	keepLatestMaintenanceJobs := 1
+	ctx := t.Context()
 	logger := logrus.New()
 	veleroNamespace := "velero"
 	repoMaintenanceJobConfig := "repo-maintenance-job-config"
@@ -404,8 +411,8 @@ func TestGetJobConfig(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		repoJobConfig  *v1.ConfigMap
-		expectedConfig *JobConfigs
+		repoJobConfig  *corev1api.ConfigMap
+		expectedConfig *velerotypes.JobConfigs
 		expectedError  error
 	}{
 		{
@@ -415,7 +422,7 @@ func TestGetJobConfig(t *testing.T) {
 		},
 		{
 			name: "Invalid JSON",
-			repoJobConfig: &v1.ConfigMap{
+			repoJobConfig: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: veleroNamespace,
 					Name:      repoMaintenanceJobConfig,
@@ -429,7 +436,7 @@ func TestGetJobConfig(t *testing.T) {
 		},
 		{
 			name: "Find config specific for BackupRepository",
-			repoJobConfig: &v1.ConfigMap{
+			repoJobConfig: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: veleroNamespace,
 					Name:      repoMaintenanceJobConfig,
@@ -438,7 +445,7 @@ func TestGetJobConfig(t *testing.T) {
 					"test-default-kopia": "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}]}",
 				},
 			},
-			expectedConfig: &JobConfigs{
+			expectedConfig: &velerotypes.JobConfigs{
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					CPULimit:      "200m",
@@ -463,7 +470,7 @@ func TestGetJobConfig(t *testing.T) {
 		},
 		{
 			name: "Find config specific for global",
-			repoJobConfig: &v1.ConfigMap{
+			repoJobConfig: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: veleroNamespace,
 					Name:      repoMaintenanceJobConfig,
@@ -472,7 +479,7 @@ func TestGetJobConfig(t *testing.T) {
 					GlobalKeyForRepoMaintenanceJobCM: "{\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
 				},
 			},
-			expectedConfig: &JobConfigs{
+			expectedConfig: &velerotypes.JobConfigs{
 				PodResources: &kube.PodResources{
 					CPURequest:    "50m",
 					CPULimit:      "100m",
@@ -497,17 +504,18 @@ func TestGetJobConfig(t *testing.T) {
 		},
 		{
 			name: "Specific config supersede global config",
-			repoJobConfig: &v1.ConfigMap{
+			repoJobConfig: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: veleroNamespace,
 					Name:      repoMaintenanceJobConfig,
 				},
 				Data: map[string]string{
-					GlobalKeyForRepoMaintenanceJobCM: "{\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
+					GlobalKeyForRepoMaintenanceJobCM: "{\"keepLatestMaintenanceJobs\":1,\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
 					"test-default-kopia":             "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}]}",
 				},
 			},
-			expectedConfig: &JobConfigs{
+			expectedConfig: &velerotypes.JobConfigs{
+				KeepLatestMaintenanceJobs: &keepLatestMaintenanceJobs,
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					CPULimit:      "200m",
@@ -527,6 +535,45 @@ func TestGetJobConfig(t *testing.T) {
 						},
 					},
 				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "Configs only exist in global section should supersede specific config",
+			repoJobConfig: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: veleroNamespace,
+					Name:      repoMaintenanceJobConfig,
+				},
+				Data: map[string]string{
+					GlobalKeyForRepoMaintenanceJobCM: "{\"keepLatestMaintenanceJobs\":1,\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}],\"priorityClassName\":\"global-priority\",\"podAnnotations\":{\"global-key\":\"global-value\"},\"podLabels\":{\"global-key\":\"global-value\"}}",
+					"test-default-kopia":             "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}],\"priorityClassName\":\"specific-priority\",\"podAnnotations\":{\"specific-key\":\"specific-value\"},\"podLabels\":{\"specific-key\":\"specific-value\"}}",
+				},
+			},
+			expectedConfig: &velerotypes.JobConfigs{
+				KeepLatestMaintenanceJobs: &keepLatestMaintenanceJobs,
+				PodResources: &kube.PodResources{
+					CPURequest:    "100m",
+					CPULimit:      "200m",
+					MemoryRequest: "100Mi",
+					MemoryLimit:   "200Mi",
+				},
+				LoadAffinities: []*kube.LoadAffinity{
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "cloud.google.com/machine-family",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"e2"},
+								},
+							},
+						},
+					},
+				},
+				PriorityClassName: "global-priority",
+				PodAnnotations:    map[string]string{"global-key": "global-value"},
+				PodLabels:         map[string]string{"global-key": "global-value"},
 			},
 			expectedError: nil,
 		},
@@ -561,13 +608,13 @@ func TestGetJobConfig(t *testing.T) {
 }
 
 func TestWaitAllJobsComplete(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second*2)
 
 	veleroNamespace := "velero"
 	repo := &velerov1api.BackupRepository{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: veleroNamespace,
-			Name:      "fake-repo",
+			Name:      "label with more than 63 characters should be modified",
 		},
 		Spec: velerov1api.BackupRepositorySpec{
 			BackupStorageLocation: "default",
@@ -578,7 +625,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 
 	now := time.Now().Round(time.Second)
 
-	jobOtherLabel := &batchv1.Job{
+	jobOtherLabel := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job1",
 			Namespace:         veleroNamespace,
@@ -587,101 +634,101 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 	}
 
-	jobIncomplete := &batchv1.Job{
+	jobIncomplete := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job1",
 			Namespace:         veleroNamespace,
-			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			Labels:            map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
 			CreationTimestamp: metav1.Time{Time: now},
 		},
 	}
 
-	jobSucceeded1 := &batchv1.Job{
+	jobSucceeded1 := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job1",
 			Namespace:         veleroNamespace,
-			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			Labels:            map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
 			CreationTimestamp: metav1.Time{Time: now},
 		},
-		Status: batchv1.JobStatus{
+		Status: batchv1api.JobStatus{
 			StartTime:      &metav1.Time{Time: now},
 			CompletionTime: &metav1.Time{Time: now.Add(time.Hour)},
 			Succeeded:      1,
 		},
 	}
 
-	jobPodSucceeded1 := builder.ForPod(veleroNamespace, "job1").Labels(map[string]string{"job-name": "job1"}).ContainerStatuses(&v1.ContainerStatus{
-		State: v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{},
+	jobPodSucceeded1 := builder.ForPod(veleroNamespace, "job1").Labels(map[string]string{"job-name": "job1"}).ContainerStatuses(&corev1api.ContainerStatus{
+		State: corev1api.ContainerState{
+			Terminated: &corev1api.ContainerStateTerminated{},
 		},
 	}).Result()
 
-	jobFailed1 := &batchv1.Job{
+	jobFailed1 := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job2",
 			Namespace:         veleroNamespace,
-			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			Labels:            map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
 			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour)},
 		},
-		Status: batchv1.JobStatus{
+		Status: batchv1api.JobStatus{
 			StartTime: &metav1.Time{Time: now.Add(time.Hour)},
 			Failed:    1,
 		},
 	}
 
-	jobPodFailed1 := builder.ForPod(veleroNamespace, "job2").Labels(map[string]string{"job-name": "job2"}).ContainerStatuses(&v1.ContainerStatus{
-		State: v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{
+	jobPodFailed1 := builder.ForPod(veleroNamespace, "job2").Labels(map[string]string{"job-name": "job2"}).ContainerStatuses(&corev1api.ContainerStatus{
+		State: corev1api.ContainerState{
+			Terminated: &corev1api.ContainerStateTerminated{
 				Message: "Repo maintenance error: fake-message-2",
 			},
 		},
 	}).Result()
 
-	jobSucceeded2 := &batchv1.Job{
+	jobSucceeded2 := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job3",
 			Namespace:         veleroNamespace,
-			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			Labels:            map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
 			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour * 2)},
 		},
-		Status: batchv1.JobStatus{
+		Status: batchv1api.JobStatus{
 			StartTime:      &metav1.Time{Time: now.Add(time.Hour * 2)},
 			CompletionTime: &metav1.Time{Time: now.Add(time.Hour * 3)},
 			Succeeded:      1,
 		},
 	}
 
-	jobPodSucceeded2 := builder.ForPod(veleroNamespace, "job3").Labels(map[string]string{"job-name": "job3"}).ContainerStatuses(&v1.ContainerStatus{
-		State: v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{},
+	jobPodSucceeded2 := builder.ForPod(veleroNamespace, "job3").Labels(map[string]string{"job-name": "job3"}).ContainerStatuses(&corev1api.ContainerStatus{
+		State: corev1api.ContainerState{
+			Terminated: &corev1api.ContainerStateTerminated{},
 		},
 	}).Result()
 
-	jobSucceeded3 := &batchv1.Job{
+	jobSucceeded3 := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job4",
 			Namespace:         veleroNamespace,
-			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			Labels:            map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
 			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour * 3)},
 		},
-		Status: batchv1.JobStatus{
+		Status: batchv1api.JobStatus{
 			StartTime:      &metav1.Time{Time: now.Add(time.Hour * 3)},
 			CompletionTime: &metav1.Time{Time: now.Add(time.Hour * 4)},
 			Succeeded:      1,
 		},
 	}
 
-	jobPodSucceeded3 := builder.ForPod(veleroNamespace, "job4").Labels(map[string]string{"job-name": "job4"}).ContainerStatuses(&v1.ContainerStatus{
-		State: v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{},
+	jobPodSucceeded3 := builder.ForPod(veleroNamespace, "job4").Labels(map[string]string{"job-name": "job4"}).ContainerStatuses(&corev1api.ContainerStatus{
+		State: corev1api.ContainerState{
+			Terminated: &corev1api.ContainerStateTerminated{},
 		},
 	}).Result()
 
 	schemeFail := runtime.NewScheme()
 
 	scheme := runtime.NewScheme()
-	batchv1.AddToScheme(scheme)
-	v1.AddToScheme(scheme)
+	batchv1api.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	testCases := []struct {
 		name           string
@@ -694,7 +741,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		{
 			name:          "list job error",
 			runtimeScheme: schemeFail,
-			expectedError: "error listing maintenance job for repo fake-repo: no kind is registered for the type v1.JobList in scheme \"pkg/runtime/scheme.go:100\"",
+			expectedError: "error listing maintenance job for repo label with more than 63 characters should be modified: no kind is registered for the type v1.JobList in scheme",
 		},
 		{
 			name:          "job not exist",
@@ -718,7 +765,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 		{
 			name:          "get result error on succeeded job",
-			ctx:           context.TODO(),
+			ctx:           t.Context(),
 			runtimeScheme: scheme,
 			kubeClientObj: []runtime.Object{
 				jobSucceeded1,
@@ -733,7 +780,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 		{
 			name:          "get result error on failed job",
-			ctx:           context.TODO(),
+			ctx:           t.Context(),
 			runtimeScheme: scheme,
 			kubeClientObj: []runtime.Object{
 				jobFailed1,
@@ -748,7 +795,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 		{
 			name:          "less than limit",
-			ctx:           context.TODO(),
+			ctx:           t.Context(),
 			runtimeScheme: scheme,
 			kubeClientObj: []runtime.Object{
 				jobFailed1,
@@ -771,7 +818,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 		{
 			name:          "equal to limit",
-			ctx:           context.TODO(),
+			ctx:           t.Context(),
 			runtimeScheme: scheme,
 			kubeClientObj: []runtime.Object{
 				jobSucceeded2,
@@ -801,7 +848,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 		{
 			name:          "more than limit",
-			ctx:           context.TODO(),
+			ctx:           t.Context(),
 			runtimeScheme: scheme,
 			kubeClientObj: []runtime.Object{
 				jobSucceeded3,
@@ -843,7 +890,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 			history, err := WaitAllJobsComplete(test.ctx, fakeClient, repo, 3, velerotest.NewLogger())
 
 			if test.expectedError != "" {
-				assert.EqualError(t, err, test.expectedError)
+				require.ErrorContains(t, err, test.expectedError)
 			} else {
 				require.NoError(t, err)
 			}
@@ -867,35 +914,41 @@ func TestWaitAllJobsComplete(t *testing.T) {
 }
 
 func TestBuildJob(t *testing.T) {
-	deploy := appsv1.Deployment{
+	deploy := appsv1api.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "velero",
 			Namespace: "velero",
 		},
-		Spec: appsv1.DeploymentSpec{
-			Template: v1.PodTemplateSpec{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
+		Spec: appsv1api.DeploymentSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					SecurityContext: &corev1api.PodSecurityContext{
+						RunAsNonRoot: boolptr.True(),
+					},
+					Containers: []corev1api.Container{
 						{
 							Name:  "velero-repo-maintenance-container",
 							Image: "velero-image",
-							Env: []v1.EnvVar{
+							SecurityContext: &corev1api.SecurityContext{
+								RunAsNonRoot: boolptr.True(),
+							},
+							Env: []corev1api.EnvVar{
 								{
 									Name:  "test-name",
 									Value: "test-value",
 								},
 							},
-							EnvFrom: []v1.EnvFromSource{
+							EnvFrom: []corev1api.EnvFromSource{
 								{
-									ConfigMapRef: &v1.ConfigMapEnvSource{
-										LocalObjectReference: v1.LocalObjectReference{
+									ConfigMapRef: &corev1api.ConfigMapEnvSource{
+										LocalObjectReference: corev1api.LocalObjectReference{
 											Name: "test-configmap",
 										},
 									},
 								},
 								{
-									SecretRef: &v1.SecretEnvSource{
-										LocalObjectReference: v1.LocalObjectReference{
+									SecretRef: &corev1api.SecretEnvSource{
+										LocalObjectReference: corev1api.LocalObjectReference{
 											Name: "test-secret",
 										},
 									},
@@ -903,30 +956,41 @@ func TestBuildJob(t *testing.T) {
 							},
 						},
 					},
+					ImagePullSecrets: []corev1api.LocalObjectReference{
+						{
+							Name: "imagePullSecret1",
+						},
+					},
 				},
 			},
 		},
 	}
 
-	deploy2 := deploy
+	deploy2 := deploy.DeepCopy()
 	deploy2.Spec.Template.Labels = map[string]string{"azure.workload.identity/use": "fake-label-value"}
+	deploy2.Spec.Template.Spec.SecurityContext = nil
+	deploy2.Spec.Template.Spec.Containers[0].SecurityContext = nil
 
 	testCases := []struct {
-		name             string
-		m                *JobConfigs
-		deploy           *appsv1.Deployment
-		logLevel         logrus.Level
-		logFormat        *logging.FormatFlag
-		thirdPartyLabel  map[string]string
-		expectedJobName  string
-		expectedError    bool
-		expectedEnv      []v1.EnvVar
-		expectedEnvFrom  []v1.EnvFromSource
-		expectedPodLabel map[string]string
+		name                       string
+		m                          *velerotypes.JobConfigs
+		deploy                     *appsv1api.Deployment
+		logLevel                   logrus.Level
+		logFormat                  *logging.FormatFlag
+		expectedJobName            string
+		expectedError              bool
+		expectedEnv                []corev1api.EnvVar
+		expectedEnvFrom            []corev1api.EnvFromSource
+		expectedPodLabel           map[string]string
+		expectedPodAnnotation      map[string]string
+		expectedSecurityContext    *corev1api.SecurityContext
+		expectedPodSecurityContext *corev1api.PodSecurityContext
+		expectedImagePullSecrets   []corev1api.LocalObjectReference
+		backupRepository           *velerov1api.BackupRepository
 	}{
 		{
 			name: "Valid maintenance job without third party labels",
-			m: &JobConfigs{
+			m: &velerotypes.JobConfigs{
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					MemoryRequest: "128Mi",
@@ -939,23 +1003,23 @@ func TestBuildJob(t *testing.T) {
 			logFormat:       logging.NewFormatFlag(),
 			expectedJobName: "test-123-maintain-job",
 			expectedError:   false,
-			expectedEnv: []v1.EnvVar{
+			expectedEnv: []corev1api.EnvVar{
 				{
 					Name:  "test-name",
 					Value: "test-value",
 				},
 			},
-			expectedEnvFrom: []v1.EnvFromSource{
+			expectedEnvFrom: []corev1api.EnvFromSource{
 				{
-					ConfigMapRef: &v1.ConfigMapEnvSource{
-						LocalObjectReference: v1.LocalObjectReference{
+					ConfigMapRef: &corev1api.ConfigMapEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
 							Name: "test-configmap",
 						},
 					},
 				},
 				{
-					SecretRef: &v1.SecretEnvSource{
-						LocalObjectReference: v1.LocalObjectReference{
+					SecretRef: &corev1api.SecretEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
 							Name: "test-secret",
 						},
 					},
@@ -964,10 +1028,21 @@ func TestBuildJob(t *testing.T) {
 			expectedPodLabel: map[string]string{
 				RepositoryNameLabel: "test-123",
 			},
+			expectedSecurityContext: &corev1api.SecurityContext{
+				RunAsNonRoot: boolptr.True(),
+			},
+			expectedPodSecurityContext: &corev1api.PodSecurityContext{
+				RunAsNonRoot: boolptr.True(),
+			},
+			expectedImagePullSecrets: []corev1api.LocalObjectReference{
+				{
+					Name: "imagePullSecret1",
+				},
+			},
 		},
 		{
 			name: "Valid maintenance job with third party labels",
-			m: &JobConfigs{
+			m: &velerotypes.JobConfigs{
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					MemoryRequest: "128Mi",
@@ -975,28 +1050,28 @@ func TestBuildJob(t *testing.T) {
 					MemoryLimit:   "256Mi",
 				},
 			},
-			deploy:          &deploy2,
+			deploy:          deploy2,
 			logLevel:        logrus.InfoLevel,
 			logFormat:       logging.NewFormatFlag(),
 			expectedJobName: "test-123-maintain-job",
 			expectedError:   false,
-			expectedEnv: []v1.EnvVar{
+			expectedEnv: []corev1api.EnvVar{
 				{
 					Name:  "test-name",
 					Value: "test-value",
 				},
 			},
-			expectedEnvFrom: []v1.EnvFromSource{
+			expectedEnvFrom: []corev1api.EnvFromSource{
 				{
-					ConfigMapRef: &v1.ConfigMapEnvSource{
-						LocalObjectReference: v1.LocalObjectReference{
+					ConfigMapRef: &corev1api.ConfigMapEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
 							Name: "test-configmap",
 						},
 					},
 				},
 				{
-					SecretRef: &v1.SecretEnvSource{
-						LocalObjectReference: v1.LocalObjectReference{
+					SecretRef: &corev1api.SecretEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
 							Name: "test-secret",
 						},
 					},
@@ -1006,10 +1081,17 @@ func TestBuildJob(t *testing.T) {
 				RepositoryNameLabel:           "test-123",
 				"azure.workload.identity/use": "fake-label-value",
 			},
+			expectedSecurityContext:    nil,
+			expectedPodSecurityContext: nil,
+			expectedImagePullSecrets: []corev1api.LocalObjectReference{
+				{
+					Name: "imagePullSecret1",
+				},
+			},
 		},
 		{
 			name: "Error getting Velero server deployment",
-			m: &JobConfigs{
+			m: &velerotypes.JobConfigs{
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					MemoryRequest: "128Mi",
@@ -1021,6 +1103,126 @@ func TestBuildJob(t *testing.T) {
 			logFormat:       logging.NewFormatFlag(),
 			expectedJobName: "",
 			expectedError:   true,
+		},
+		{
+			name: "Valid maintenance job customized labels and annotations",
+			m: &velerotypes.JobConfigs{
+				PodResources: &kube.PodResources{
+					CPURequest:    "100m",
+					MemoryRequest: "128Mi",
+					CPULimit:      "200m",
+					MemoryLimit:   "256Mi",
+				},
+				PodLabels: map[string]string{
+					"global-label-1": "global-label-value-1",
+					"global-label-2": "global-label-value-2",
+				},
+				PodAnnotations: map[string]string{
+					"global-annotation-1": "global-annotation-value-1",
+					"global-annotation-2": "global-annotation-value-2",
+				},
+			},
+			deploy:          deploy2,
+			logLevel:        logrus.InfoLevel,
+			logFormat:       logging.NewFormatFlag(),
+			expectedError:   false,
+			expectedJobName: "test-123-maintain-job",
+			expectedEnv: []corev1api.EnvVar{
+				{
+					Name:  "test-name",
+					Value: "test-value",
+				},
+			},
+			expectedEnvFrom: []corev1api.EnvFromSource{
+				{
+					ConfigMapRef: &corev1api.ConfigMapEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
+							Name: "test-configmap",
+						},
+					},
+				},
+				{
+					SecretRef: &corev1api.SecretEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
+							Name: "test-secret",
+						},
+					},
+				},
+			},
+			expectedPodLabel: map[string]string{
+				"global-label-1":    "global-label-value-1",
+				"global-label-2":    "global-label-value-2",
+				RepositoryNameLabel: "test-123",
+			},
+			expectedPodAnnotation: map[string]string{
+				"global-annotation-1": "global-annotation-value-1",
+				"global-annotation-2": "global-annotation-value-2",
+			},
+			expectedSecurityContext:    nil,
+			expectedPodSecurityContext: nil,
+			expectedImagePullSecrets: []corev1api.LocalObjectReference{
+				{
+					Name: "imagePullSecret1",
+				},
+			},
+		},
+		{
+			name: "Valid maintenance job with third party labels and BackupRepository name longer than 63",
+			m: &velerotypes.JobConfigs{
+				PodResources: &kube.PodResources{
+					CPURequest:    "100m",
+					MemoryRequest: "128Mi",
+					CPULimit:      "200m",
+					MemoryLimit:   "256Mi",
+				},
+			},
+			deploy:        deploy2,
+			logLevel:      logrus.InfoLevel,
+			logFormat:     logging.NewFormatFlag(),
+			expectedError: false,
+			expectedEnv: []corev1api.EnvVar{
+				{
+					Name:  "test-name",
+					Value: "test-value",
+				},
+			},
+			expectedEnvFrom: []corev1api.EnvFromSource{
+				{
+					ConfigMapRef: &corev1api.ConfigMapEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
+							Name: "test-configmap",
+						},
+					},
+				},
+				{
+					SecretRef: &corev1api.SecretEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
+							Name: "test-secret",
+						},
+					},
+				},
+			},
+			expectedPodLabel: map[string]string{
+				RepositoryNameLabel:           velerolabel.ReturnNameOrHash("label with more than 63 characters should be modified"),
+				"azure.workload.identity/use": "fake-label-value",
+			},
+			expectedSecurityContext:    nil,
+			expectedPodSecurityContext: nil,
+			expectedImagePullSecrets: []corev1api.LocalObjectReference{
+				{
+					Name: "imagePullSecret1",
+				},
+			},
+			backupRepository: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "label with more than 63 characters should be modified",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					VolumeNamespace: "test-123",
+					RepositoryType:  "kopia",
+				},
+			},
 		},
 	}
 
@@ -1045,6 +1247,10 @@ func TestBuildJob(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.backupRepository != nil {
+				param.BackupRepo = tc.backupRepository
+			}
+
 			// Create a fake clientset with resources
 			objs := []runtime.Object{param.BackupLocation, param.BackupRepo}
 
@@ -1052,19 +1258,28 @@ func TestBuildJob(t *testing.T) {
 				objs = append(objs, tc.deploy)
 			}
 			scheme := runtime.NewScheme()
-			_ = appsv1.AddToScheme(scheme)
+			_ = appsv1api.AddToScheme(scheme)
 			_ = velerov1api.AddToScheme(scheme)
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 
 			// Call the function to test
-			job, err := buildJob(cli, context.TODO(), param.BackupRepo, param.BackupLocation.Name, tc.m, *tc.m.PodResources, tc.logLevel, tc.logFormat)
+			job, err := buildJob(
+				cli,
+				t.Context(),
+				param.BackupRepo,
+				param.BackupLocation.Name,
+				tc.m,
+				tc.logLevel,
+				tc.logFormat,
+				logrus.New(),
+			)
 
 			// Check the error
 			if tc.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, job)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, job)
 				assert.Contains(t, job.Name, tc.expectedJobName)
 				assert.Equal(t, param.BackupRepo.Namespace, job.Namespace)
@@ -1077,21 +1292,25 @@ func TestBuildJob(t *testing.T) {
 				container := job.Spec.Template.Spec.Containers[0]
 				assert.Equal(t, "velero-repo-maintenance-container", container.Name)
 				assert.Equal(t, "velero-image", container.Image)
-				assert.Equal(t, v1.PullIfNotPresent, container.ImagePullPolicy)
+				assert.Equal(t, corev1api.PullIfNotPresent, container.ImagePullPolicy)
 
 				// Check container env
 				assert.Equal(t, tc.expectedEnv, container.Env)
 				assert.Equal(t, tc.expectedEnvFrom, container.EnvFrom)
 
+				// Check security context
+				assert.Equal(t, tc.expectedPodSecurityContext, job.Spec.Template.Spec.SecurityContext)
+				assert.Equal(t, tc.expectedSecurityContext, container.SecurityContext)
+
 				// Check resources
-				expectedResources := v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse(tc.m.PodResources.CPURequest),
-						v1.ResourceMemory: resource.MustParse(tc.m.PodResources.MemoryRequest),
+				expectedResources := corev1api.ResourceRequirements{
+					Requests: corev1api.ResourceList{
+						corev1api.ResourceCPU:    resource.MustParse(tc.m.PodResources.CPURequest),
+						corev1api.ResourceMemory: resource.MustParse(tc.m.PodResources.MemoryRequest),
 					},
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse(tc.m.PodResources.CPULimit),
-						v1.ResourceMemory: resource.MustParse(tc.m.PodResources.MemoryLimit),
+					Limits: corev1api.ResourceList{
+						corev1api.ResourceCPU:    resource.MustParse(tc.m.PodResources.CPULimit),
+						corev1api.ResourceMemory: resource.MustParse(tc.m.PodResources.MemoryLimit),
 					},
 				}
 				assert.Equal(t, expectedResources, container.Resources)
@@ -1108,7 +1327,613 @@ func TestBuildJob(t *testing.T) {
 				assert.Equal(t, expectedArgs, container.Args)
 
 				assert.Equal(t, tc.expectedPodLabel, job.Spec.Template.Labels)
+
+				assert.Equal(t, tc.expectedImagePullSecrets, job.Spec.Template.Spec.ImagePullSecrets)
 			}
+		})
+	}
+}
+
+func TestGetKeepLatestMaintenanceJobs(t *testing.T) {
+	tests := []struct {
+		name                     string
+		repoMaintenanceJobConfig string
+		configMap                *corev1api.ConfigMap
+		repo                     *velerov1api.BackupRepository
+		expectedValue            int
+		expectError              bool
+	}{
+		{
+			name:                     "no config map name provided",
+			repoMaintenanceJobConfig: "",
+			configMap:                nil,
+			repo:                     mockBackupRepo(),
+			expectedValue:            3,
+			expectError:              false,
+		},
+		{
+			name:                     "config map not found",
+			repoMaintenanceJobConfig: "non-existent-config",
+			configMap:                nil,
+			repo:                     mockBackupRepo(),
+			expectedValue:            3,
+			expectError:              false,
+		},
+		{
+			name:                     "config map with global keepLatestMaintenanceJobs",
+			repoMaintenanceJobConfig: "repo-job-config",
+			configMap: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "repo-job-config",
+				},
+				Data: map[string]string{
+					"global": `{"keepLatestMaintenanceJobs": 5}`,
+				},
+			},
+			repo:          mockBackupRepo(),
+			expectedValue: 5,
+			expectError:   false,
+		},
+		{
+			name:                     "config map with specific repo keepLatestMaintenanceJobs overriding global",
+			repoMaintenanceJobConfig: "repo-job-config",
+			configMap: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "repo-job-config",
+				},
+				Data: map[string]string{
+					"global":                `{"keepLatestMaintenanceJobs": 5}`,
+					"test-ns-default-kopia": `{"keepLatestMaintenanceJobs": 10}`,
+				},
+			},
+			repo:          mockBackupRepo(),
+			expectedValue: 10,
+			expectError:   false,
+		},
+		{
+			name:                     "config map with no keepLatestMaintenanceJobs specified",
+			repoMaintenanceJobConfig: "repo-job-config",
+			configMap: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "repo-job-config",
+				},
+				Data: map[string]string{
+					"global": `{"podResources": {"cpuRequest": "100m"}}`,
+				},
+			},
+			repo:          mockBackupRepo(),
+			expectedValue: 3,
+			expectError:   false,
+		},
+		{
+			name:                     "config map with invalid JSON",
+			repoMaintenanceJobConfig: "repo-job-config",
+			configMap: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "repo-job-config",
+				},
+				Data: map[string]string{
+					"global": `{"keepLatestMaintenanceJobs": invalid}`,
+				},
+			},
+			repo:          mockBackupRepo(),
+			expectedValue: 3,
+			expectError:   true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			corev1api.AddToScheme(scheme)
+
+			var objects []runtime.Object
+			if test.configMap != nil {
+				objects = append(objects, test.configMap)
+			}
+
+			client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objects...).Build()
+			logger := velerotest.NewLogger()
+
+			result, err := GetKeepLatestMaintenanceJobs(
+				t.Context(),
+				client,
+				logger,
+				"velero",
+				test.repoMaintenanceJobConfig,
+				test.repo,
+			)
+
+			if test.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, test.expectedValue, result)
+			}
+		})
+	}
+}
+
+func mockBackupRepo() *velerov1api.BackupRepository {
+	return &velerov1api.BackupRepository{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "velero",
+			Name:      "test-repo",
+		},
+		Spec: velerov1api.BackupRepositorySpec{
+			VolumeNamespace:       "test-ns",
+			BackupStorageLocation: "default",
+			RepositoryType:        "kopia",
+		},
+	}
+}
+
+func TestGetPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		name                string
+		config              *velerotypes.JobConfigs
+		priorityClassExists bool
+		expectedValue       string
+		expectedLogContains string
+		expectedLogLevel    string
+	}{
+		{
+			name:                "empty priority class name should return empty string",
+			config:              &velerotypes.JobConfigs{PriorityClassName: ""},
+			expectedValue:       "",
+			expectedLogContains: "",
+		},
+		{
+			name:                "nil config should return empty string",
+			config:              nil,
+			expectedValue:       "",
+			expectedLogContains: "",
+		},
+		{
+			name:                "existing priority class should log info and return name",
+			config:              &velerotypes.JobConfigs{PriorityClassName: "high-priority"},
+			priorityClassExists: true,
+			expectedValue:       "high-priority",
+			expectedLogContains: "Validated priority class \\\"high-priority\\\" exists in cluster",
+			expectedLogLevel:    "info",
+		},
+		{
+			name:                "non-existing priority class should log warning and still return name",
+			config:              &velerotypes.JobConfigs{PriorityClassName: "missing-priority"},
+			priorityClassExists: false,
+			expectedValue:       "missing-priority",
+			expectedLogContains: "Priority class \\\"missing-priority\\\" not found in cluster",
+			expectedLogLevel:    "warning",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a new scheme and add necessary API types
+			localScheme := runtime.NewScheme()
+			err := schedulingv1.AddToScheme(localScheme)
+			require.NoError(t, err)
+
+			// Create fake client builder
+			clientBuilder := fake.NewClientBuilder().WithScheme(localScheme)
+
+			// Add priority class if it should exist
+			if tc.priorityClassExists {
+				priorityClass := &schedulingv1.PriorityClass{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: tc.config.PriorityClassName,
+					},
+					Value: 1000,
+				}
+				clientBuilder = clientBuilder.WithObjects(priorityClass)
+			}
+
+			client := clientBuilder.Build()
+
+			// Capture logs
+			var logBuffer strings.Builder
+			logger := logrus.New()
+			logger.SetOutput(&logBuffer)
+			logger.SetLevel(logrus.InfoLevel)
+
+			// Call the function
+			result := getPriorityClassName(t.Context(), client, tc.config, logger)
+
+			// Verify the result
+			assert.Equal(t, tc.expectedValue, result)
+
+			// Verify log output
+			logOutput := logBuffer.String()
+			if tc.expectedLogContains != "" {
+				assert.Contains(t, logOutput, tc.expectedLogContains)
+			}
+
+			// Verify log level
+			if tc.expectedLogLevel == "warning" {
+				assert.Contains(t, logOutput, "level=warning")
+			} else if tc.expectedLogLevel == "info" {
+				assert.Contains(t, logOutput, "level=info")
+			}
+		})
+	}
+}
+
+func TestBuildJobWithPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		name              string
+		priorityClassName string
+		expectedValue     string
+	}{
+		{
+			name:              "with priority class name",
+			priorityClassName: "high-priority",
+			expectedValue:     "high-priority",
+		},
+		{
+			name:              "without priority class name",
+			priorityClassName: "",
+			expectedValue:     "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a new scheme and add necessary API types
+			localScheme := runtime.NewScheme()
+			err := velerov1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			err = appsv1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			err = batchv1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			err = schedulingv1.AddToScheme(localScheme)
+			require.NoError(t, err)
+			// Create a fake client
+			client := fake.NewClientBuilder().WithScheme(localScheme).Build()
+
+			// Create a deployment with the specified priority class name
+			deployment := &appsv1api.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "velero",
+					Namespace: "velero",
+				},
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
+								{
+									Name:  "velero",
+									Image: "velero/velero:latest",
+								},
+							},
+							PriorityClassName: tc.priorityClassName,
+						},
+					},
+				},
+			}
+
+			// Create a backup repository
+			repo := &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-repo",
+					Namespace: "velero",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					VolumeNamespace:       "velero",
+					BackupStorageLocation: "default",
+				},
+			}
+
+			// Create the deployment in the fake client
+			err = client.Create(t.Context(), deployment)
+			require.NoError(t, err)
+
+			// Create minimal job configs and resources
+			jobConfig := &velerotypes.JobConfigs{
+				PriorityClassName: tc.priorityClassName,
+			}
+			logLevel := logrus.InfoLevel
+			logFormat := logging.NewFormatFlag()
+			logFormat.Set("text")
+
+			// Call buildJob
+			job, err := buildJob(client, t.Context(), repo, "default", jobConfig, logLevel, logFormat, logrus.New())
+			require.NoError(t, err)
+
+			// Verify the priority class name is set correctly
+			assert.Equal(t, tc.expectedValue, job.Spec.Template.Spec.PriorityClassName)
+		})
+	}
+}
+
+func TestBuildTolerationsForMaintenanceJob(t *testing.T) {
+	windowsToleration := corev1api.Toleration{
+		Key:      "os",
+		Operator: "Equal",
+		Effect:   "NoSchedule",
+		Value:    "windows",
+	}
+
+	testCases := []struct {
+		name                  string
+		deploymentTolerations []corev1api.Toleration
+		expectedTolerations   []corev1api.Toleration
+	}{
+		{
+			name:                  "no tolerations should only include Windows toleration",
+			deploymentTolerations: nil,
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+			},
+		},
+		{
+			name:                  "empty tolerations should only include Windows toleration",
+			deploymentTolerations: []corev1api.Toleration{},
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+			},
+		},
+		{
+			name: "non-allowed toleration should not be inherited",
+			deploymentTolerations: []corev1api.Toleration{
+				{
+					Key:      "vng-ondemand",
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "amd64",
+				},
+			},
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+			},
+		},
+		{
+			name: "allowed toleration should be inherited",
+			deploymentTolerations: []corev1api.Toleration{
+				{
+					Key:      "kubernetes.azure.com/scalesetpriority",
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "spot",
+				},
+			},
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+				{
+					Key:      "kubernetes.azure.com/scalesetpriority",
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "spot",
+				},
+			},
+		},
+		{
+			name: "mixed allowed and non-allowed tolerations should only inherit allowed",
+			deploymentTolerations: []corev1api.Toleration{
+				{
+					Key:      "vng-ondemand", // not in allowlist
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "amd64",
+				},
+				{
+					Key:      "CriticalAddonsOnly", // in allowlist
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "custom-key", // not in allowlist
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "custom-value",
+				},
+			},
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+				{
+					Key:      "CriticalAddonsOnly",
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+			},
+		},
+		{
+			name: "multiple allowed tolerations should all be inherited",
+			deploymentTolerations: []corev1api.Toleration{
+				{
+					Key:      "kubernetes.azure.com/scalesetpriority",
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "spot",
+				},
+				{
+					Key:      "CriticalAddonsOnly",
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+			},
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+				{
+					Key:      "kubernetes.azure.com/scalesetpriority",
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "spot",
+				},
+				{
+					Key:      "CriticalAddonsOnly",
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a deployment with the specified tolerations
+			deployment := &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Tolerations: tc.deploymentTolerations,
+						},
+					},
+				},
+			}
+
+			result := buildTolerationsForMaintenanceJob(deployment)
+			assert.Equal(t, tc.expectedTolerations, result)
+		})
+	}
+}
+
+func TestBuildJobWithTolerationsInheritance(t *testing.T) {
+	// Define allowed tolerations that would be set on Velero deployment
+	allowedTolerations := []corev1api.Toleration{
+		{
+			Key:      "kubernetes.azure.com/scalesetpriority",
+			Operator: "Equal",
+			Effect:   "NoSchedule",
+			Value:    "spot",
+		},
+		{
+			Key:      "CriticalAddonsOnly",
+			Operator: "Exists",
+			Effect:   "NoSchedule",
+		},
+	}
+
+	// Mixed tolerations (allowed and non-allowed)
+	mixedTolerations := []corev1api.Toleration{
+		{
+			Key:      "vng-ondemand", // not in allowlist
+			Operator: "Equal",
+			Effect:   "NoSchedule",
+			Value:    "amd64",
+		},
+		{
+			Key:      "CriticalAddonsOnly", // in allowlist
+			Operator: "Exists",
+			Effect:   "NoSchedule",
+		},
+	}
+
+	// Windows toleration that should always be present
+	windowsToleration := corev1api.Toleration{
+		Key:      "os",
+		Operator: "Equal",
+		Effect:   "NoSchedule",
+		Value:    "windows",
+	}
+
+	testCases := []struct {
+		name                  string
+		deploymentTolerations []corev1api.Toleration
+		expectedTolerations   []corev1api.Toleration
+	}{
+		{
+			name:                  "no tolerations on deployment should only have Windows toleration",
+			deploymentTolerations: nil,
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+			},
+		},
+		{
+			name:                  "allowed tolerations should be inherited along with Windows toleration",
+			deploymentTolerations: allowedTolerations,
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+				{
+					Key:      "kubernetes.azure.com/scalesetpriority",
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "spot",
+				},
+				{
+					Key:      "CriticalAddonsOnly",
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+			},
+		},
+		{
+			name:                  "mixed tolerations should only inherit allowed ones",
+			deploymentTolerations: mixedTolerations,
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+				{
+					Key:      "CriticalAddonsOnly",
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a new scheme and add necessary API types
+			localScheme := runtime.NewScheme()
+			err := velerov1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			err = appsv1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			err = batchv1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+
+			// Create a deployment with the specified tolerations
+			deployment := &appsv1api.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "velero",
+					Namespace: "velero",
+				},
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
+								{
+									Name:  "velero",
+									Image: "velero/velero:latest",
+								},
+							},
+							Tolerations: tc.deploymentTolerations,
+						},
+					},
+				},
+			}
+
+			// Create a backup repository
+			repo := &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-repo",
+					Namespace: "velero",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					VolumeNamespace:       "velero",
+					BackupStorageLocation: "default",
+				},
+			}
+
+			// Create fake client and add the deployment
+			client := fake.NewClientBuilder().WithScheme(localScheme).WithObjects(deployment).Build()
+
+			// Create minimal job configs and resources
+			jobConfig := &velerotypes.JobConfigs{}
+			logLevel := logrus.InfoLevel
+			logFormat := logging.NewFormatFlag()
+			logFormat.Set("text")
+
+			// Call buildJob
+			job, err := buildJob(client, t.Context(), repo, "default", jobConfig, logLevel, logFormat, logrus.New())
+			require.NoError(t, err)
+
+			// Verify the tolerations are set correctly
+			assert.Equal(t, tc.expectedTolerations, job.Spec.Template.Spec.Tolerations)
 		})
 	}
 }

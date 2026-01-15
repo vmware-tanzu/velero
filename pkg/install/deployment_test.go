@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -42,7 +42,7 @@ func TestDeployment(t *testing.T) {
 
 	deploy = Deployment("velero", WithImage("velero/velero:v0.11"))
 	assert.Equal(t, "velero/velero:v0.11", deploy.Spec.Template.Spec.Containers[0].Image)
-	assert.Equal(t, corev1.PullIfNotPresent, deploy.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	assert.Equal(t, corev1api.PullIfNotPresent, deploy.Spec.Template.Spec.Containers[0].ImagePullPolicy)
 
 	deploy = Deployment("velero", WithSecret(true))
 	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Env, 7)
@@ -102,4 +102,38 @@ func TestDeployment(t *testing.T) {
 
 	assert.Equal(t, "linux", deploy.Spec.Template.Spec.NodeSelector["kubernetes.io/os"])
 	assert.Equal(t, "linux", string(deploy.Spec.Template.Spec.OS.Name))
+}
+
+func TestDeploymentWithPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		name              string
+		priorityClassName string
+		expectedValue     string
+	}{
+		{
+			name:              "with priority class name",
+			priorityClassName: "high-priority",
+			expectedValue:     "high-priority",
+		},
+		{
+			name:              "without priority class name",
+			priorityClassName: "",
+			expectedValue:     "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a deployment with the priority class name option
+			var opts []podTemplateOption
+			if tc.priorityClassName != "" {
+				opts = append(opts, WithPriorityClassName(tc.priorityClassName))
+			}
+
+			deployment := Deployment("velero", opts...)
+
+			// Verify the priority class name is set correctly
+			assert.Equal(t, tc.expectedValue, deployment.Spec.Template.Spec.PriorityClassName)
+		})
+	}
 }

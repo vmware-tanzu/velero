@@ -10,6 +10,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -73,7 +74,14 @@ func (s *StorageClasssChanging) CreateResources() error {
 	}
 
 	By(fmt.Sprintf("Create namespace %s", s.namespace), func() {
-		Expect(CreateNamespace(s.Ctx, s.Client, s.namespace)).To(Succeed(),
+		nsLabels := make(map[string]string)
+		if s.VeleroCfg.WorkerOS == common.WorkerOSWindows {
+			nsLabels = map[string]string{
+				"pod-security.kubernetes.io/enforce":         "privileged",
+				"pod-security.kubernetes.io/enforce-version": "latest",
+			}
+		}
+		Expect(CreateNamespaceWithLabel(s.Ctx, s.Client, s.namespace, nsLabels)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", s.namespace))
 	})
 
@@ -82,7 +90,14 @@ func (s *StorageClasssChanging) CreateResources() error {
 		Expect(err).To(Succeed())
 		vols := CreateVolumes(pvc.Name, []string{s.volume})
 
-		deployment := NewDeployment(s.CaseBaseName, s.namespace, 1, label, nil).WithVolume(vols).Result()
+		deployment := NewDeployment(
+			s.CaseBaseName,
+			s.namespace,
+			1,
+			label,
+			s.VeleroCfg.ImageRegistryProxy,
+			s.VeleroCfg.WorkerOS,
+		).WithVolume(vols).Result()
 		deployment, err = CreateDeployment(s.Client.ClientGo, s.namespace, deployment)
 		Expect(err).To(Succeed())
 		s.deploymentName = deployment.Name

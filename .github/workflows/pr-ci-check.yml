@@ -1,18 +1,26 @@
 name: Pull Request CI Check
 on: [pull_request]
 jobs:
+  get-go-version:
+    uses: ./.github/workflows/get-go-version.yaml
+    with:
+      ref: ${{ github.event.pull_request.base.ref }}
+
   build:
     name: Run CI
+    needs: get-go-version
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
     steps:
       - name: Check out the code
-        uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/checkout@v6
+
+      - name: Set up Go version
+        uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
+          go-version: ${{ needs.get-go-version.outputs.version }}      
+
       - name: Make ci
         run: make ci
       - name: Upload test coverage
