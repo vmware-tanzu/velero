@@ -561,6 +561,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 							ep.On("GetExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 						} else if test.isPeekExposeErr {
 							ep.On("PeekExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("fake-peek-error"))
+							ep.On("DiagnoseExpose", mock.Anything, mock.Anything).Return("")
 						}
 
 						if !test.notMockCleanUp {

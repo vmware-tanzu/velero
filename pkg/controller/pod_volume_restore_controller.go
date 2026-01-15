@@ -274,6 +274,12 @@ func (r *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	} else if pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseAccepted {
 		if peekErr := r.exposer.PeekExposed(ctx, getPVROwnerObject(pvr)); peekErr != nil {
 			log.Errorf("Cancel PVR %s/%s because of expose error %s", pvr.Namespace, pvr.Name, peekErr)
+
+			diags := strings.Split(r.exposer.DiagnoseExpose(ctx, getPVROwnerObject(pvr)), "\n")
+			for _, diag := range diags {
+				log.Warnf("[Diagnose PVR expose]%s", diag)
+			}
+
 			_ = r.tryCancelPodVolumeRestore(ctx, pvr, fmt.Sprintf("found a PVR %s/%s with expose error: %s. mark it as cancel", pvr.Namespace, pvr.Name, peekErr))
 		} else if pvr.Status.AcceptedTimestamp != nil {
 			if time.Since(pvr.Status.AcceptedTimestamp.Time) >= r.preparingTimeout {

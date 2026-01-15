@@ -260,6 +260,12 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	} else if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseAccepted {
 		if peekErr := r.exposer.PeekExposed(ctx, getPVBOwnerObject(pvb)); peekErr != nil {
 			log.Errorf("Cancel PVB %s/%s because of expose error %s", pvb.Namespace, pvb.Name, peekErr)
+
+			diags := strings.Split(r.exposer.DiagnoseExpose(ctx, getPVBOwnerObject(pvb)), "\n")
+			for _, diag := range diags {
+				log.Warnf("[Diagnose PVB expose]%s", diag)
+			}
+
 			r.tryCancelPodVolumeBackup(ctx, pvb, fmt.Sprintf("found a PVB %s/%s with expose error: %s. mark it as cancel", pvb.Namespace, pvb.Name, peekErr))
 		} else if pvb.Status.AcceptedTimestamp != nil {
 			if time.Since(pvb.Status.AcceptedTimestamp.Time) >= r.preparingTimeout {
