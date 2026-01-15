@@ -63,6 +63,18 @@ func TestNewStorageClient(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, client)
 	assert.Nil(t, credential)
+
+	// custom apiVersion
+	config = map[string]string{
+		BSLConfigStorageAccount: "storage-account",
+		BSLConfigApiVersion:     "2026-01-15-test",
+		"credentialsFile":       name,
+		"useAAD":                "true",
+	}
+	client, credential, err = NewStorageClient(log, config)
+	require.NoError(t, err)
+	assert.NotNil(t, client)
+	assert.Nil(t, credential)
 }
 
 func TestGetStorageAccountCredentials(t *testing.T) {

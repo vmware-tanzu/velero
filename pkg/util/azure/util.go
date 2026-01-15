@@ -183,3 +183,17 @@ func GetFromLocationConfigOrCredential(cfg, creds map[string]string, cfgKey, cre
 	}
 	return creds[credKey]
 }
+
+// ApiVersionCustomPolicy is a azure client policy that allows changing the x-ms-version header. This is needed for azure
+// environments that may have different supported APIVersion than the defaults for the sdk
+type ApiVersionCustomPolicy struct {
+	Version string
+}
+
+func (c *ApiVersionCustomPolicy) Do(req *policy.Request) (*http.Response, error) {
+	// https://github.com/Azure/azure-sdk-for-go/issues/25289
+	if c.Version != "" {
+		req.Raw().Header["x-ms-version"] = []string{c.Version}
+	}
+	return req.Next()
+}

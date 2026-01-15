@@ -18,6 +18,7 @@ package azure
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -25,8 +26,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	azruntime "github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/cloud-provider-azure/pkg/azclient"
@@ -375,4 +380,46 @@ func TestGetFromLocationConfigOrCredential(t *testing.T) {
 	}
 	str = GetFromLocationConfigOrCredential(cfg, creds, cfgKey, credKey)
 	assert.Equal(t, "value", str)
+}
+
+type fakeCredential struct{}
+
+func (mc fakeCredential) GetToken(ctx context.Context, options policy.TokenRequestOptions) (azcore.AccessToken, error) {
+	return azcore.AccessToken{Token: "***", ExpiresOn: time.Now().Add(time.Hour)}, nil
+}
+
+func TestApiVersionCustomPolicy(t *testing.T) {
+
+	type assertRequest func(t *testing.T, req *policy.Request)
+
+	cases := []struct {
+		name       string
+		apiVersion string
+		assertFn   assertRequest
+	}{
+		{
+			name:       "empty apiVersion",
+			apiVersion: "",
+			assertFn: func(t *testing.T, req *policy.Request) {
+				assert.NotContains(t, req.Raw().Header, "x-ms-version")
+			},
+		},
+		{
+			name:       "specific apiVersion",
+			apiVersion: "2026-01-15-test",
+			assertFn: func(t *testing.T, req *policy.Request) {
+				assert.Equal(t, req.Raw().Header["x-ms-version"], []string{"2026-01-15-test"})
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &ApiVersionCustomPolicy{tt.apiVersion}
+			req, err := azruntime.NewRequest(t.Context(), "GET", "https://test")
+			require.NoError(t, err)
+			p.Do(req)
+			tt.assertFn(t, req)
+		})
+	}
 }
