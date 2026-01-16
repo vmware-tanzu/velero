@@ -128,10 +128,6 @@ func GetClientOptions(locationCfg, creds map[string]string) (policy.ClientOption
 		}
 	}
 
-	if locationCfg["apiVersion"] != "" {
-		options.APIVersion = locationCfg["apiVersion"]
-	}
-
 	return options, nil
 }
 
@@ -196,4 +192,16 @@ func (c *ApiVersionCustomPolicy) Do(req *policy.Request) (*http.Response, error)
 		req.Raw().Header["x-ms-version"] = []string{c.Version}
 	}
 	return req.Next()
+}
+
+// SetApiVersionPolicy sets an apiVersion, if provided, through x-ms-version header
+func SetApiVersionPolicy(apiVersion string, clientOptions policy.ClientOptions) policy.ClientOptions {
+	if apiVersion == "" {
+		return clientOptions
+	}
+	if clientOptions.PerCallPolicies == nil {
+		clientOptions.PerCallPolicies = []policy.Policy{}
+	}
+	clientOptions.PerCallPolicies = append(clientOptions.PerCallPolicies, &ApiVersionCustomPolicy{Version: apiVersion})
+	return clientOptions
 }

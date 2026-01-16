@@ -102,27 +102,6 @@ func TestGetClientOptions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, options.Cloud, cloud.AzurePublic)
 	assert.Nil(t, options.Transport)
-
-	// specify apiVersion
-	bslCfg = map[string]string{
-		CredentialKeyCloudName: "",
-		"apiVersion":           "2020-test",
-	}
-	creds = map[string]string{}
-	options, err = GetClientOptions(bslCfg, creds)
-	require.NoError(t, err)
-	assert.Equal(t, options.Cloud, cloud.AzurePublic)
-	assert.Equal(t, "2020-test", options.APIVersion)
-
-	// doesn't specify apiVesion
-	bslCfg = map[string]string{
-		CredentialKeyCloudName: "",
-	}
-	creds = map[string]string{}
-	options, err = GetClientOptions(bslCfg, creds)
-	require.NoError(t, err)
-	assert.Equal(t, options.Cloud, cloud.AzurePublic)
-	assert.Equal(t, "", options.APIVersion)
 }
 
 func Test_getCloudConfiguration(t *testing.T) {
@@ -422,4 +401,19 @@ func TestApiVersionCustomPolicy(t *testing.T) {
 			tt.assertFn(t, req)
 		})
 	}
+}
+
+func TestSetApiVersionPolicy(t *testing.T) {
+	clientOptions := policy.ClientOptions{}
+
+	// test no policies
+	options := SetApiVersionPolicy("2026-01-15-test", clientOptions)
+	assert.Len(t, clientOptions.PerCallPolicies, 0)
+	assert.Len(t, options.PerCallPolicies, 1)
+
+	// test existing policies
+	options2 := SetApiVersionPolicy("XXX", options)
+	assert.Len(t, clientOptions.PerCallPolicies, 0)
+	assert.Len(t, options.PerCallPolicies, 1)
+	assert.Len(t, options2.PerCallPolicies, 2)
 }

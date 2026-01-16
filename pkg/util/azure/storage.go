@@ -25,7 +25,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	_ "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/pkg/errors"
@@ -267,15 +266,8 @@ func newStorageAccountManagemenClient(bslCfg map[string]string, creds map[string
 		return nil, errors.New("subscription ID is required in BSL or credential to create the storage account client")
 	}
 
-	if creds[BSLConfigApiVersion] != "" {
-		if clientOptions.PerCallPolicies == nil {
-			clientOptions.PerCallPolicies = []policy.Policy{}
-		}
-		clientOptions.PerCallPolicies = append(clientOptions.PerCallPolicies, &ApiVersionCustomPolicy{creds[BSLConfigApiVersion]})
-	}
-
 	client, err := armstorage.NewAccountsClient(subID, cred, &arm.ClientOptions{
-		ClientOptions: clientOptions,
+		ClientOptions: SetApiVersionPolicy(bslCfg[BSLConfigApiVersion], clientOptions),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create the storage account client")
