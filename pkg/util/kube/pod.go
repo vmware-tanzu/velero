@@ -230,14 +230,9 @@ func CollectPodLogs(ctx context.Context, podGetter corev1client.CoreV1Interface,
 	return nil
 }
 
-func ToSystemAffinity(loadAffinities []*LoadAffinity) *corev1api.Affinity {
-	if len(loadAffinities) == 0 {
-		return nil
-	}
-	nodeSelectorTermList := make([]corev1api.NodeSelectorTerm, 0)
-
-	for _, loadAffinity := range loadAffinities {
-		requirements := []corev1api.NodeSelectorRequirement{}
+func ToSystemAffinity(loadAffinity *LoadAffinity, volumeTopolpogy *corev1api.NodeSelector) *corev1api.Affinity {
+	requirements := []corev1api.NodeSelectorRequirement{}
+	if loadAffinity != nil {
 		for k, v := range loadAffinity.NodeSelector.MatchLabels {
 			requirements = append(requirements, corev1api.NodeSelectorRequirement{
 				Key:      k,
@@ -253,25 +248,25 @@ func ToSystemAffinity(loadAffinities []*LoadAffinity) *corev1api.Affinity {
 				Operator: corev1api.NodeSelectorOperator(exp.Operator),
 			})
 		}
-
-		nodeSelectorTermList = append(
-			nodeSelectorTermList,
-			corev1api.NodeSelectorTerm{
-				MatchExpressions: requirements,
-			},
-		)
 	}
 
-	if len(nodeSelectorTermList) > 0 {
-		result := new(corev1api.Affinity)
-		result.NodeAffinity = new(corev1api.NodeAffinity)
-		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = new(corev1api.NodeSelector)
-		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = nodeSelectorTermList
+	result := new(corev1api.Affinity)
+	result.NodeAffinity = new(corev1api.NodeAffinity)
+	result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = new(corev1api.NodeSelector)
 
-		return result
+	if volumeTopolpogy != nil {
+		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, volumeTopolpogy.NodeSelectorTerms...)
+	} else if len(requirements) > 0 {
+		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = make([]corev1api.NodeSelectorTerm, 1)
+	} else {
+		return nil
 	}
 
-	return nil
+	for i := range result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i].MatchExpressions = append(result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i].MatchExpressions, requirements...)
+	}
+
+	return result
 }
 
 func DiagnosePod(pod *corev1api.Pod, events *corev1api.EventList) string {

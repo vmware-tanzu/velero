@@ -671,7 +671,7 @@ func buildJob(
 	}
 
 	if config != nil && len(config.LoadAffinities) > 0 {
-		affinity := kube.ToSystemAffinity(config.LoadAffinities)
+		affinity := kube.ToSystemAffinity(config.LoadAffinities[0], nil)
 		job.Spec.Template.Spec.Affinity = affinity
 	}
 

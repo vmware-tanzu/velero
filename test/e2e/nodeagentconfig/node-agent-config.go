@@ -240,7 +240,7 @@ func (n *NodeAgentConfigTestCase) Backup() error {
 	Expect(backupPodList.Items[0].Spec.PriorityClassName).To(Equal(n.nodeAgentConfigs.PriorityClassName))
 
 	// In backup, only the second element of LoadAffinity array should be used.
-	expectedAffinity := velerokubeutil.ToSystemAffinity(n.nodeAgentConfigs.LoadAffinity[1:])
+	expectedAffinity := velerokubeutil.ToSystemAffinity(n.nodeAgentConfigs.LoadAffinity[1], nil)
 
 	Expect(backupPodList.Items[0].Spec.Affinity).To(Equal(expectedAffinity))
 
@@ -317,7 +317,7 @@ func (n *NodeAgentConfigTestCase) Restore() error {
 	Expect(restorePodList.Items[0].Spec.PriorityClassName).To(Equal(n.nodeAgentConfigs.PriorityClassName))
 
 	// In restore, only the first element of LoadAffinity array should be used.
-	expectedAffinity := velerokubeutil.ToSystemAffinity(n.nodeAgentConfigs.LoadAffinity[:1])
+	expectedAffinity := velerokubeutil.ToSystemAffinity(n.nodeAgentConfigs.LoadAffinity[0], nil)
 
 	Expect(restorePodList.Items[0].Spec.Affinity).To(Equal(expectedAffinity))
 
