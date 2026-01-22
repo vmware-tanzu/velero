@@ -580,3 +580,25 @@ func GetPVAttachedNodes(ctx context.Context, pv string, storageClient storagev1.
 
 	return nodes, nil
 }
+
+func GetVolumeTopology(ctx context.Context, volumeClient corev1client.CoreV1Interface, storageClient storagev1.StorageV1Interface, pvName string, scName string) (*corev1api.NodeSelector, error) {
+	sc, err := storageClient.StorageClasses().Get(ctx, scName, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting storage class %s", scName)
+	}
+
+	if sc.VolumeBindingMode == nil || *sc.VolumeBindingMode != storagev1api.VolumeBindingWaitForFirstConsumer {
+		return nil, nil
+	}
+
+	pv, err := volumeClient.PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting PV %s", pvName)
+	}
+
+	if pv.Spec.NodeAffinity == nil {
+		return nil, nil
+	}
+
+	return pv.Spec.NodeAffinity.Required, nil
+}
