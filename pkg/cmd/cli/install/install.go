@@ -95,6 +95,7 @@ type Options struct {
 	Apply                           bool
 	ServerPriorityClassName         string
 	NodeAgentPriorityClassName      string
+	AdditionalVolumePolicyActions   flag.StringArray
 }
 
 // BindFlags adds command line values to the options struct.
@@ -217,6 +218,11 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		o.NodeAgentPriorityClassName,
 		"Priority class name for the node agent daemonset. Optional.",
 	)
+	flags.Var(
+		&o.AdditionalVolumePolicyActions,
+		"additional-volume-policy-actions",
+		"Additional (externally implemented) volume policy actions. Optional.",
+	)
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -246,8 +252,9 @@ func NewInstallOptions() *Options {
 		DefaultSnapshotMoveData:  false,
 		DisableInformerCache:     false,
 		ScheduleSkipImmediately:  false,
-		kubeletRootDir:           install.DefaultKubeletRootDir,
-		NodeAgentDisableHostPath: false,
+		kubeletRootDir:                install.DefaultKubeletRootDir,
+		NodeAgentDisableHostPath:      false,
+		AdditionalVolumePolicyActions: flag.NewStringArray(),
 	}
 }
 
@@ -327,6 +334,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		NodeAgentDisableHostPath:        o.NodeAgentDisableHostPath,
 		ServerPriorityClassName:         o.ServerPriorityClassName,
 		NodeAgentPriorityClassName:      o.NodeAgentPriorityClassName,
+		AdditionalVolumePolicyActions:   o.AdditionalVolumePolicyActions,
 	}, nil
 }
 

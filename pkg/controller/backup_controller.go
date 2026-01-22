@@ -110,6 +110,7 @@ type backupReconciler struct {
 	globalCRClient              kbclient.Client
 	itemBlockWorkerCount        int
 	concurrentBackups           int
+	additionalVolumePolicyActions []string
 }
 
 func NewBackupReconciler(
@@ -138,6 +139,7 @@ func NewBackupReconciler(
 	itemBlockWorkerCount int,
 	concurrentBackups int,
 	globalCRClient kbclient.Client,
+	additionalVolumePolicyActions []string,
 ) *backupReconciler {
 	b := &backupReconciler{
 		ctx:                         ctx,
@@ -166,6 +168,7 @@ func NewBackupReconciler(
 		itemBlockWorkerCount:        itemBlockWorkerCount,
 		concurrentBackups:           max(concurrentBackups, 1),
 		globalCRClient:              globalCRClient,
+		additionalVolumePolicyActions: additionalVolumePolicyActions,
 	}
 	b.updateTotalBackupMetric()
 	return b

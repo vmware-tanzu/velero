@@ -181,6 +181,7 @@ type Config struct {
 	RepoMaintenanceJobConfig       string
 	ItemBlockWorkerCount           int
 	ConcurrentBackups              int
+	AdditionalVolumePolicyActions  flag.StringArray
 }
 
 func GetDefaultConfig() *Config {
@@ -214,6 +215,7 @@ func GetDefaultConfig() *Config {
 		CredentialsDirectory:           credentials.DefaultStoreDirectory(),
 		ItemBlockWorkerCount:           DefaultItemBlockWorkerCount,
 		ConcurrentBackups:              DefaultConcurrentBackups,
+		AdditionalVolumePolicyActions:  flag.NewStringArray(),
 	}
 
 	return config
@@ -274,5 +276,10 @@ func (c *Config) BindFlags(flags *pflag.FlagSet) {
 		"concurrent-backups",
 		c.ConcurrentBackups,
 		"Number of backups to process concurrently. Default is one. Optional.",
+	)
+	flags.Var(
+		&c.AdditionalVolumePolicyActions,
+		"additional-volume-policy-actions",
+		"Additional (externally implemented) volume policy actions. Optional.",
 	)
 }

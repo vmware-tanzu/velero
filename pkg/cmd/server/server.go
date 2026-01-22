@@ -671,6 +671,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.ItemBlockWorkerCount,
 			s.config.ConcurrentBackups,
 			s.crClient,
+			s.config.AdditionalVolumePolicyActions,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackup)
 		}
