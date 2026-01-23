@@ -81,19 +81,6 @@ data:
           "nodeSelector": {
             "matchExpressions": [
               {
-                "key": "cloud.google.com/machine-family",
-                "operator": "In",
-                "values": [
-                  "e2"
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "nodeSelector": {
-            "matchExpressions": [
-              {
                 "key": "topology.kubernetes.io/zone",
                 "operator": "In",
                 "values": [
@@ -119,10 +106,10 @@ data:
     }
 EOF
 ```
-This sample showcases two affinity configurations:
-- matchLabels: maintenance job runs on nodes with label key `cloud.google.com/machine-family` and value `e2`.
+Notice: although loadAffinity is an array, Velero only takes the first element of the array.
+
+This sample showcases how to use affinity configuration:
 - matchLabels: maintenance job runs on nodes located in `us-central1-a`, `us-central1-b` and `us-central1-c`.
-The nodes matching one of the two conditions are selected.
 
 To create the configMap, users need to save something like the above sample to a json file and then run below command:
 ```
