@@ -256,11 +256,22 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 			},
 		}
 	} else {
-		daemonSet.Spec.Template.Spec.NodeSelector = map[string]string{
-			"kubernetes.io/os": "linux",
-		}
-		daemonSet.Spec.Template.Spec.OS = &corev1api.PodOS{
-			Name: "linux",
+		daemonSet.Spec.Template.Spec.Affinity = &corev1api.Affinity{
+			NodeAffinity: &corev1api.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+					NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+						{
+							MatchExpressions: []corev1api.NodeSelectorRequirement{
+								{
+									Key:      "kubernetes.io/os",
+									Values:   []string{"windows"},
+									Operator: corev1api.NodeSelectorOpNotIn,
+								},
+							},
+						},
+					},
+				},
+			},
 		}
 	}
 
