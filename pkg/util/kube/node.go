@@ -17,7 +17,6 @@ package kube
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -34,6 +33,11 @@ const (
 	NodeOSLabel   = "kubernetes.io/os"
 )
 
+var nodeOSMap map[string]string = map[string]string{
+	"linux":   NodeOSLinux,
+	"windows": NodeOSWindows,
+}
+
 func IsLinuxNode(ctx context.Context, nodeName string, client client.Client) error {
 	node := &corev1api.Node{}
 	if err := client.Get(ctx, types.NamespacedName{Name: nodeName}, node); err != nil {
@@ -41,12 +45,11 @@ func IsLinuxNode(ctx context.Context, nodeName string, client client.Client) err
 	}
 
 	os, found := node.Labels[NodeOSLabel]
-
 	if !found {
 		return errors.Errorf("no os type label for node %s", nodeName)
 	}
 
-	if os != NodeOSLinux {
+	if getRealOS(os) != NodeOSLinux {
 		return errors.Errorf("os type %s for node %s is not linux", os, nodeName)
 	}
 
@@ -72,7 +75,7 @@ func withOSNode(ctx context.Context, client client.Client, osType string, log lo
 	for _, node := range nodeList.Items {
 		os, found := node.Labels[NodeOSLabel]
 
-		if os == osType {
+		if getRealOS(os) == osType {
 			return true
 		}
 
@@ -98,7 +101,7 @@ func GetNodeOS(ctx context.Context, nodeName string, nodeClient corev1client.Cor
 		return "", nil
 	}
 
-	return node.Labels[NodeOSLabel], nil
+	return getRealOS(node.Labels[NodeOSLabel]), nil
 }
 
 func HasNodeWithOS(ctx context.Context, os string, nodeClient corev1client.CoreV1Interface) error {
@@ -106,14 +109,29 @@ func HasNodeWithOS(ctx context.Context, os string, nodeClient corev1client.CoreV
 		return errors.New("invalid node OS")
 	}
 
-	nodes, err := nodeClient.Nodes().List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", NodeOSLabel, os)})
+	nodes, err := nodeClient.Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "error listing nodes with OS %s", os)
 	}
 
-	if len(nodes.Items) == 0 {
-		return errors.Errorf("node with OS %s doesn't exist", os)
+	for _, node := range nodes.Items {
+		osLabel, found := node.Labels[NodeOSLabel]
+		if !found {
+			continue
+		}
+
+		if getRealOS(osLabel) == os {
+			return nil
+		}
 	}
 
-	return nil
+	return errors.Errorf("node with OS %s doesn't exist", os)
+}
+
+func getRealOS(osLabel string) string {
+	if os, found := nodeOSMap[osLabel]; !found {
+		return NodeOSLinux
+	} else {
+		return os
+	}
 }
