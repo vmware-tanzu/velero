@@ -19,3 +19,7 @@ package kopia
 import "github.com/pkg/errors"
 
 var errFlushUnsupported = errors.New("flush is not supported")
+
+type Flusher interface {
+	Flush() error
+}

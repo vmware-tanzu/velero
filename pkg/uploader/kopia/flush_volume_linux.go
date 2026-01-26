@@ -43,5 +43,5 @@ func flushVolume(dirPath string) error {
 		}
 	})
 
-	return errors.Wrapf(err, "error syncing dir %v", dirPath)
+	return errors.Wrapf(err, "error syncing fs from %v", dirPath)
 }
