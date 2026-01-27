@@ -494,8 +494,12 @@ func (e *genericRestoreExposer) createRestorePod(
 	volumeName := string(ownerObject.UID)
 
 	if selectedNode != "" {
-		affinity = &kube.LoadAffinity{}
+		affinity = nil
 		e.log.Infof("Selected node for restore pod. Ignore affinity from the node-agent config.")
+	}
+
+	if affinity == nil {
+		affinity = &kube.LoadAffinity{}
 	}
 
 	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, nodeOS)
