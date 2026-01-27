@@ -17,14 +17,31 @@ limitations under the License.
 package azure
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	azruntime "github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/cloud-provider-azure/pkg/azclient"
 )
+
+type RoundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (fn RoundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return fn(r)
+}
 
 func TestLoadCredentials(t *testing.T) {
 	// no credential file
@@ -88,23 +105,105 @@ func TestGetClientOptions(t *testing.T) {
 }
 
 func Test_getCloudConfiguration(t *testing.T) {
+	// Change the default client to be our mock here, which will respond for either a custom cloud
+	//	or AzureStackHub
+	http.DefaultClient = &http.Client{
+		Transport: RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			var content any
+			if req.URL.Path == "/metadata/endpoints" {
+				if req.Host == "management.customcloudapi.net" {
+					content = []map[string]any{
+						{
+							"authentication": map[string]any{
+								"loginEndpoint": "https://login.customcloudapi.net",
+								"audiences": []string{
+									"https://management.core.customcloudapi.net",
+									"https://management.customcloudapi.net",
+								},
+							},
+							"name": "AzureCustomCloud",
+							"suffixes": map[string]any{
+								"storage": "core.customcloudapi.net",
+							},
+							"resourceManager": "https://management.customcloudapi.net",
+						},
+					}
+				}
+				if req.Host == "management.local.azurestack.external" {
+					content = []map[string]any{
+						{
+							"authentication": map[string]any{
+								"loginEndpoint": "https://adfs.local.azurestack.external/adfs",
+								"audiences": []string{
+									"https://management.adfs.azurestack.local/1234567890",
+								},
+							},
+							"name": "AzureStack-User-1234567890",
+							"suffixes": map[string]any{
+								"storage": "local.azurestack.external",
+							},
+						},
+					}
+				}
+			}
+
+			if content != nil {
+				data, ok := json.Marshal(content)
+				if ok != nil {
+					return nil, ok
+				}
+				return &http.Response{
+					StatusCode:    http.StatusOK,
+					Status:        http.StatusText(http.StatusOK),
+					ContentLength: int64(len(data)),
+					Body:          io.NopCloser(bytes.NewBuffer(data)),
+				}, nil
+			}
+
+			return &http.Response{
+				StatusCode:    http.StatusNotFound,
+				Status:        http.StatusText(http.StatusNotFound),
+				ContentLength: 0,
+			}, nil
+		}),
+	}
 	publicCloudWithADURI := cloud.AzurePublic
 	publicCloudWithADURI.ActiveDirectoryAuthorityHost = "https://example.com"
-	cases := []struct {
-		name     string
-		bslCfg   map[string]string
-		creds    map[string]string
-		err      bool
-		expected cloud.Configuration
-	}{
-		{
-			name:   "invalid cloud name",
-			bslCfg: map[string]string{},
-			creds: map[string]string{
-				CredentialKeyCloudName: "invalid",
+	// Represents a custom AzureCloud environment
+	azureCustomCloud := cloud.Configuration{
+		ActiveDirectoryAuthorityHost: "https://login.customcloudapi.net",
+		Services: map[cloud.ServiceName]cloud.ServiceConfiguration{
+			serviceNameBlob: {
+				Endpoint: "blob.core.customcloudapi.net",
 			},
-			err: true,
+			cloud.ResourceManager: {
+				Audience: "https://management.core.customcloudapi.net",
+				Endpoint: "https://management.customcloudapi.net",
+			},
 		},
+	}
+	// Represents an AzureStackCloud environment (using ADFS)
+	azureStackCloud := cloud.Configuration{
+		ActiveDirectoryAuthorityHost: "https://adfs.local.azurestack.external/adfs",
+		Services: map[cloud.ServiceName]cloud.ServiceConfiguration{
+			serviceNameBlob: {
+				Endpoint: "blob.local.azurestack.external",
+			},
+			cloud.ResourceManager: {
+				Audience: "https://management.adfs.azurestack.local/1234567890",
+				Endpoint: "https://management.local.azurestack.external",
+			},
+		},
+	}
+	cases := []struct {
+		name      string
+		bslCfg    map[string]string
+		creds     map[string]string
+		err       bool
+		expected  cloud.Configuration
+		pretestFn func()
+		postestFn func()
+	}{
 		{
 			name:   "null cloud name",
 			bslCfg: map[string]string{},
@@ -179,14 +278,65 @@ func Test_getCloudConfiguration(t *testing.T) {
 			err:      false,
 			expected: publicCloudWithADURI,
 		},
+		{
+			name:   "azure custom cloud",
+			bslCfg: map[string]string{},
+			creds: map[string]string{
+				CredentialKeyResourceManagerEndpoint: "https://management.customcloudapi.net",
+				CredentialKeyCloudName:               "AZURECUSTOMCLOUD",
+			},
+			err:      false,
+			expected: azureCustomCloud,
+		},
+		{
+			name:   "azure stack no configuration provided",
+			bslCfg: map[string]string{},
+			creds: map[string]string{
+				CredentialKeyCloudName: "AZURESTACKCLOUD",
+			},
+			err: true,
+		},
+		{
+			name:   "azure stack cloud resourceManagerEndpoint provided",
+			bslCfg: map[string]string{},
+			creds: map[string]string{
+				CredentialKeyResourceManagerEndpoint: "https://management.local.azurestack.external",
+				// when using the ARM endpoint, the cloud name follows this pattern where the numbers match AZURE_TENANT_ID
+				CredentialKeyCloudName: "AzureStack-User-1234567890",
+			},
+			err:      false,
+			expected: azureStackCloud,
+		},
+		{
+			name:   "azure stack cloud configuration file provided",
+			bslCfg: map[string]string{},
+			creds: map[string]string{
+				CredentialKeyCloudName: "AzureStackCloud",
+			},
+			err:      false,
+			expected: azureStackCloud,
+			pretestFn: func() {
+				_, filename, _, _ := runtime.Caller(0)
+				os.Setenv(azclient.EnvironmentFilepathName, filepath.Join(filepath.Dir(filename), "testdata/azurestackcloud.json"))
+			},
+			postestFn: func() {
+				os.Setenv(azclient.EnvironmentFilepathName, "")
+			},
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			if c.pretestFn != nil {
+				c.pretestFn()
+			}
 			cfg, err := getCloudConfiguration(c.bslCfg, c.creds)
 			require.Equal(t, c.err, err != nil)
 			if !c.err {
 				assert.Equal(t, c.expected, cfg)
+			}
+			if c.postestFn != nil {
+				c.postestFn()
 			}
 		})
 	}
@@ -209,4 +359,61 @@ func TestGetFromLocationConfigOrCredential(t *testing.T) {
 	}
 	str = GetFromLocationConfigOrCredential(cfg, creds, cfgKey, credKey)
 	assert.Equal(t, "value", str)
+}
+
+type fakeCredential struct{}
+
+func (mc fakeCredential) GetToken(ctx context.Context, options policy.TokenRequestOptions) (azcore.AccessToken, error) {
+	return azcore.AccessToken{Token: "***", ExpiresOn: time.Now().Add(time.Hour)}, nil
+}
+
+func TestApiVersionCustomPolicy(t *testing.T) {
+
+	type assertRequest func(t *testing.T, req *policy.Request)
+
+	cases := []struct {
+		name       string
+		apiVersion string
+		assertFn   assertRequest
+	}{
+		{
+			name:       "empty apiVersion",
+			apiVersion: "",
+			assertFn: func(t *testing.T, req *policy.Request) {
+				assert.NotContains(t, req.Raw().Header, "x-ms-version")
+			},
+		},
+		{
+			name:       "specific apiVersion",
+			apiVersion: "2026-01-15-test",
+			assertFn: func(t *testing.T, req *policy.Request) {
+				assert.Equal(t, req.Raw().Header["x-ms-version"], []string{"2026-01-15-test"})
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &ApiVersionCustomPolicy{tt.apiVersion}
+			req, err := azruntime.NewRequest(t.Context(), "GET", "https://test")
+			require.NoError(t, err)
+			p.Do(req)
+			tt.assertFn(t, req)
+		})
+	}
+}
+
+func TestSetApiVersionPolicy(t *testing.T) {
+	clientOptions := policy.ClientOptions{}
+
+	// test no policies
+	options := SetApiVersionPolicy("2026-01-15-test", clientOptions)
+	assert.Len(t, clientOptions.PerCallPolicies, 0)
+	assert.Len(t, options.PerCallPolicies, 1)
+
+	// test existing policies
+	options2 := SetApiVersionPolicy("XXX", options)
+	assert.Len(t, clientOptions.PerCallPolicies, 0)
+	assert.Len(t, options.PerCallPolicies, 1)
+	assert.Len(t, options2.PerCallPolicies, 2)
 }

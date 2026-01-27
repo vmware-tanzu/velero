@@ -41,6 +41,7 @@ const (
 	BSLConfigStorageAccountURI           = "storageAccountURI"
 	BSLConfigUseAAD                      = "useAAD"
 	BSLConfigActiveDirectoryAuthorityURI = "activeDirectoryAuthorityURI"
+	BSLConfigApiVersion                  = "apiVersion"
 
 	serviceNameBlob cloud.ServiceName = "blob"
 )
@@ -266,7 +267,7 @@ func newStorageAccountManagemenClient(bslCfg map[string]string, creds map[string
 	}
 
 	client, err := armstorage.NewAccountsClient(subID, cred, &arm.ClientOptions{
-		ClientOptions: clientOptions,
+		ClientOptions: SetApiVersionPolicy(bslCfg[BSLConfigApiVersion], clientOptions),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create the storage account client")
