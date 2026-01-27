@@ -655,6 +655,10 @@ func (e *csiSnapshotExposer) createBackupPod(
 	args = append(args, podInfo.logFormatArgs...)
 	args = append(args, podInfo.logLevelArgs...)
 
+	if affinity == nil {
+		affinity = &kube.LoadAffinity{}
+	}
+
 	var securityCtx *corev1api.PodSecurityContext
 	nodeSelector := map[string]string{}
 	podOS := corev1api.PodOS{}
@@ -666,8 +670,13 @@ func (e *csiSnapshotExposer) createBackupPod(
 			},
 		}
 
-		nodeSelector[kube.NodeOSLabel] = kube.NodeOSWindows
 		podOS.Name = kube.NodeOSWindows
+
+		affinity.NodeSelector.MatchExpressions = append(affinity.NodeSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+			Key:      kube.NodeOSLabel,
+			Values:   []string{kube.NodeOSWindows},
+			Operator: metav1.LabelSelectorOpIn,
+		})
 
 		toleration = append(toleration, []corev1api.Toleration{
 			{
@@ -695,8 +704,13 @@ func (e *csiSnapshotExposer) createBackupPod(
 			}
 		}
 
-		nodeSelector[kube.NodeOSLabel] = kube.NodeOSLinux
 		podOS.Name = kube.NodeOSLinux
+
+		affinity.NodeSelector.MatchExpressions = append(affinity.NodeSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+			Key:      kube.NodeOSLabel,
+			Values:   []string{kube.NodeOSWindows},
+			Operator: metav1.LabelSelectorOpNotIn,
+		})
 	}
 
 	var podAffinity *corev1api.Affinity
