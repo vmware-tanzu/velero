@@ -33,7 +33,7 @@ const (
 	NodeOSLabel   = "kubernetes.io/os"
 )
 
-var nodeOSMap map[string]string = map[string]string{
+var realNodeOSMap map[string]string = map[string]string{
 	"linux":   NodeOSLinux,
 	"windows": NodeOSWindows,
 }
@@ -129,7 +129,7 @@ func HasNodeWithOS(ctx context.Context, os string, nodeClient corev1client.CoreV
 }
 
 func getRealOS(osLabel string) string {
-	if os, found := nodeOSMap[osLabel]; !found {
+	if os, found := realNodeOSMap[osLabel]; !found {
 		return NodeOSLinux
 	} else {
 		return os

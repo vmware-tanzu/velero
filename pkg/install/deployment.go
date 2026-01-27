@@ -364,11 +364,25 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1api.Deployme
 				Spec: corev1api.PodSpec{
 					RestartPolicy:      corev1api.RestartPolicyAlways,
 					ServiceAccountName: c.serviceAccountName,
-					NodeSelector: map[string]string{
-						"kubernetes.io/os": "linux",
-					},
 					OS: &corev1api.PodOS{
 						Name: "linux",
+					},
+					Affinity: &corev1api.Affinity{
+						NodeAffinity: &corev1api.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+								NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+									{
+										MatchExpressions: []corev1api.NodeSelectorRequirement{
+											{
+												Key:      "kubernetes.io/os",
+												Values:   []string{"windows"},
+												Operator: corev1api.NodeSelectorOpNotIn,
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 					Containers: []corev1api.Container{
 						{
