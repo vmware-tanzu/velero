@@ -307,6 +307,16 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	backupScheduleName := request.GetLabels()[velerov1api.ScheduleNameLabel]
 
+	b.backupTracker.Add(request.Namespace, request.Name)
+	defer func() {
+		switch request.Status.Phase {
+		case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed, velerov1api.BackupPhaseFailedValidation:
+			b.backupTracker.Delete(request.Namespace, request.Name)
+		case velerov1api.BackupPhaseWaitingForPluginOperations, velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed, velerov1api.BackupPhaseFinalizing, velerov1api.BackupPhaseFinalizingPartiallyFailed:
+			b.backupTracker.AddPostProcessing(request.Namespace, request.Name)
+		}
+	}()
+
 	if request.Status.Phase == velerov1api.BackupPhaseFailedValidation {
 		log.Debug("failed to validate backup status")
 		b.metrics.RegisterBackupValidationFailure(backupScheduleName)
@@ -317,16 +327,6 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// store ref to just-updated item for creating patch
 	original = request.Backup.DeepCopy()
-
-	b.backupTracker.Add(request.Namespace, request.Name)
-	defer func() {
-		switch request.Status.Phase {
-		case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed, velerov1api.BackupPhaseFailedValidation:
-			b.backupTracker.Delete(request.Namespace, request.Name)
-		case velerov1api.BackupPhaseWaitingForPluginOperations, velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed, velerov1api.BackupPhaseFinalizing, velerov1api.BackupPhaseFinalizingPartiallyFailed:
-			b.backupTracker.AddPostProcessing(request.Namespace, request.Name)
-		}
-	}()
 
 	log.Debug("Running backup")
 
