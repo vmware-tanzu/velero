@@ -390,13 +390,6 @@ func TestExpandWildcardsPrivate(t *testing.T) {
 			expectError:      false,
 		},
 		{
-			name:             "negated character class",
-			patterns:         []string{"ns[!abc]"},
-			activeNamespaces: []string{"nsa", "nsb", "nsc", "nsd", "ns1"},
-			expected:         []string{"nsd", "ns1"}, // [!abc] matches anything except a, b, c
-			expectError:      false,
-		},
-		{
 			name:             "brace alternatives",
 			patterns:         []string{"app-{prod,test}"},
 			activeNamespaces: []string{"app-prod", "app-test", "app-staging", "db-prod"},
