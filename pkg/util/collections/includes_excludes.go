@@ -666,10 +666,20 @@ func validateNamespaceName(ns string) []error {
 		return nil
 	}
 
-	// Kubernetes does not allow asterisks in namespaces but Velero uses them as
-	// wildcards. Replace asterisks with an arbitrary letter to pass Kubernetes
-	// validation.
-	tmpNamespace := strings.ReplaceAll(ns, "*", "x")
+	// Kubernetes does not allow wildcard characters in namespaces but Velero uses them
+	// for glob patterns. Replace wildcard characters with valid characters to pass
+	// Kubernetes validation.
+	tmpNamespace := ns
+
+	// Replace glob wildcard characters with valid alphanumeric characters
+	// Note: Validation of wildcard patterns is handled by the wildcard package.
+	tmpNamespace = strings.ReplaceAll(tmpNamespace, "*", "x") // matches any sequence
+	tmpNamespace = strings.ReplaceAll(tmpNamespace, "?", "x") // matches single character
+	tmpNamespace = strings.ReplaceAll(tmpNamespace, "{", "x") // brace expansion start
+	tmpNamespace = strings.ReplaceAll(tmpNamespace, "}", "x") // brace expansion end
+	tmpNamespace = strings.ReplaceAll(tmpNamespace, ",", "x") // brace expansion separator
+	tmpNamespace = strings.ReplaceAll(tmpNamespace, "[", "x") // character class start
+	tmpNamespace = strings.ReplaceAll(tmpNamespace, "]", "x") // character class end
 
 	if errMsgs := validation.ValidateNamespaceName(tmpNamespace, false); errMsgs != nil {
 		for _, msg := range errMsgs {
