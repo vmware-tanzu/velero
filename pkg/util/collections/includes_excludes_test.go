@@ -289,6 +289,60 @@ func TestValidateNamespaceIncludesExcludes(t *testing.T) {
 			excludes: []string{"bar"},
 			wantErr:  true,
 		},
+		{
+			name:     "glob characters in includes should not error",
+			includes: []string{"kube-*", "test-?", "app-{prod,dev}", "ns-[0-9]"},
+			excludes: []string{},
+			wantErr:  false,
+		},
+		{
+			name:     "glob characters in excludes should not error",
+			includes: []string{"default"},
+			excludes: []string{"test-*", "app-?", "env-{a,b}", "ns-[1-5]"},
+			wantErr:  false,
+		},
+		{
+			name:     "brace expansion in includes should not error",
+			includes: []string{"namespace-{prod,staging,dev}"},
+			excludes: []string{},
+			wantErr:  false,
+		},
+		{
+			name:     "character class in includes should not error",
+			includes: []string{"ns-[abc]", "test-[0-9]"},
+			excludes: []string{},
+			wantErr:  false,
+		},
+		{
+			name:     "mixed glob patterns should not error",
+			includes: []string{"kube-*", "test-?", "app-{a,b}"},
+			excludes: []string{"*-test", "debug-[0-9]"},
+			wantErr:  false,
+		},
+		{
+			name:     "pipe character in includes should error",
+			includes: []string{"namespace|other"},
+			excludes: []string{},
+			wantErr:  true,
+		},
+		{
+			name:     "parentheses in includes should error",
+			includes: []string{"namespace(prod)", "test-(dev)"},
+			excludes: []string{},
+			wantErr:  true,
+		},
+		{
+			name:     "exclamation mark in includes should error",
+			includes: []string{"!namespace", "test!"},
+			excludes: []string{},
+			wantErr:  true,
+		},
+		{
+			name:     "unsupported characters in excludes should error",
+			includes: []string{"default"},
+			excludes: []string{"test|prod", "app(staging)"},
+			wantErr:  true,
+		},
 	}
 
 	for _, tc := range tests {
