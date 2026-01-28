@@ -42,7 +42,7 @@ func validateWildcardPatterns(patterns []string) error {
 	for _, pattern := range patterns {
 		// Check for invalid characters that are not supported in glob patterns
 		if strings.ContainsAny(pattern, "|()!") {
-			return errors.New("wildcard pattern contains unsupported characters: |, (, ), !")
+			return errors.New("wildcard pattern contains unsupported characters: |, (, ), ! ")
 		}
 
 		// Check for consecutive asterisks (2 or more)
