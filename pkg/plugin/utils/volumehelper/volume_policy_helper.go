@@ -74,10 +74,13 @@ func ShouldPerformSnapshotWithVolumeHelper(
 	}
 
 	// Otherwise, create a new VolumeHelper (original behavior for third-party plugins)
+	// No need to validate policies here as this has already happened for the backup.
 	resourcePolicies, err := resourcepolicies.GetResourcePoliciesFromBackup(
 		backup,
 		crClient,
 		logger,
+		nil,
+		false,
 	)
 	if err != nil {
 		return false, err

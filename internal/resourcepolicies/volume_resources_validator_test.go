@@ -83,9 +83,10 @@ func TestCapacityConditionValidate(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	testCases := []struct {
-		name    string
-		res     *ResourcePolicies
-		wantErr bool
+		name              string
+		res               *ResourcePolicies
+		additionalActions []string
+		wantErr           bool
 	}{
 		{
 			name: "unknown key in yaml",
@@ -243,6 +244,66 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			wantErr: true,
+		},
+		{
+			name: "supported action with additional actions defined",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]any{
+							"capacity": "0,10Gi",
+							"csi": any(
+								map[string]any{
+									"driver": "aws.efs.csi.driver",
+								}),
+						},
+					},
+				},
+			},
+			additionalActions: []string{"custom1", "custom2"},
+			wantErr:           false,
+		},
+		{
+			name: "custom action with additional actions defined",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "custom1"},
+						Conditions: map[string]any{
+							"capacity": "0,10Gi",
+							"csi": any(
+								map[string]any{
+									"driver": "aws.efs.csi.driver",
+								}),
+						},
+					},
+				},
+			},
+			additionalActions: []string{"custom1", "custom2"},
+			wantErr:           false,
+		},
+		{
+			name: "unsupported action with additional actions defined",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "unsupported"},
+						Conditions: map[string]any{
+							"capacity": "0,10Gi",
+							"csi": any(
+								map[string]any{
+									"driver": "aws.efs.csi.driver",
+								}),
+						},
+					},
+				},
+			},
+			additionalActions: []string{"custom1", "custom2"},
+			wantErr:           true,
 		},
 		{
 			name: "error format of nfs",
@@ -554,6 +615,9 @@ func TestValidate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			policies := &Policies{}
 			err1 := policies.BuildPolicy(tc.res)
+			if err1 == nil && tc.additionalActions != nil {
+				policies.additionalVolumePolicyActions = tc.additionalActions
+			}
 			err2 := policies.Validate()
 
 			if tc.wantErr {

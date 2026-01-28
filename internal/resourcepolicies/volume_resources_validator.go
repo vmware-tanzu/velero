@@ -18,6 +18,7 @@ package resourcepolicies
 import (
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
@@ -87,12 +88,15 @@ func decodeStruct(r io.Reader, s any) error {
 }
 
 // validate check action format
-func (a *Action) validate() error {
+func (a *Action) validate(additionalVolumePolicyActions []string) error {
 	// validate Type
 	valid := false
 	if a.Type == Skip || a.Type == Snapshot || a.Type == FSBackup {
 		valid = true
+	} else if slices.Contains(additionalVolumePolicyActions, string(a.Type)) {
+		valid = true
 	}
+
 	if !valid {
 		return fmt.Errorf("invalid action type %s", a.Type)
 	}

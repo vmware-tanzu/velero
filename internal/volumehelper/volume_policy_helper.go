@@ -111,7 +111,9 @@ func NewVolumeHelperImplWithCache(
 	logger logrus.FieldLogger,
 	pvcPodCache *podvolumeutil.PVCPodCache,
 ) (VolumeHelper, error) {
-	resourcePolicies, err := resourcepolicies.GetResourcePoliciesFromBackup(backup, client, logger)
+	// no need to validate resource policies here since this is called from the plugin. They're already
+	// validated at the backup level.
+	resourcePolicies, err := resourcepolicies.GetResourcePoliciesFromBackup(backup, client, logger, nil, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get volume policies from backup")
 	}

@@ -363,6 +363,8 @@ There are three actions supported via the VolumePolicy feature:
 * snapshot: back up the action matching volume's data by the snapshot way.
 * fs-backup: back up the action matching volumes' data by the fs-backup way.
 
+Note that if you are using an external plugin which implements a volume policy that is not one of the above, you need to use the installer/server flag `--additional-volume-policy-actions=custom-action1,custom-action2` to enable validation to work, as Velero's backup validation also validates the volume policy actions.
+
 #### Supported conditions
 
 Currently, Velero supports the volume attributes listed below:

@@ -84,32 +84,32 @@ var autoExcludeClusterScopedResources = []string{
 }
 
 type backupReconciler struct {
-	ctx                         context.Context
-	logger                      logrus.FieldLogger
-	discoveryHelper             discovery.Helper
-	backupper                   pkgbackup.Backupper
-	kbClient                    kbclient.Client
-	clock                       clock.WithTickerAndDelayedExecution
-	backupLogLevel              logrus.Level
-	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
-	backupTracker               BackupTracker
-	defaultBackupLocation       string
-	defaultVolumesToFsBackup    bool
-	defaultBackupTTL            time.Duration
-	defaultVGSLabelKey          string
-	defaultCSISnapshotTimeout   time.Duration
-	resourceTimeout             time.Duration
-	defaultItemOperationTimeout time.Duration
-	defaultSnapshotLocations    map[string]string
-	metrics                     *metrics.ServerMetrics
-	backupStoreGetter           persistence.ObjectBackupStoreGetter
-	formatFlag                  logging.Format
-	credentialFileStore         credentials.FileStore
-	maxConcurrentK8SConnections int
-	defaultSnapshotMoveData     bool
-	globalCRClient              kbclient.Client
-	itemBlockWorkerCount        int
-	concurrentBackups           int
+	ctx                           context.Context
+	logger                        logrus.FieldLogger
+	discoveryHelper               discovery.Helper
+	backupper                     pkgbackup.Backupper
+	kbClient                      kbclient.Client
+	clock                         clock.WithTickerAndDelayedExecution
+	backupLogLevel                logrus.Level
+	newPluginManager              func(logrus.FieldLogger) clientmgmt.Manager
+	backupTracker                 BackupTracker
+	defaultBackupLocation         string
+	defaultVolumesToFsBackup      bool
+	defaultBackupTTL              time.Duration
+	defaultVGSLabelKey            string
+	defaultCSISnapshotTimeout     time.Duration
+	resourceTimeout               time.Duration
+	defaultItemOperationTimeout   time.Duration
+	defaultSnapshotLocations      map[string]string
+	metrics                       *metrics.ServerMetrics
+	backupStoreGetter             persistence.ObjectBackupStoreGetter
+	formatFlag                    logging.Format
+	credentialFileStore           credentials.FileStore
+	maxConcurrentK8SConnections   int
+	defaultSnapshotMoveData       bool
+	globalCRClient                kbclient.Client
+	itemBlockWorkerCount          int
+	concurrentBackups             int
 	additionalVolumePolicyActions []string
 }
 
@@ -142,32 +142,32 @@ func NewBackupReconciler(
 	additionalVolumePolicyActions []string,
 ) *backupReconciler {
 	b := &backupReconciler{
-		ctx:                         ctx,
-		discoveryHelper:             discoveryHelper,
-		backupper:                   backupper,
-		clock:                       &clock.RealClock{},
-		logger:                      logger,
-		backupLogLevel:              backupLogLevel,
-		newPluginManager:            newPluginManager,
-		backupTracker:               backupTracker,
-		kbClient:                    kbClient,
-		defaultBackupLocation:       defaultBackupLocation,
-		defaultVolumesToFsBackup:    defaultVolumesToFsBackup,
-		defaultBackupTTL:            defaultBackupTTL,
-		defaultVGSLabelKey:          defaultVGSLabelKey,
-		defaultCSISnapshotTimeout:   defaultCSISnapshotTimeout,
-		resourceTimeout:             resourceTimeout,
-		defaultItemOperationTimeout: defaultItemOperationTimeout,
-		defaultSnapshotLocations:    defaultSnapshotLocations,
-		metrics:                     metrics,
-		backupStoreGetter:           backupStoreGetter,
-		formatFlag:                  formatFlag,
-		credentialFileStore:         credentialStore,
-		maxConcurrentK8SConnections: maxConcurrentK8SConnections,
-		defaultSnapshotMoveData:     defaultSnapshotMoveData,
-		itemBlockWorkerCount:        itemBlockWorkerCount,
-		concurrentBackups:           max(concurrentBackups, 1),
-		globalCRClient:              globalCRClient,
+		ctx:                           ctx,
+		discoveryHelper:               discoveryHelper,
+		backupper:                     backupper,
+		clock:                         &clock.RealClock{},
+		logger:                        logger,
+		backupLogLevel:                backupLogLevel,
+		newPluginManager:              newPluginManager,
+		backupTracker:                 backupTracker,
+		kbClient:                      kbClient,
+		defaultBackupLocation:         defaultBackupLocation,
+		defaultVolumesToFsBackup:      defaultVolumesToFsBackup,
+		defaultBackupTTL:              defaultBackupTTL,
+		defaultVGSLabelKey:            defaultVGSLabelKey,
+		defaultCSISnapshotTimeout:     defaultCSISnapshotTimeout,
+		resourceTimeout:               resourceTimeout,
+		defaultItemOperationTimeout:   defaultItemOperationTimeout,
+		defaultSnapshotLocations:      defaultSnapshotLocations,
+		metrics:                       metrics,
+		backupStoreGetter:             backupStoreGetter,
+		formatFlag:                    formatFlag,
+		credentialFileStore:           credentialStore,
+		maxConcurrentK8SConnections:   maxConcurrentK8SConnections,
+		defaultSnapshotMoveData:       defaultSnapshotMoveData,
+		itemBlockWorkerCount:          itemBlockWorkerCount,
+		concurrentBackups:             max(concurrentBackups, 1),
+		globalCRClient:                globalCRClient,
 		additionalVolumePolicyActions: additionalVolumePolicyActions,
 	}
 	b.updateTotalBackupMetric()
@@ -583,7 +583,7 @@ func (b *backupReconciler) prepareBackupRequest(ctx context.Context, backup *vel
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, "encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified")
 	}
 
-	resourcePolicies, err := resourcepolicies.GetResourcePoliciesFromBackup(*request.Backup, b.kbClient, logger)
+	resourcePolicies, err := resourcepolicies.GetResourcePoliciesFromBackup(*request.Backup, b.kbClient, logger, b.additionalVolumePolicyActions, true)
 	if err != nil {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, err.Error())
 	}
