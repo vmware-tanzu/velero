@@ -64,6 +64,7 @@ type podTemplateConfig struct {
 	kubeletRootDir                  string
 	nodeAgentDisableHostPath        bool
 	priorityClassName               string
+	additionalVolumePolicyActions   []string
 }
 
 func WithImage(image string) podTemplateOption {
@@ -237,6 +238,12 @@ func WithPriorityClassName(priorityClassName string) podTemplateOption {
 	}
 }
 
+func WithAdditionalVolumePolicyActions(additionalVolumePolicyActions []string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.additionalVolumePolicyActions = additionalVolumePolicyActions
+	}
+}
+
 func WithForWindows() podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.forWindows = true
@@ -346,6 +353,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1api.Deployme
 
 	if c.concurrentBackups > 0 {
 		args = append(args, fmt.Sprintf("--concurrent-backups=%d", c.concurrentBackups))
+	}
+
+	if len(c.additionalVolumePolicyActions) > 0 {
+		args = append(args, fmt.Sprintf("--additional-volume-policy-actions=%s", strings.Join(c.additionalVolumePolicyActions, ",")))
 	}
 
 	deployment := &appsv1api.Deployment{

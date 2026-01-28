@@ -276,6 +276,7 @@ type VeleroOptions struct {
 	NodeAgentDisableHostPath        bool
 	ServerPriorityClassName         string
 	NodeAgentPriorityClassName      string
+	AdditionalVolumePolicyActions   []string
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -401,6 +402,8 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 	if len(o.RepoMaintenanceJobConfigMap) > 0 {
 		deployOpts = append(deployOpts, WithRepoMaintenanceJobConfigMap(o.RepoMaintenanceJobConfigMap))
 	}
+
+	deployOpts = append(deployOpts, WithAdditionalVolumePolicyActions(o.AdditionalVolumePolicyActions))
 
 	deploy := Deployment(o.Namespace, deployOpts...)
 
