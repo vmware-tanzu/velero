@@ -101,9 +101,10 @@ type ResourcePolicies struct {
 }
 
 type Policies struct {
-	version              string
-	volumePolicies       []volPolicy
-	includeExcludePolicy *IncludeExcludePolicy
+	version                       string
+	volumePolicies                []volPolicy
+	additionalVolumePolicyActions []string
+	includeExcludePolicy          *IncludeExcludePolicy
 	// OtherPolicies
 }
 
@@ -210,7 +211,7 @@ func (p *Policies) Validate() error {
 	}
 
 	for _, policy := range p.volumePolicies {
-		if err := policy.action.validate(); err != nil {
+		if err := policy.action.validate(p.additionalVolumePolicyActions); err != nil {
 			return errors.WithStack(err)
 		}
 		for _, con := range policy.conditions {
@@ -237,6 +238,8 @@ func GetResourcePoliciesFromBackup(
 	backup velerov1api.Backup,
 	client crclient.Client,
 	logger logrus.FieldLogger,
+	additionalVolumePolicyActions []string,
+	validate bool,
 ) (resourcePolicies *Policies, err error) {
 	if backup.Spec.ResourcePolicy != nil &&
 		strings.EqualFold(backup.Spec.ResourcePolicy.Kind, ConfigmapRefType) {
@@ -258,11 +261,14 @@ func GetResourcePoliciesFromBackup(
 				backup.Namespace+"/"+backup.Name, err.Error())
 			return nil, fmt.Errorf("fail to read the ResourcePolicies from ConfigMap %s with error %s",
 				backup.Namespace+"/"+backup.Name, err.Error())
-		} else if err = resourcePolicies.Validate(); err != nil {
-			logger.Errorf("Fail to validate ResourcePolicies in ConfigMap %s with error %s.",
-				backup.Namespace+"/"+backup.Name, err.Error())
-			return nil, fmt.Errorf("fail to validate ResourcePolicies in ConfigMap %s with error %s",
-				backup.Namespace+"/"+backup.Name, err.Error())
+		} else if validate {
+			resourcePolicies.additionalVolumePolicyActions = additionalVolumePolicyActions
+			if err = resourcePolicies.Validate(); err != nil {
+				logger.Errorf("Fail to validate ResourcePolicies in ConfigMap %s with error %s.",
+					backup.Namespace+"/"+backup.Name, err.Error())
+				return nil, fmt.Errorf("fail to validate ResourcePolicies in ConfigMap %s with error %s",
+					backup.Namespace+"/"+backup.Name, err.Error())
+			}
 		}
 	}
 
