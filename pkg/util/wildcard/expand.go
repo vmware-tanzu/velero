@@ -40,9 +40,9 @@ func containsWildcardPattern(pattern string) bool {
 
 func validateWildcardPatterns(patterns []string) error {
 	for _, pattern := range patterns {
-		// Check for invalid regex-only patterns that we don't support
-		if strings.ContainsAny(pattern, "|()") {
-			return errors.New("wildcard pattern contains unsupported regex symbols: |, (, )")
+		// Check for invalid characters that are not supported in glob patterns
+		if strings.ContainsAny(pattern, "|()!") {
+			return errors.New("wildcard pattern contains unsupported characters: |, (, ), !")
 		}
 
 		// Check for consecutive asterisks (2 or more)
