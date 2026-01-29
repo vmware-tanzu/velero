@@ -286,7 +286,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 			expectedErr:         false,
 		},
 		{
-			name:          "PVC not having PV, return false and error case PV not found",
+			name:          "PVC not having PV, return false and error when no matching policy",
 			inputObj:      builder.ForPersistentVolumeClaim("default", "example-pvc").StorageClass("gp2-csi").Result(),
 			groupResource: kuberesource.PersistentVolumeClaims,
 			resourcePolicies: &resourcepolicies.ResourcePolicies{
@@ -1233,4 +1233,313 @@ func TestNewVolumeHelperImplWithCache_UsesCache(t *testing.T) {
 	shouldSnapshot, err := vh.ShouldPerformSnapshot(&unstructured.Unstructured{Object: obj}, kuberesource.PersistentVolumes)
 	require.NoError(t, err)
 	require.False(t, shouldSnapshot, "Expected snapshot to be skipped due to fs-backup selection via cache")
+}
+
+// TestVolumeHelperImpl_ShouldPerformSnapshot_UnboundPVC tests that Pending and Lost PVCs with
+// phase-based skip policies don't cause errors when GetPVForPVC would fail.
+func TestVolumeHelperImpl_ShouldPerformSnapshot_UnboundPVC(t *testing.T) {
+	testCases := []struct {
+		name             string
+		inputPVC         *corev1api.PersistentVolumeClaim
+		resourcePolicies *resourcepolicies.ResourcePolicies
+		shouldSnapshot   bool
+		expectedErr      bool
+	}{
+		{
+			name: "Pending PVC with phase-based skip policy should not error and return false",
+			inputPVC: builder.ForPersistentVolumeClaim("ns", "pvc-pending").
+				StorageClass("non-existent-class").
+				Phase(corev1api.ClaimPending).
+				Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"pvcPhase": []string{"Pending"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Skip,
+						},
+					},
+				},
+			},
+			shouldSnapshot: false,
+			expectedErr:    false,
+		},
+		{
+			name: "Pending PVC without matching skip policy should error (no PV)",
+			inputPVC: builder.ForPersistentVolumeClaim("ns", "pvc-pending-no-policy").
+				StorageClass("non-existent-class").
+				Phase(corev1api.ClaimPending).
+				Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Skip,
+						},
+					},
+				},
+			},
+			shouldSnapshot: false,
+			expectedErr:    true,
+		},
+		{
+			name: "Lost PVC with phase-based skip policy should not error and return false",
+			inputPVC: builder.ForPersistentVolumeClaim("ns", "pvc-lost").
+				StorageClass("some-class").
+				Phase(corev1api.ClaimLost).
+				Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"pvcPhase": []string{"Lost"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Skip,
+						},
+					},
+				},
+			},
+			shouldSnapshot: false,
+			expectedErr:    false,
+		},
+		{
+			name: "Lost PVC with policy for Pending and Lost should not error and return false",
+			inputPVC: builder.ForPersistentVolumeClaim("ns", "pvc-lost").
+				StorageClass("some-class").
+				Phase(corev1api.ClaimLost).
+				Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"pvcPhase": []string{"Pending", "Lost"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Skip,
+						},
+					},
+				},
+			},
+			shouldSnapshot: false,
+			expectedErr:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t)
+
+			var p *resourcepolicies.Policies
+			if tc.resourcePolicies != nil {
+				p = &resourcepolicies.Policies{}
+				err := p.BuildPolicy(tc.resourcePolicies)
+				require.NoError(t, err)
+			}
+
+			vh := NewVolumeHelperImpl(
+				p,
+				ptr.To(true),
+				logrus.StandardLogger(),
+				fakeClient,
+				false,
+				false,
+			)
+
+			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.inputPVC)
+			require.NoError(t, err)
+
+			actualShouldSnapshot, actualError := vh.ShouldPerformSnapshot(&unstructured.Unstructured{Object: obj}, kuberesource.PersistentVolumeClaims)
+			if tc.expectedErr {
+				require.Error(t, actualError, "Want error; Got nil error")
+				return
+			}
+
+			require.NoError(t, actualError)
+			require.Equalf(t, tc.shouldSnapshot, actualShouldSnapshot, "Want shouldSnapshot as %t; Got shouldSnapshot as %t", tc.shouldSnapshot, actualShouldSnapshot)
+		})
+	}
+}
+
+// TestVolumeHelperImpl_ShouldPerformFSBackup_UnboundPVC tests that Pending and Lost PVCs with
+// phase-based skip policies don't cause errors when GetPVForPVC would fail.
+func TestVolumeHelperImpl_ShouldPerformFSBackup_UnboundPVC(t *testing.T) {
+	testCases := []struct {
+		name             string
+		pod              *corev1api.Pod
+		pvc              *corev1api.PersistentVolumeClaim
+		resourcePolicies *resourcepolicies.ResourcePolicies
+		shouldFSBackup   bool
+		expectedErr      bool
+	}{
+		{
+			name: "Pending PVC with phase-based skip policy should not error and return false",
+			pod: builder.ForPod("ns", "pod-1").
+				Volumes(
+					&corev1api.Volume{
+						Name: "vol-pending",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-pending",
+							},
+						},
+					}).Result(),
+			pvc: builder.ForPersistentVolumeClaim("ns", "pvc-pending").
+				StorageClass("non-existent-class").
+				Phase(corev1api.ClaimPending).
+				Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"pvcPhase": []string{"Pending"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Skip,
+						},
+					},
+				},
+			},
+			shouldFSBackup: false,
+			expectedErr:    false,
+		},
+		{
+			name: "Pending PVC without matching skip policy should error (no PV)",
+			pod: builder.ForPod("ns", "pod-1").
+				Volumes(
+					&corev1api.Volume{
+						Name: "vol-pending",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-pending-no-policy",
+							},
+						},
+					}).Result(),
+			pvc: builder.ForPersistentVolumeClaim("ns", "pvc-pending-no-policy").
+				StorageClass("non-existent-class").
+				Phase(corev1api.ClaimPending).
+				Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Skip,
+						},
+					},
+				},
+			},
+			shouldFSBackup: false,
+			expectedErr:    true,
+		},
+		{
+			name: "Lost PVC with phase-based skip policy should not error and return false",
+			pod: builder.ForPod("ns", "pod-1").
+				Volumes(
+					&corev1api.Volume{
+						Name: "vol-lost",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-lost",
+							},
+						},
+					}).Result(),
+			pvc: builder.ForPersistentVolumeClaim("ns", "pvc-lost").
+				StorageClass("some-class").
+				Phase(corev1api.ClaimLost).
+				Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"pvcPhase": []string{"Lost"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Skip,
+						},
+					},
+				},
+			},
+			shouldFSBackup: false,
+			expectedErr:    false,
+		},
+		{
+			name: "Lost PVC with policy for Pending and Lost should not error and return false",
+			pod: builder.ForPod("ns", "pod-1").
+				Volumes(
+					&corev1api.Volume{
+						Name: "vol-lost",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-lost",
+							},
+						},
+					}).Result(),
+			pvc: builder.ForPersistentVolumeClaim("ns", "pvc-lost").
+				StorageClass("some-class").
+				Phase(corev1api.ClaimLost).
+				Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]any{
+							"pvcPhase": []string{"Pending", "Lost"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Skip,
+						},
+					},
+				},
+			},
+			shouldFSBackup: false,
+			expectedErr:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, tc.pvc)
+			require.NoError(t, fakeClient.Create(t.Context(), tc.pod))
+
+			var p *resourcepolicies.Policies
+			if tc.resourcePolicies != nil {
+				p = &resourcepolicies.Policies{}
+				err := p.BuildPolicy(tc.resourcePolicies)
+				require.NoError(t, err)
+			}
+
+			vh := NewVolumeHelperImpl(
+				p,
+				ptr.To(true),
+				logrus.StandardLogger(),
+				fakeClient,
+				false,
+				false,
+			)
+
+			actualShouldFSBackup, actualError := vh.ShouldPerformFSBackup(tc.pod.Spec.Volumes[0], *tc.pod)
+			if tc.expectedErr {
+				require.Error(t, actualError, "Want error; Got nil error")
+				return
+			}
+
+			require.NoError(t, actualError)
+			require.Equalf(t, tc.shouldFSBackup, actualShouldFSBackup, "Want shouldFSBackup as %t; Got shouldFSBackup as %t", tc.shouldFSBackup, actualShouldFSBackup)
+		})
+	}
 }
