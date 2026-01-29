@@ -394,7 +394,7 @@ else
 endif
 
 build-image-hugo:
-	cd site && docker build --pull -t $(HUGO_IMAGE) .
+	cd site && docker build --load --pull -t $(HUGO_IMAGE) .
 
 clean:
 # if we have a cached image then use it to run go clean --modcache
