@@ -1,0 +1,1 @@
+Add optional repository credentials secret creation to support restricted environments. Addresses issue #6540 by allowing Velero to run without requiring secret creation/access permissions.
