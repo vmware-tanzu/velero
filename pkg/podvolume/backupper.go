@@ -210,11 +210,9 @@ func resultsKey(ns, name string) string {
 
 func (b *backupper) getMatchAction(resPolicies *resourcepolicies.Policies, pvc *corev1api.PersistentVolumeClaim, volume *corev1api.Volume) (*resourcepolicies.Action, error) {
 	if pvc != nil {
-		pv := new(corev1api.PersistentVolume)
-		err := b.crClient.Get(context.TODO(), ctrlclient.ObjectKey{Name: pvc.Spec.VolumeName}, pv)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error getting pv for pvc %s", pvc.Spec.VolumeName)
-		}
+		// Ignore err, if the PV is not available (Pending/Lost PVC or PV fetch failed) - try matching with PVC only
+		// GetPVForPVC returns nil for all error cases
+		pv, _ := kube.GetPVForPVC(pvc, b.crClient)
 		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
 		return resPolicies.GetMatchAction(vfd)
 	}
