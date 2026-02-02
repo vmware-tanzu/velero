@@ -461,7 +461,7 @@ func TestValidateBracePatterns(t *testing.T) {
 		expectError bool
 		errorMsg    string
 	}{
-		// Valid patterns
+		// Valid brace patterns
 		{
 			name:        "valid single brace pattern",
 			pattern:     "app-{prod,staging}",
@@ -505,6 +505,55 @@ func TestValidateBracePatterns(t *testing.T) {
 		{
 			name:        "valid brace with hyphens in options",
 			pattern:     "{app-prod,db-staging}",
+			expectError: false,
+		},
+
+		// Valid bracket patterns
+		{
+			name:        "valid bracket pattern with characters",
+			pattern:     "ns[abc]",
+			expectError: false,
+		},
+		{
+			name:        "valid bracket pattern with range",
+			pattern:     "ns[a-z]",
+			expectError: false,
+		},
+		{
+			name:        "valid bracket pattern with numbers",
+			pattern:     "ns[0-9]",
+			expectError: false,
+		},
+		{
+			name:        "valid bracket pattern with mixed",
+			pattern:     "ns[a-z0-9]",
+			expectError: false,
+		},
+		{
+			name:        "valid bracket with single character",
+			pattern:     "ns[a]",
+			expectError: false,
+		},
+		{
+			name:        "valid pattern with text before and after bracket",
+			pattern:     "prefix-[abc]-suffix",
+			expectError: false,
+		},
+		{
+			name:        "valid multiple bracket patterns",
+			pattern:     "ns[a-z][0-9]",
+			expectError: false,
+		},
+		{
+			name:        "valid bracket with negation",
+			pattern:     "ns[!abc]",
+			expectError: false,
+		},
+
+		// Valid mixed patterns
+		{
+			name:        "valid brace and bracket together",
+			pattern:     "app-{prod,staging}-ns[0-9]",
 			expectError: false,
 		},
 
@@ -608,6 +657,102 @@ func TestValidateBracePatterns(t *testing.T) {
 			pattern:     "{}",
 			expectError: true,
 			errorMsg:    "empty brace pattern",
+		},
+		// Valid square bracket patterns
+		{
+			name:        "valid square bracket pattern",
+			pattern:     "ns[abc]",
+			expectError: false,
+		},
+		{
+			name:        "valid square bracket pattern with range",
+			pattern:     "ns[a-z]",
+			expectError: false,
+		},
+		{
+			name:        "valid square bracket pattern with numbers",
+			pattern:     "ns[0-9]",
+			expectError: false,
+		},
+		{
+			name:        "valid square bracket pattern with mixed",
+			pattern:     "ns[a-z0-9]",
+			expectError: false,
+		},
+		{
+			name:        "valid square bracket pattern with single character",
+			pattern:     "ns[a]",
+			expectError: false,
+		},
+		{
+			name:        "valid square bracket pattern with text before and after",
+			pattern:     "prefix-[abc]-suffix",
+			expectError: false,
+		},
+		// Unclosed opening brackets
+		{
+			name:        "unclosed opening bracket at end",
+			pattern:     "ns[abc",
+			expectError: true,
+			errorMsg:    "unclosed bracket",
+		},
+		{
+			name:        "unclosed opening bracket at start",
+			pattern:     "[abc",
+			expectError: true,
+			errorMsg:    "unclosed bracket",
+		},
+		{
+			name:        "unclosed opening bracket in middle",
+			pattern:     "ns[abc-test",
+			expectError: true,
+			errorMsg:    "unclosed bracket",
+		},
+
+		// Unmatched closing brackets
+		{
+			name:        "unmatched closing bracket at end",
+			pattern:     "ns-abc]",
+			expectError: true,
+			errorMsg:    "unmatched closing bracket",
+		},
+		{
+			name:        "unmatched closing bracket at start",
+			pattern:     "]ns-abc",
+			expectError: true,
+			errorMsg:    "unmatched closing bracket",
+		},
+		{
+			name:        "unmatched closing bracket in middle",
+			pattern:     "ns-]abc",
+			expectError: true,
+			errorMsg:    "unmatched closing bracket",
+		},
+		{
+			name:        "extra closing bracket after valid pair",
+			pattern:     "ns[abc]]",
+			expectError: true,
+			errorMsg:    "unmatched closing bracket",
+		},
+
+		// Empty bracket patterns
+		{
+			name:        "completely empty brackets",
+			pattern:     "ns[]",
+			expectError: true,
+			errorMsg:    "empty bracket pattern",
+		},
+		{
+			name:        "empty brackets at start",
+			pattern:     "[]ns",
+			expectError: true,
+			errorMsg:    "empty bracket pattern",
+		},
+		{
+			name:        "empty brackets standalone",
+			pattern:     "[]",
+			expectError: true,
+			errorMsg:    "empty bracket pattern",
 		},
 
 		// Edge cases
