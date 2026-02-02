@@ -666,6 +666,11 @@ func validateNamespaceName(ns string) []error {
 		return nil
 	}
 
+	// Validate the namespace name to ensure it is a valid wildcard pattern
+	if err := wildcard.ValidateNamespaceName(ns); err != nil {
+		return []error{err}
+	}
+
 	// Kubernetes does not allow wildcard characters in namespaces but Velero uses them
 	// for glob patterns. Replace wildcard characters with valid characters to pass
 	// Kubernetes validation.
