@@ -17,13 +17,18 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"fmt"
 
+	volumegroupsnapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumegroupsnapshot/v1beta1"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	corev1 "k8s.io/api/core/v1"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -65,6 +70,124 @@ func resetVolumeSnapshotAnnotation(vs *snapshotv1api.VolumeSnapshot) {
 		string(snapshotv1api.VolumeSnapshotContentRetain)
 }
 
+// ensureStubVGSCExists creates a stub VolumeGroupSnapshotContent if the snapshot
+// was created as part of a VolumeGroupSnapshot. This is needed for CSI drivers
+// like Ceph RBD that populate volumeGroupSnapshotHandle on pre-provisioned snapshots.
+// The CSI snapshot controller requires a VGSC with matching handle to exist.
+func (p *volumeSnapshotRestoreItemAction) ensureStubVGSCExists(
+	ctx context.Context,
+	vs *snapshotv1api.VolumeSnapshot,
+	restore *velerov1api.Restore,
+) error {
+	vgsh, ok := vs.Annotations[velerov1api.VolumeGroupSnapshotHandleAnnotation]
+	if !ok || vgsh == "" {
+		// No VolumeGroupSnapshotHandle, nothing to do
+		return nil
+	}
+
+	snapshotHandle, ok := vs.Annotations[velerov1api.VolumeSnapshotHandleAnnotation]
+	if !ok || snapshotHandle == "" {
+		p.log.Warnf("VS %s/%s has VolumeGroupSnapshotHandle but no SnapshotHandle annotation",
+			vs.Namespace, vs.Name)
+		return nil
+	}
+
+	driver, ok := vs.Annotations[velerov1api.DriverNameAnnotation]
+	if !ok || driver == "" {
+		p.log.Warnf("VS %s/%s has VolumeGroupSnapshotHandle but no Driver annotation",
+			vs.Namespace, vs.Name)
+		return nil
+	}
+
+	// Generate a deterministic name for the stub VGSC based on the group handle
+	vgscName := util.GenerateSha256FromRestoreUIDAndVsName(string(restore.UID), vgsh)
+
+	// Check if VGSC already exists
+	existingVGSC := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent{}
+	err := p.crClient.Get(ctx, crclient.ObjectKey{Name: vgscName}, existingVGSC)
+	if err == nil {
+		// VGSC already exists, check if we need to add this snapshot handle
+		p.log.Infof("Stub VGSC %s already exists for VolumeGroupSnapshotHandle %s", vgscName, vgsh)
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, "failed to check for existing VGSC %s", vgscName)
+	}
+
+	// Create stub VGSC
+	p.log.Infof("Creating stub VGSC %s for VolumeGroupSnapshotHandle %s", vgscName, vgsh)
+
+	// Look up VolumeGroupSnapshotClass to get secret annotations
+	vgscAnnotations := map[string]string{}
+	vgscList := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotClassList{}
+	if err := p.crClient.List(ctx, vgscList); err == nil {
+		for _, vgsClass := range vgscList.Items {
+			if vgsClass.Driver == driver {
+				// Found matching class, extract secret parameters
+				if secretName, ok := vgsClass.Parameters["csi.storage.k8s.io/group-snapshotter-secret-name"]; ok {
+					vgscAnnotations["groupsnapshot.storage.kubernetes.io/deletion-secret-name"] = secretName
+				}
+				if secretNS, ok := vgsClass.Parameters["csi.storage.k8s.io/group-snapshotter-secret-namespace"]; ok {
+					vgscAnnotations["groupsnapshot.storage.kubernetes.io/deletion-secret-namespace"] = secretNS
+				}
+				break
+			}
+		}
+	}
+
+	vgsc := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: vgscName,
+			Labels: map[string]string{
+				velerov1api.RestoreNameLabel: restore.Name,
+			},
+			Annotations: vgscAnnotations,
+		},
+		Spec: volumegroupsnapshotv1beta1.VolumeGroupSnapshotContentSpec{
+			DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+			Driver:         driver,
+			Source: volumegroupsnapshotv1beta1.VolumeGroupSnapshotContentSource{
+				GroupSnapshotHandles: &volumegroupsnapshotv1beta1.GroupSnapshotHandles{
+					VolumeGroupSnapshotHandle: vgsh,
+					VolumeSnapshotHandles:     []string{snapshotHandle},
+				},
+			},
+			VolumeGroupSnapshotRef: corev1.ObjectReference{
+				Name:      "stub-vgs-" + vgscName[:8],
+				Namespace: vs.Namespace,
+			},
+		},
+	}
+
+	if err := p.crClient.Create(ctx, vgsc); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			p.log.Infof("Stub VGSC %s was created by another VS restore, continuing", vgscName)
+			return nil
+		}
+		return errors.Wrapf(err, "failed to create stub VGSC %s", vgscName)
+	}
+
+	// Re-fetch to get server-assigned metadata (resourceVersion) needed for patching
+	createdVGSC := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent{}
+	if err := p.crClient.Get(ctx, crclient.ObjectKey{Name: vgscName}, createdVGSC); err != nil {
+		p.log.Warnf("Failed to fetch stub VGSC %s for status patch: %v", vgscName, err)
+		return nil
+	}
+
+	// Set volumeGroupSnapshotHandle in status using Patch to avoid conflicts with the CSI controller.
+	patchBase := createdVGSC.DeepCopy()
+	if createdVGSC.Status == nil {
+		createdVGSC.Status = &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContentStatus{}
+	}
+	createdVGSC.Status.VolumeGroupSnapshotHandle = &vgsh
+	if err := p.crClient.Status().Patch(ctx, createdVGSC, crclient.MergeFrom(patchBase)); err != nil {
+		p.log.Warnf("Failed to patch stub VGSC %s status: %v", vgscName, err)
+	}
+
+	p.log.Infof("Successfully created stub VGSC %s", vgscName)
+	return nil
+}
+
 func (p *volumeSnapshotRestoreItemAction) Execute(
 	input *velero.RestoreItemActionExecuteInput,
 ) (*velero.RestoreItemActionExecuteOutput, error) {
@@ -88,6 +211,13 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 		input.ItemFromBackup.UnstructuredContent(), &vsFromBackup); err != nil {
 		return &velero.RestoreItemActionExecuteOutput{},
 			errors.Wrapf(err, "failed to convert input.Item from unstructured")
+	}
+
+	// Create stub VGSC if this snapshot was created via VolumeGroupSnapshot
+	// This must happen before VSC is created, as the CSI controller requires VGSC to exist
+	if err := p.ensureStubVGSCExists(context.Background(), &vsFromBackup, input.Restore); err != nil {
+		p.log.Warnf("Failed to create stub VGSC for VS %s/%s: %v", vsFromBackup.Namespace, vsFromBackup.Name, err)
+		// Continue with restore, VGSC creation failure should not block restore
 	}
 
 	generatedName := util.GenerateSha256FromRestoreUIDAndVsName(string(input.Restore.UID), vsFromBackup.Name)
