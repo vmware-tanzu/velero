@@ -106,9 +106,9 @@ func (p *volumeSnapshotRestoreItemAction) ensureStubVGSCExists(
 	existingVGSC := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent{}
 	err := p.crClient.Get(ctx, crclient.ObjectKey{Name: vgscName}, existingVGSC)
 	if err == nil {
-		// VGSC already exists, check if we need to add this snapshot handle
+		// VGSC already exists, add this snapshot handle if not already present
 		p.log.Infof("Stub VGSC %s already exists for VolumeGroupSnapshotHandle %s", vgscName, vgsh)
-		return nil
+		return p.addSnapshotHandleToVGSC(ctx, existingVGSC, snapshotHandle)
 	}
 	if !apierrors.IsNotFound(err) {
 		return errors.Wrapf(err, "failed to check for existing VGSC %s", vgscName)
@@ -161,8 +161,14 @@ func (p *volumeSnapshotRestoreItemAction) ensureStubVGSCExists(
 
 	if err := p.crClient.Create(ctx, vgsc); err != nil {
 		if apierrors.IsAlreadyExists(err) {
-			p.log.Infof("Stub VGSC %s was created by another VS restore, continuing", vgscName)
-			return nil
+			// Another VS restore created the VGSC between our Get and Create.
+			// Re-fetch and add our snapshot handle.
+			p.log.Infof("Stub VGSC %s was created by another VS restore, adding our handle", vgscName)
+			raceVGSC := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent{}
+			if getErr := p.crClient.Get(ctx, crclient.ObjectKey{Name: vgscName}, raceVGSC); getErr != nil {
+				return errors.Wrapf(getErr, "failed to get VGSC %s after race", vgscName)
+			}
+			return p.addSnapshotHandleToVGSC(ctx, raceVGSC, snapshotHandle)
 		}
 		return errors.Wrapf(err, "failed to create stub VGSC %s", vgscName)
 	}
@@ -185,6 +191,41 @@ func (p *volumeSnapshotRestoreItemAction) ensureStubVGSCExists(
 	}
 
 	p.log.Infof("Successfully created stub VGSC %s", vgscName)
+	return nil
+}
+
+// addSnapshotHandleToVGSC adds a snapshot handle to an existing VGSC if not already present.
+// This is needed when multiple VolumeSnapshots from the same VolumeGroupSnapshot are restored.
+func (p *volumeSnapshotRestoreItemAction) addSnapshotHandleToVGSC(
+	ctx context.Context,
+	vgsc *volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent,
+	snapshotHandle string,
+) error {
+	// Check if handle is already in the list
+	if vgsc.Spec.Source.GroupSnapshotHandles != nil {
+		for _, handle := range vgsc.Spec.Source.GroupSnapshotHandles.VolumeSnapshotHandles {
+			if handle == snapshotHandle {
+				p.log.Infof("Snapshot handle %s already present in VGSC %s", snapshotHandle, vgsc.Name)
+				return nil
+			}
+		}
+	}
+
+	// Add the snapshot handle to the list
+	patchBase := vgsc.DeepCopy()
+	if vgsc.Spec.Source.GroupSnapshotHandles == nil {
+		vgsc.Spec.Source.GroupSnapshotHandles = &volumegroupsnapshotv1beta1.GroupSnapshotHandles{}
+	}
+	vgsc.Spec.Source.GroupSnapshotHandles.VolumeSnapshotHandles = append(
+		vgsc.Spec.Source.GroupSnapshotHandles.VolumeSnapshotHandles,
+		snapshotHandle,
+	)
+
+	if err := p.crClient.Patch(ctx, vgsc, crclient.MergeFrom(patchBase)); err != nil {
+		return errors.Wrapf(err, "failed to add snapshot handle to VGSC %s", vgsc.Name)
+	}
+
+	p.log.Infof("Added snapshot handle %s to existing VGSC %s", snapshotHandle, vgsc.Name)
 	return nil
 }
 
