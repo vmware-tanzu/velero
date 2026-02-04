@@ -7,11 +7,11 @@
 | Maintainer          | GitHub ID                                                     | Affiliation                                      |
 |---------------------|---------------------------------------------------------------|--------------------------------------------------|
 | Scott Seago         | [sseago](https://github.com/sseago)                           | [OpenShift](https://github.com/openshift)        |
-| Daniel Jiang        | [reasonerjt](https://github.com/reasonerjt)                   | [VMware](https://www.github.com/vmware/)         |
-| Wenkai Yin          | [ywk253100](https://github.com/ywk253100)                     | [VMware](https://www.github.com/vmware/)         |
-| Xun Jiang           | [blackpiglet](https://github.com/blackpiglet)                 | [VMware](https://www.github.com/vmware/)         |
+| Daniel Jiang        | [reasonerjt](https://github.com/reasonerjt)                   | Broadcom                                         |
+| Wenkai Yin          | [ywk253100](https://github.com/ywk253100)                     | Broadcom                                         |
+| Xun Jiang           | [blackpiglet](https://github.com/blackpiglet)                 | Broadcom                                         |
 | Shubham Pampattiwar | [shubham-pampattiwar](https://github.com/shubham-pampattiwar) | [OpenShift](https://github.com/openshift)        |
-| Yonghui Li          | [Lyndon-Li](https://github.com/Lyndon-Li)                     | [VMware](https://www.github.com/vmware/)         |
+| Yonghui Li          | [Lyndon-Li](https://github.com/Lyndon-Li)                     | Broadcom                                         |
 | Anshul Ahuja        | [anshulahuja98](https://github.com/anshulahuja98)             | [Microsoft Azure](https://www.github.com/azure/) |
 | Tiger Kaovilai      | [kaovilai](https://github.com/kaovilai)                       | [OpenShift](https://github.com/openshift)        |
 
@@ -27,14 +27,3 @@
 * JenTing Hsiao ([jenting](https://github.com/jenting))
 * Dave Smith-Uchida ([dsu-igeek](https://github.com/dsu-igeek))
 * Ming Qiu ([qiuming-best](https://github.com/qiuming-best))
-
-## Velero Contributors & Stakeholders
-
-| Feature Area           |                                         Lead                                         |
-|------------------------|:------------------------------------------------------------------------------------:|
-| Technical Lead         |               Daniel Jiang [reasonerjt](https://github.com/reasonerjt)               |
-| Kubernetes CSI Liaison |                                                                                      |
-| Deployment             |                                                                                      |
-| Community Management   |            Orlin Vasilev [OrlinVasilev](https://github.com/OrlinVasilev)             |
-| Product Management     | Pradeep Kumar Chaturvedi [pradeepkchaturvedi](https://github.com/pradeepkchaturvedi) |
-
