@@ -7,23 +7,29 @@
 **Velero Generic Data Path (VGDP)**: VGDP is the collective of modules that is introduced in [Unified Repository design][1]. Velero uses these modules to finish data transfer for various purposes (i.e., PodVolume backup/restore, Volume Snapshot Data Movement). VGDP modules include uploaders and the backup repository.  
 **Velero Built-in Data Mover (VBDM)**: VBDM, which is introduced in [Volume Snapshot Data Movement design][2] and [Unified Repository design][1], is the built-in data mover shipped along with Velero, it includes Velero data mover controllers and VGDP.  
 **Data Mover Pods**: Intermediate pods which hold VGDP and complete the data transfer. See [VGDP Micro Service for Volume Snapshot Data Movement][3] for details.   
-**Change Block Tracking (CBT)**: CBT is the mechanism to track changed blocks, so that backups could back up the changed data only. CBT usually provides by the comupting/storage plateform.  
+**Change Block Tracking (CBT)**: CBT is the mechanism to track changed blocks, so that backups could back up the changed data only. CBT usually provides by the comupting/storage platform.  
 **TCO**: Total Cost of Ownership. This is a general criteria for products/solutions, but also means a lot for BR solutions. For example, this means what kind of backup storage (and its cost) it requires, the retention policy of backup copies, the ways to remove backup data redundancy, etc.  
 
 ## Background
-At present, [CSI Snapshot Data Movement][2] which is implemented by VBDM, ships a file system uploader, so the backup/restore is done from file system only.  
-However, once possible, block level backup/restore is better than file system level backup/restore:  
-- Block level backup could leverage CBT to process minimual size of data so significantly reduce the overhead to network, backup repository and backup storage. As a result, TCO is significantly reduced.
+Kubernetes supports two kinds of volume mode, `FileSystem` and `Block`, for persistent volumes. Underlyingly, the storage could use a block storage to provision either `FileSystem` mode or `Block` mode volumes; and the storage could use a file storage to provision `FileSystem` mode volumes.  
+For volumes provisioned by block storage, they could be backed up/restored from the block level, regardless the volume mode of the persistent volume.  
+On the other hand, as long as the data could be accessed from the file system, a backup/restore could be conducted from the file system level.  That is to say `FileSystem` mode volumes could be backed up/restored from the file system level, regardless of the backend storage type.  
+Then if a `FileSystem` mode volume is provisioned by a block storage, the volume could be backed up/restored either from the file system level or block level.  
+
+For Velero, [CSI Snapshot Data Movement][2] which is implemented by VBDM, ships a file system uploader, so the backup/restore is done from file system only. 
+
+Once possible, block level backup/restore is better than file system level backup/restore:  
+- Block level backup could leverage CBT to process minimal size of data, so it significantly reduces the overhead to network, backup repository and backup storage. As a result, TCO is significantly reduced.
 - Block level backup/restore is performant in throughput and resource consumption, because it doesn't need to handle the complexity of the file system, especially for the case that huge number of small files in the file system.
 - Block level backup/restore is less OS dependent because the uploader doesn't need the OS to be aware of the file system in the volume.
 
-At present, [Kubernetes CBT API][4] is mature and close to Beta stage. Many plateform/storage has supported/is going to support it.  
+At present, [Kubernetes CBT API][4] is mature and close to Beta stage. Many platform/storage has supported/is going to support it.  
 
 Therefore, it is very important for Velero to deliver the block level backup/restore and recommend users to use it over the file system data mover as long as:  
 - The volume is backed by block storage so block level access is possible
-- The plateform supports CBT
+- The platform supports CBT
 
-Meanwhile, file system data mover is still valuable for below scenarios:
+Meanwhile, file system level backup/restore is still valuable for below scenarios:
 - The volume is backed by file storage, e.g., AWS EFS, Azure File, CephFS, VKS File Volume, etc.
 - The volume is backed by block storage but CBT is not available
 - The volume doesn't support CSI snapshot, so Velero fs-backup method is used
@@ -31,6 +37,8 @@ Meanwhile, file system data mover is still valuable for below scenarios:
 There are rich features delivered with VGDP, VBDM and [VGDP micro service][3], to reuse these features, block data mover should be built based on these modules.  
 
 Velero VBDM supports linux and Windows nodes, however, Windows container doesn't support block mode volumes, so backing up/restoring from Windows nodes is not supported until Windows container removes this limitation. As a result, if there are both linux and Windows nodes in the cluster, block data mover can only run in linux nodes.  
+
+Both the Kubernetes CBT service and Velero work in the boundary of the cluster, even though the backend storage may be shared by multiple clusters, Velero can only protection workloads in the same cluster where it is running.  
 
 ## Goals
 
@@ -40,6 +48,7 @@ Add a block data mover to VBDM and support block level backup/restore for [CSI S
 - Support block level restore from full/incremental backup for both `FileSystem` and `Block` mode volumes
 - Support block level backup/restore for both linux and Windows workloads
 - Support all existing features, i.e., load concurrency, node selection, cache volume, deduplication, compression, encryption, etc. for the block data mover
+- Support volumes processed from file system level and block level in the same backup/restore
 
 ## Non-Goals
 
@@ -83,16 +92,69 @@ Below are the major changes based on the existing VBDM:
 ## Detailed Design
 
 ### Selectable Data Mover Type
+
+#### Per Backup Selection
 At present, the backup accepts a `DataMover` parameter and when its value is empty or `velero`, VBDM is used.  
 After block data mover is introduced, VBDM will have two types of data movers, Velero file system data mover and Velero block data mover.  
 A new type string `velero-block` is introduced for Velero block data mover, that is, when `DataMover` is set as `velero-block`, Velero block data mover is used.  
 Another new value `velero-fs` is introduced for Velero file system data mover, that is, when `DataMover` is set as `velero-fs`, Velero file system data mover is used.  
-For backwards compatibility consideration, `velero` is preserved a valid value, it refers to the default data mover, and the default data mover may change among releases.  
-When `DataMover` is empty or `velero`, the default data mover is used. At present, Velero file system data mover is the default data mover; we can change the default one to Velero block data mover in future releases.  
+For backwards compatibility consideration, `velero` is preserved a valid value, it refers to the default data mover, and the default data mover may change among releases. At present, Velero file system data mover is the default data mover; we can change the default one to Velero block data mover in future releases.  
+
+#### Volume Policy
+It is a valid case that users have multiple volumes in a single backup, while they want to use Velero file system data mover for some of the volumes and use Velero block data mover for some others.  
+To meet this requirement, a combined solution of Per Backup Selection and Volume Policy is used.
+
+Here are the data structs for VolumePolicy:  
+```go
+type volPolicy struct {
+	action     Action
+	conditions []volumeCondition
+}
+
+type volumeCondition interface {
+	match(v *structuredVolume) bool
+	validate() error
+}
+
+type structuredVolume struct {
+	capacity     resource.Quantity
+	storageClass string
+	nfs          *nFSVolumeSource
+	csi          *csiVolumeSource
+	volumeType   SupportedVolume
+	pvcLabels    map[string]string
+	pvcPhase     string
+}
+
+type Action struct {
+	Type VolumeActionType `yaml:"type"`
+	Parameters map[string]any `yaml:"parameters,omitempty"`
+}
+
+const (
+	ConfigmapRefType string = "configmap"
+	Skip VolumeActionType = "skip"
+	FSBackup VolumeActionType = "fs-backup"
+	Snapshot VolumeActionType = "snapshot"
+)
+```
+
+`action.parameters` is used to provide extra information of the action. This is an ideal place to differentate Velero file system data mover and Velero block data mover.  
+Therefore, Velero built-in data mover will support `dataMover` key in `parameters`, with the value either `velero-fs` or `velero-block`. While `velero-fs` and `velero-block` are with the same meaning with Per Backup Selection.  
+
+As an example, here is how a user might use both `velero-block` and `velero-fs` in a single backup:    
+- Users set `DataMover` parameter for the backup as `velero-block`
+- Users add a record into Volume Policy, make `conditions` to filter the volumes they want to backup through Velero file system data mover, make `action.type` as `snapshot` and insert a record into `action.parameter` as `dataMover:velero-fs`
+
+In this way, all volumes matched by `conditions` will be backed up with Velero file system data mover; while the others will fallback to the per backup method Velero block data mover.  
+
+Vice versa, users could set the per backup method as file system data mover and select volumes for Velero block data mover.  
+
+The selected data mover for each volume should be recorded to `volumeInfo.json`.  
 
 ### Controllers
 Backup controller and Restore controller are kept as is, async operations are still used to interact with VBDM with block data mover.  
-DataUpload controller and DataDownload controller are almost kpet as is, with some minor changes to handle the data mover type and backup type appropriately and convey it to the exposers. With [VGDP Micro Service][3], the controllers are almost isolated from VGDP, so no major changes are required.  
+DataUpload controller and DataDownload controller are almost kept as is, with some minor changes to handle the data mover type and backup type appropriately and convey it to the exposers. With [VGDP Micro Service][3], the controllers are almost isolated from VGDP, so no major changes are required.  
 
 ### Exposer
 
@@ -107,7 +169,7 @@ However, Kubernetes doesn't allow to bound a PV to a PVC with mismatch volume mo
 
 Therefore, the workflow of ***Finish Volume Readiness*** as introduced in [Volume Snapshot Data Movement design][2] is changed as below:
 - When restore completes and restorePV is created, set restorePV's `deletionPolicy` to `Retain`
-- Create another rebindPV and copy restorePV's `volumeHandle`
+- Create another rebindPV and copy restorePV's `volumeHandle` but the `volumeMode` matches to the targetPVC
 - Delete restorePV
 - Set the rebindPV's claim reference (the ```claimRef``` filed) to targetPVC
 - Add the ```velero.io/dynamic-pv-restore``` label to the rebindPV
@@ -293,8 +355,9 @@ There are some occasions that the incremental backup won't continue, so the data
 Incremental backup could continue when volume is resized.  
 Block uploader supports to write disk with arbibrary size.  
 When volume resize happens, block uploader needs to handle it appropriately in below ways:
-- The new boundary should always be Max(oldSize, newSize)
-- Always rewrite the tail between RoundDownTo1M(newSize) and newSize  
+- Loop with CBT to the boundary of RoundDownTo1M(newSize)
+- Read data between RoundDownTo1M(newSize) and newSize to get the tail data
+- Call `WriteAt` from offset RoundDownTo1M(newSize) with the tail data
 
 That is to say, the tail must be rewrite since Incremental Aware Object Extension cannot copy BAT entries halfly for the incremental backup.  
 
@@ -335,14 +398,6 @@ From user experience this is not reasonable.
 Therefore, to solve this problem and to make it align with Velero block data mover, Velero file system data mover will support backup type as well.  
 
 At present, the data path for Velero file system data mover has already supported it, we only need to expose this functionality to users.  
-
-### Data Mover Selection
-At present, in the Backup CRD, there is a `DataMover` field for users to specify the data mover to be used. This field will be kept, once it is set, all the data movements in the backup will use the specified data mover.  
-
-However, this is not enough. In one backup, users may include volumes backed by both block storage and file system storage.  
-To meet this requirement, VolumePolicy will be enhanced to support the `DataMover` action.  
-
-The selected data mover for each volume should be updated to `volumeInfo.json`.  
 
 ### Backup Describe
 Backup type should be added to backup description, this value could be retrieved from `volumeInfo.json`.  
