@@ -17,7 +17,9 @@ Wildcard takes precedence when both a wildcard and specific resource are include
 
 ### --include-namespaces
 
-Namespaces to include. Default is `*`, all namespaces.
+Namespaces to include. Accepts glob patterns. Default is `*`, all namespaces.
+
+Note: `*` alone is reserved for empty fields, which means all namespaces.
 
 * Backup a namespace and it's objects.
 
@@ -158,7 +160,7 @@ Wildcard excludes are ignored.
 
 ### --exclude-namespaces
 
-Namespaces to exclude.
+Namespaces to exclude. Accepts glob patterns.
 
 * Exclude kube-system from the cluster backup.
 
