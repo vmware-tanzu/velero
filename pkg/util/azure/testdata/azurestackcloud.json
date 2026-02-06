@@ -1,0 +1,10 @@
+{
+  "name": "AZURESTACKCLOUD",
+  "resourceManagerEndpoint": "https://management.local.azurestack.external",
+  "activeDirectoryEndpoint": "https://adfs.local.azurestack.external/adfs",
+  "storageEndpointSuffix": "local.azurestack.external",
+  "tokenAudience": "https://management.adfs.azurestack.local/1234567890",
+  "resourceIdentifiers": {
+    "storage": "https://storage.azure.com"
+  }
+}
