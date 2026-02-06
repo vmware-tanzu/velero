@@ -925,9 +925,10 @@ func TestDiagnosePod(t *testing.T) {
 							Message: "fake-message-2",
 						},
 					},
+					Message: "fake-message-3",
 				},
 			},
-			expected: "Pod fake-ns/fake-pod, phase Pending, node name fake-node\nPod condition Initialized, status True, reason fake-reason-1, message fake-message-1\nPod condition PodScheduled, status False, reason fake-reason-2, message fake-message-2\n",
+			expected: "Pod fake-ns/fake-pod, phase Pending, node name fake-node, message fake-message-3\nPod condition Initialized, status True, reason fake-reason-1, message fake-message-1\nPod condition PodScheduled, status False, reason fake-reason-2, message fake-message-2\n",
 		},
 		{
 			name: "pod with all info and empty event list",
@@ -955,10 +956,11 @@ func TestDiagnosePod(t *testing.T) {
 							Message: "fake-message-2",
 						},
 					},
+					Message: "fake-message-3",
 				},
 			},
 			events:   &corev1api.EventList{},
-			expected: "Pod fake-ns/fake-pod, phase Pending, node name fake-node\nPod condition Initialized, status True, reason fake-reason-1, message fake-message-1\nPod condition PodScheduled, status False, reason fake-reason-2, message fake-message-2\n",
+			expected: "Pod fake-ns/fake-pod, phase Pending, node name fake-node, message fake-message-3\nPod condition Initialized, status True, reason fake-reason-1, message fake-message-1\nPod condition PodScheduled, status False, reason fake-reason-2, message fake-message-2\n",
 		},
 		{
 			name: "pod with all info and events",
@@ -987,6 +989,7 @@ func TestDiagnosePod(t *testing.T) {
 							Message: "fake-message-2",
 						},
 					},
+					Message: "fake-message-3",
 				},
 			},
 			events: &corev1api.EventList{Items: []corev1api.Event{
@@ -1027,7 +1030,7 @@ func TestDiagnosePod(t *testing.T) {
 					Message:        "message-6",
 				},
 			}},
-			expected: "Pod fake-ns/fake-pod, phase Pending, node name fake-node\nPod condition Initialized, status True, reason fake-reason-1, message fake-message-1\nPod condition PodScheduled, status False, reason fake-reason-2, message fake-message-2\nPod event reason reason-3, message message-3\nPod event reason reason-6, message message-6\n",
+			expected: "Pod fake-ns/fake-pod, phase Pending, node name fake-node, message fake-message-3\nPod condition Initialized, status True, reason fake-reason-1, message fake-message-1\nPod condition PodScheduled, status False, reason fake-reason-2, message fake-message-2\nPod event reason reason-3, message message-3\nPod event reason reason-6, message message-6\n",
 		},
 	}
 

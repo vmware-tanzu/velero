@@ -298,8 +298,14 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted {
 		if peekErr := ep.PeekExposed(ctx, getOwnerObject(du)); peekErr != nil {
-			r.tryCancelDataUpload(ctx, du, fmt.Sprintf("found a du %s/%s with expose error: %s. mark it as cancel", du.Namespace, du.Name, peekErr))
 			log.Errorf("Cancel du %s/%s because of expose error %s", du.Namespace, du.Name, peekErr)
+
+			diags := strings.Split(ep.DiagnoseExpose(ctx, getOwnerObject(du)), "\n")
+			for _, diag := range diags {
+				log.Warnf("[Diagnose DU expose]%s", diag)
+			}
+
+			r.tryCancelDataUpload(ctx, du, fmt.Sprintf("found a du %s/%s with expose error: %s. mark it as cancel", du.Namespace, du.Name, peekErr))
 		} else if du.Status.AcceptedTimestamp != nil {
 			if time.Since(du.Status.AcceptedTimestamp.Time) >= r.preparingTimeout {
 				r.onPrepareTimeout(ctx, du)
