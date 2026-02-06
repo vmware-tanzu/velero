@@ -134,6 +134,7 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 	pv := new(corev1api.PersistentVolume)
 	var err error
 
+	var pvNotFoundErr error
 	if groupResource == kuberesource.PersistentVolumeClaims {
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
 			v.logger.WithError(err).Error("fail to convert unstructured into PVC")
@@ -142,8 +143,10 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 
 		pv, err = kubeutil.GetPVForPVC(pvc, v.client)
 		if err != nil {
-			v.logger.WithError(err).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
-			return false, err
+			// Any error means PV not available - save to return later if no policy matches
+			v.logger.Debugf("PV not found for PVC %s: %v", pvc.Namespace+"/"+pvc.Name, err)
+			pvNotFoundErr = err
+			pv = nil
 		}
 	}
 
@@ -158,7 +161,7 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
 		action, err := v.volumePolicy.GetMatchAction(vfd)
 		if err != nil {
-			v.logger.WithError(err).Errorf("fail to get VolumePolicy match action for PV %s", pv.Name)
+			v.logger.WithError(err).Errorf("fail to get VolumePolicy match action for %+v", vfd)
 			return false, err
 		}
 
@@ -167,13 +170,19 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 		// If there is no match action, go on to the next check.
 		if action != nil {
 			if action.Type == resourcepolicies.Snapshot {
-				v.logger.Infof(fmt.Sprintf("performing snapshot action for pv %s", pv.Name))
+				v.logger.Infof("performing snapshot action for %+v", vfd)
 				return true, nil
 			} else {
-				v.logger.Infof("Skip snapshot action for pv %s as the action type is %s", pv.Name, action.Type)
+				v.logger.Infof("Skip snapshot action for %+v as the action type is %s", vfd, action.Type)
 				return false, nil
 			}
 		}
+	}
+
+	// If resource is PVC, and PV is nil (e.g., Pending/Lost PVC with no matching policy), return the original error
+	if groupResource == kuberesource.PersistentVolumeClaims && pv == nil && pvNotFoundErr != nil {
+		v.logger.WithError(pvNotFoundErr).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
+		return false, pvNotFoundErr
 	}
 
 	// If this PV is claimed, see if we've already taken a (pod volume backup)
@@ -209,7 +218,7 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 		return true, nil
 	}
 
-	v.logger.Infof(fmt.Sprintf("skipping snapshot action for pv %s possibly due to no volume policy setting or snapshotVolumes is false", pv.Name))
+	v.logger.Infof("skipping snapshot action for pv %s possibly due to no volume policy setting or snapshotVolumes is false", pv.Name)
 	return false, nil
 }
 
@@ -219,6 +228,7 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 		return false, nil
 	}
 
+	var pvNotFoundErr error
 	if v.volumePolicy != nil {
 		var resource any
 		var err error
@@ -230,10 +240,13 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 				v.logger.WithError(err).Errorf("fail to get PVC for pod %s", pod.Namespace+"/"+pod.Name)
 				return false, err
 			}
-			resource, err = kubeutil.GetPVForPVC(pvc, v.client)
+			pvResource, err := kubeutil.GetPVForPVC(pvc, v.client)
 			if err != nil {
-				v.logger.WithError(err).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
-				return false, err
+				// Any error means PV not available - save to return later if no policy matches
+				v.logger.Debugf("PV not found for PVC %s: %v", pvc.Namespace+"/"+pvc.Name, err)
+				pvNotFoundErr = err
+			} else {
+				resource = pvResource
 			}
 		}
 
@@ -259,6 +272,12 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 					volume.Name, pod.Namespace+"/"+pod.Name, action.Type)
 				return false, nil
 			}
+		}
+
+		// If no policy matched and PV was not found, return the original error
+		if pvNotFoundErr != nil {
+			v.logger.WithError(pvNotFoundErr).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
+			return false, pvNotFoundErr
 		}
 	}
 
