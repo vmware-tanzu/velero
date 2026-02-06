@@ -1,1 +1,0 @@
-Fix issue #9400, connect repo first time after creation so that init params could be written
