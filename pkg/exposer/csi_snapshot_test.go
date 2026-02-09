@@ -213,8 +213,9 @@ func TestExpose(t *testing.T) {
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 			},
-			err: "error getting volume topology for PV , storage class fake-sc: error getting storage class fake-sc: storageclasses.storage.k8s.io \"fake-sc\" not found",
+			err: "error getting volume topology for PV fake-pv, storage class fake-sc: error getting storage class fake-sc: storageclasses.storage.k8s.io \"fake-sc\" not found",
 		},
 		{
 			name:        "wait vs ready fail",
@@ -224,6 +225,7 @@ func TestExpose(t *testing.T) {
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 			},
 			kubeClientObj: []runtime.Object{
 				scObj,
@@ -239,6 +241,7 @@ func TestExpose(t *testing.T) {
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -257,6 +260,7 @@ func TestExpose(t *testing.T) {
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -285,6 +289,7 @@ func TestExpose(t *testing.T) {
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -313,6 +318,7 @@ func TestExpose(t *testing.T) {
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -341,6 +347,7 @@ func TestExpose(t *testing.T) {
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -368,6 +375,7 @@ func TestExpose(t *testing.T) {
 				SourceNamespace: "fake-ns",
 				AccessMode:      "fake-mode",
 				StorageClass:    "fake-sc",
+				SourcePVName:    "fake-pv",
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -388,6 +396,7 @@ func TestExpose(t *testing.T) {
 				ExposeTimeout:    time.Millisecond,
 				AccessMode:       AccessModeFileSystem,
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -417,6 +426,7 @@ func TestExpose(t *testing.T) {
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -447,6 +457,7 @@ func TestExpose(t *testing.T) {
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -467,6 +478,7 @@ func TestExpose(t *testing.T) {
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -488,6 +500,7 @@ func TestExpose(t *testing.T) {
 				ExposeTimeout:    time.Millisecond,
 				VolumeSize:       *resource.NewQuantity(567890, ""),
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObjectWithoutRestoreSize,
@@ -506,6 +519,7 @@ func TestExpose(t *testing.T) {
 				SnapshotName:     "fake-vs",
 				SourceNamespace:  "fake-ns",
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 				AccessMode:       AccessModeFileSystem,
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
@@ -533,6 +547,7 @@ func TestExpose(t *testing.T) {
 				SnapshotName:     "fake-vs",
 				SourceNamespace:  "fake-ns",
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 				AccessMode:       AccessModeFileSystem,
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
@@ -561,6 +576,7 @@ func TestExpose(t *testing.T) {
 				SnapshotName:     "fake-vs",
 				SourceNamespace:  "fake-ns",
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 				AccessMode:       AccessModeFileSystem,
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
@@ -587,6 +603,7 @@ func TestExpose(t *testing.T) {
 				SnapshotName:     "fake-vs",
 				SourceNamespace:  "fake-ns",
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 				AccessMode:       AccessModeFileSystem,
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
@@ -638,6 +655,7 @@ func TestExpose(t *testing.T) {
 				SnapshotName:     "fake-vs",
 				SourceNamespace:  "fake-ns",
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 				AccessMode:       AccessModeFileSystem,
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
@@ -695,6 +713,7 @@ func TestExpose(t *testing.T) {
 				SnapshotName:     "fake-vs",
 				SourceNamespace:  "fake-ns",
 				StorageClass:     "fake-sc",
+				SourcePVName:     "fake-pv",
 				AccessMode:       AccessModeFileSystem,
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
