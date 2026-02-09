@@ -713,7 +713,6 @@ func (e *csiSnapshotExposer) createBackupPod(
 		})
 	}
 
-	var podAffinity *corev1api.Affinity
 	if len(intoleratableNodes) > 0 {
 		if affinity == nil {
 			affinity = &kube.LoadAffinity{}
@@ -726,9 +725,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 		})
 	}
 
-	if affinity != nil {
-		podAffinity = kube.ToSystemAffinity(affinity, volumeTopology)
-	}
+	podAffinity := kube.ToSystemAffinity([]*kube.LoadAffinity{affinity})
 
 	pod := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
