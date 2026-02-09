@@ -15,7 +15,7 @@ Assistive AI tools are permitted, as long as contributions are marked in the com
 * For example: 
   * "Assisted-By: Claude AI"
   * "Generated-By: DeepSeek AI"
-
+  * "Co-Authored-By: AI <ai@example.com>"
 ### Reviews:
 * When reviewing contributions with the “Generated-By” or “Assisted-By labels, verify that the change includes sufficient explanation of the context that the reviewer and future contributors can understand the purpose and origin.
 * Apply a higher level of scrutiny to contributions created using AI tools, understanding the limitations of the tools. This does not mean automatically rejecting all contributions that use AI tools, it means giving them the same consideration of technical and legal merits and standards as you would give to any other change.
