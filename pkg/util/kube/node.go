@@ -33,7 +33,7 @@ const (
 	NodeOSLabel   = "kubernetes.io/os"
 )
 
-var realNodeOSMap map[string]string = map[string]string{
+var realNodeOSMap = map[string]string{
 	"linux":   NodeOSLinux,
 	"windows": NodeOSWindows,
 }

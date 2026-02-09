@@ -613,10 +613,7 @@ func (e *genericRestoreExposer) createRestorePod(
 		})
 	}
 
-	var podAffinity *corev1api.Affinity
-	if affinity != nil {
-		podAffinity = kube.ToSystemAffinity([]*kube.LoadAffinity{affinity})
-	}
+	podAffinity := kube.ToSystemAffinity([]*kube.LoadAffinity{affinity})
 
 	pod := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
