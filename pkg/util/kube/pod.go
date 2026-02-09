@@ -230,7 +230,7 @@ func CollectPodLogs(ctx context.Context, podGetter corev1client.CoreV1Interface,
 	return nil
 }
 
-func ToSystemAffinity(loadAffinity *LoadAffinity, volumeTopolpogy *corev1api.NodeSelector) *corev1api.Affinity {
+func ToSystemAffinity(loadAffinity *LoadAffinity, volumeTopology *corev1api.NodeSelector) *corev1api.Affinity {
 	requirements := []corev1api.NodeSelectorRequirement{}
 	if loadAffinity != nil {
 		for k, v := range loadAffinity.NodeSelector.MatchLabels {
@@ -254,8 +254,8 @@ func ToSystemAffinity(loadAffinity *LoadAffinity, volumeTopolpogy *corev1api.Nod
 	result.NodeAffinity = new(corev1api.NodeAffinity)
 	result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = new(corev1api.NodeSelector)
 
-	if volumeTopolpogy != nil {
-		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, volumeTopolpogy.NodeSelectorTerms...)
+	if volumeTopology != nil {
+		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, volumeTopology.NodeSelectorTerms...)
 	} else if len(requirements) > 0 {
 		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = make([]corev1api.NodeSelectorTerm, 1)
 	} else {
