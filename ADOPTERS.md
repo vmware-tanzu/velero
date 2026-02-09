@@ -17,6 +17,7 @@ If you're using Velero and want to add your organization to this list,
 <a href="https://www.replicated.com/" border="0" target="_blank"><img alt="replicated.com" src="site/static/img/adopters/replicated-logo-red.svg" height="50"></a>
 <a href="https://cloudcasa.io/" border="0" target="_blank"><img alt="cloudcasa.io" src="site/static/img/adopters/cloudcasa.svg" height="50"></a>
 <a href="https://azure.microsoft.com/" border="0" target="_blank"><img alt="azure.com" src="site/static/img/adopters/azure.svg" height="50"></a>
+<a href="https://www.broadcom.com/" border="0" target="_blank"><img alt="broadcom.com" src="site/static/img/adopters/broadcom.svg" height="50"></a>
 ## Success Stories
 
 Below is a list of adopters of Velero in **production environments** that have
@@ -67,6 +68,9 @@ Replicated uses the Velero open source project to enable snapshots in [KOTS][101
 
 **[Microsoft Azure][105]**<br>
 [Azure Backup for AKS][106] is an Azure native, Kubernetes aware, Enterprise ready backup for containerized applications deployed on Azure Kubernetes Service (AKS). AKS Backup utilizes Velero to perform backup and restore operations to protect stateful applications in AKS clusters.<br>
+
+**[Broadcom][107]**<br>
+[VMware Cloud Foundation][108] (VCF) offers built-in [vSphere Kubernetes Service][109] (VKS),  a Kubernetes runtime that includes a CNCF certified Kubernetes distribution, to deploy and manage containerized workloads. VCF empowers platform engineers with native [Kubernetes multi-cluster management][110] capability for managing Kubernetes (K8s) infrastructure at scale. VCF utilizes Velero for Kubernetes data protection enabling platform engineers to back up and restore containerized workloads manifests & persistent volumes, helping to increase the resiliency of stateful applications in VKS cluster.
 
 ## Adding your organization to the list of Velero Adopters
 
@@ -125,3 +129,8 @@ If you would like to add your logo to a future `Adopters of Velero` section on [
 
 [105]: https://azure.microsoft.com/
 [106]: https://learn.microsoft.com/azure/backup/backup-overview
+
+[107]: https://www.broadcom.com/
+[108]: https://www.vmware.com/products/cloud-infrastructure/vmware-cloud-foundation
+[109]: https://www.vmware.com/products/cloud-infrastructure/vsphere-kubernetes-service
+[110]: https://blogs.vmware.com/cloud-foundation/2025/09/29/empowering-platform-engineers-with-native-kubernetes-multi-cluster-management-in-vmware-cloud-foundation/

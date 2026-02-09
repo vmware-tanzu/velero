@@ -246,6 +246,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				clock:                 &clock.RealClock{},
 				formatFlag:            formatFlag,
 				metrics:               metrics.NewServerMetrics(),
+				backupTracker:         NewBackupTracker(),
 			}
 
 			require.NotNil(t, test.backup)

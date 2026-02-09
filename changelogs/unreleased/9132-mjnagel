@@ -1,1 +1,0 @@
-Add `--apply` flag to `install` command, allowing usage of Kubernetes apply to make changes to existing installs

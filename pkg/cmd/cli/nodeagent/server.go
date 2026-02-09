@@ -340,18 +340,14 @@ func (s *nodeAgentServer) run() {
 		}
 	}
 
+	var cachePVCConfig *velerotypes.CachePVC
 	if s.dataPathConfigs != nil && s.dataPathConfigs.CachePVCConfig != nil {
 		if err := s.validateCachePVCConfig(*s.dataPathConfigs.CachePVCConfig); err != nil {
 			s.logger.WithError(err).Warnf("Ignore cache config %v", s.dataPathConfigs.CachePVCConfig)
 		} else {
+			cachePVCConfig = s.dataPathConfigs.CachePVCConfig
 			s.logger.Infof("Using cache volume configs %v", s.dataPathConfigs.CachePVCConfig)
 		}
-	}
-
-	var cachePVCConfig *velerotypes.CachePVC
-	if s.dataPathConfigs != nil && s.dataPathConfigs.CachePVCConfig != nil {
-		cachePVCConfig = s.dataPathConfigs.CachePVCConfig
-		s.logger.Infof("Using customized cachePVC config %v", cachePVCConfig)
 	}
 
 	var podLabels map[string]string
@@ -368,6 +364,8 @@ func (s *nodeAgentServer) run() {
 
 	if s.backupRepoConfigs != nil {
 		s.logger.Infof("Using backup repo config %v", s.backupRepoConfigs)
+	} else if cachePVCConfig != nil {
+		s.logger.Info("Backup repo config is not provided, using default values for cache volume configs")
 	}
 
 	pvbReconciler := controller.NewPodVolumeBackupReconciler(
