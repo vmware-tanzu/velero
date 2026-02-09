@@ -582,6 +582,10 @@ func GetPVAttachedNodes(ctx context.Context, pv string, storageClient storagev1.
 }
 
 func GetVolumeTopology(ctx context.Context, volumeClient corev1client.CoreV1Interface, storageClient storagev1.StorageV1Interface, pvName string, scName string) (*corev1api.NodeSelector, error) {
+	if pvName == "" || scName == "" {
+		return nil, errors.Errorf("invalid parameter, pv %s, sc %s", pvName, scName)
+	}
+
 	sc, err := storageClient.StorageClasses().Get(ctx, scName, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting storage class %s", scName)
