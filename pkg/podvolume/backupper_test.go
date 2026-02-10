@@ -309,8 +309,8 @@ func createNodeObj() *corev1api.Node {
 
 func TestBackupPodVolumes(t *testing.T) {
 	scheme := runtime.NewScheme()
-	velerov1api.AddToScheme(scheme)
-	corev1api.AddToScheme(scheme)
+	require.NoError(t, velerov1api.AddToScheme(scheme))
+	require.NoError(t, corev1api.AddToScheme(scheme))
 	log := logrus.New()
 
 	tests := []struct {
@@ -778,7 +778,7 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 
 		backuper := newBackupper(c.ctx, log, nil, nil, informer, nil, "", &velerov1api.Backup{})
 		if c.pvb != nil {
-			backuper.pvbIndexer.Add(c.pvb)
+			require.NoError(t, backuper.pvbIndexer.Add(c.pvb))
 			backuper.wg.Add(1)
 		}
 
@@ -832,4 +832,186 @@ func TestPVCBackupSummary(t *testing.T) {
 	pbs.addBackedup("vol-2")
 	assert.Empty(t, pbs.Skipped)
 	assert.Len(t, pbs.Backedup, 2)
+}
+
+func TestGetMatchAction_PendingPVC(t *testing.T) {
+	// Create resource policies that skip Pending/Lost PVCs
+	resPolicies := &resourcepolicies.ResourcePolicies{
+		Version: "v1",
+		VolumePolicies: []resourcepolicies.VolumePolicy{
+			{
+				Conditions: map[string]any{
+					"pvcPhase": []string{"Pending", "Lost"},
+				},
+				Action: resourcepolicies.Action{
+					Type: resourcepolicies.Skip,
+				},
+			},
+		},
+	}
+	policies := &resourcepolicies.Policies{}
+	err := policies.BuildPolicy(resPolicies)
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name           string
+		pvc            *corev1api.PersistentVolumeClaim
+		volume         *corev1api.Volume
+		pv             *corev1api.PersistentVolume
+		expectedAction *resourcepolicies.Action
+		expectError    bool
+	}{
+		{
+			name: "Pending PVC with pvcPhase skip policy should return skip action",
+			pvc: builder.ForPersistentVolumeClaim("ns", "pending-pvc").
+				StorageClass("test-sc").
+				Phase(corev1api.ClaimPending).
+				Result(),
+			volume: &corev1api.Volume{
+				Name: "test-volume",
+				VolumeSource: corev1api.VolumeSource{
+					PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+						ClaimName: "pending-pvc",
+					},
+				},
+			},
+			pv:             nil,
+			expectedAction: &resourcepolicies.Action{Type: resourcepolicies.Skip},
+			expectError:    false,
+		},
+		{
+			name: "Lost PVC with pvcPhase skip policy should return skip action",
+			pvc: builder.ForPersistentVolumeClaim("ns", "lost-pvc").
+				StorageClass("test-sc").
+				Phase(corev1api.ClaimLost).
+				Result(),
+			volume: &corev1api.Volume{
+				Name: "test-volume",
+				VolumeSource: corev1api.VolumeSource{
+					PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+						ClaimName: "lost-pvc",
+					},
+				},
+			},
+			pv:             nil,
+			expectedAction: &resourcepolicies.Action{Type: resourcepolicies.Skip},
+			expectError:    false,
+		},
+		{
+			name: "Bound PVC with matching PV should not match pvcPhase policy",
+			pvc: builder.ForPersistentVolumeClaim("ns", "bound-pvc").
+				StorageClass("test-sc").
+				VolumeName("test-pv").
+				Phase(corev1api.ClaimBound).
+				Result(),
+			volume: &corev1api.Volume{
+				Name: "test-volume",
+				VolumeSource: corev1api.VolumeSource{
+					PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+						ClaimName: "bound-pvc",
+					},
+				},
+			},
+			pv:             builder.ForPersistentVolume("test-pv").StorageClass("test-sc").Result(),
+			expectedAction: nil,
+			expectError:    false,
+		},
+		{
+			name: "Pending PVC with no matching policy should return nil action",
+			pvc: builder.ForPersistentVolumeClaim("ns", "pending-pvc-no-match").
+				StorageClass("test-sc").
+				Phase(corev1api.ClaimPending).
+				Result(),
+			volume: &corev1api.Volume{
+				Name: "test-volume",
+				VolumeSource: corev1api.VolumeSource{
+					PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+						ClaimName: "pending-pvc-no-match",
+					},
+				},
+			},
+			pv:             nil,
+			expectedAction: &resourcepolicies.Action{Type: resourcepolicies.Skip}, // Will match the pvcPhase policy
+			expectError:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Build fake client with PV if present
+			var objs []runtime.Object
+			if tc.pv != nil {
+				objs = append(objs, tc.pv)
+			}
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
+
+			b := &backupper{
+				crClient: fakeClient,
+			}
+
+			action, err := b.getMatchAction(policies, tc.pvc, tc.volume)
+			if tc.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tc.expectedAction == nil {
+				assert.Nil(t, action)
+			} else {
+				require.NotNil(t, action)
+				assert.Equal(t, tc.expectedAction.Type, action.Type)
+			}
+		})
+	}
+}
+
+func TestGetMatchAction_PVCWithoutPVLookupError(t *testing.T) {
+	// Test that when a PVC has a VolumeName but the PV doesn't exist,
+	// the function ignores the error and tries to match with PVC only
+	resPolicies := &resourcepolicies.ResourcePolicies{
+		Version: "v1",
+		VolumePolicies: []resourcepolicies.VolumePolicy{
+			{
+				Conditions: map[string]any{
+					"pvcPhase": []string{"Pending"},
+				},
+				Action: resourcepolicies.Action{
+					Type: resourcepolicies.Skip,
+				},
+			},
+		},
+	}
+	policies := &resourcepolicies.Policies{}
+	err := policies.BuildPolicy(resPolicies)
+	require.NoError(t, err)
+
+	// Pending PVC without a matching PV in the cluster
+	pvc := builder.ForPersistentVolumeClaim("ns", "pending-pvc").
+		StorageClass("test-sc").
+		Phase(corev1api.ClaimPending).
+		Result()
+
+	volume := &corev1api.Volume{
+		Name: "test-volume",
+		VolumeSource: corev1api.VolumeSource{
+			PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+				ClaimName: "pending-pvc",
+			},
+		},
+	}
+
+	// Empty client - no PV exists
+	fakeClient := velerotest.NewFakeControllerRuntimeClient(t)
+
+	b := &backupper{
+		crClient: fakeClient,
+	}
+
+	// Should succeed even though PV lookup would fail
+	// because the function ignores PV lookup errors and uses PVC-only matching
+	action, err := b.getMatchAction(policies, pvc, volume)
+	require.NoError(t, err)
+	require.NotNil(t, action)
+	assert.Equal(t, resourcepolicies.Skip, action.Type)
 }
