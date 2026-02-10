@@ -69,43 +69,10 @@ func ValidateNamespaceName(pattern string) error {
 // validateBracePatterns checks for malformed brace patterns like unclosed braces or empty braces
 // Also validates bracket patterns [] for character classes
 func validateBracePatterns(pattern string) error {
-	braceDepth := 0
 	bracketDepth := 0
 
 	for i := 0; i < len(pattern); i++ {
-		if pattern[i] == '{' {
-			braceStart := i
-			braceDepth++
-
-			// Scan ahead to find the matching closing brace and validate content
-			for j := i + 1; j < len(pattern) && braceDepth > 0; j++ {
-				if pattern[j] == '{' {
-					braceDepth++
-				} else if pattern[j] == '}' {
-					braceDepth--
-					if braceDepth == 0 {
-						// Found matching closing brace - validate content
-						content := pattern[braceStart+1 : j]
-						if strings.Trim(content, ", \t") == "" {
-							return errors.New("wildcard pattern contains empty brace pattern '{}'")
-						}
-						// Skip to the closing brace
-						i = j
-						break
-					}
-				}
-			}
-
-			// If we exited the loop without finding a match (braceDepth > 0), brace is unclosed
-			if braceDepth > 0 {
-				return errors.New("wildcard pattern contains unclosed brace '{'")
-			}
-
-			// i is now positioned at the closing brace; the outer loop will increment it
-		} else if pattern[i] == '}' {
-			// Found a closing brace without a matching opening brace
-			return errors.New("wildcard pattern contains unmatched closing brace '}'")
-		} else if pattern[i] == '[' {
+		if pattern[i] == '[' {
 			bracketStart := i
 			bracketDepth++
 

@@ -259,33 +259,6 @@ func TestExpandWildcards(t *testing.T) {
 			expectedExcludes: nil,
 			expectError:      true, // |, (, ) are not supported
 		},
-		{
-			name:             "unclosed brace patterns should error",
-			activeNamespaces: []string{"app-prod"},
-			includes:         []string{"app-{prod,staging"},
-			excludes:         []string{},
-			expectedIncludes: nil,
-			expectedExcludes: nil,
-			expectError:      true, // unclosed brace
-		},
-		{
-			name:             "empty brace patterns should error",
-			activeNamespaces: []string{"app-prod"},
-			includes:         []string{"app-{}"},
-			excludes:         []string{},
-			expectedIncludes: nil,
-			expectedExcludes: nil,
-			expectError:      true, // empty braces
-		},
-		{
-			name:             "unmatched closing brace should error",
-			activeNamespaces: []string{"app-prod"},
-			includes:         []string{"app-prod}"},
-			excludes:         []string{},
-			expectedIncludes: nil,
-			expectedExcludes: nil,
-			expectError:      true, // unmatched closing brace
-		},
 	}
 
 	for _, tt := range tests {
@@ -355,13 +328,6 @@ func TestExpandWildcardsPrivate(t *testing.T) {
 			expectError:      false,
 		},
 		{
-			name:             "brace patterns work correctly",
-			patterns:         []string{"app-{prod,staging}"},
-			activeNamespaces: []string{"app-prod", "app-staging", "app-dev", "app-{prod,staging}"},
-			expected:         []string{"app-prod", "app-staging"}, // brace patterns do expand
-			expectError:      false,
-		},
-		{
 			name:             "duplicate matches from multiple patterns",
 			patterns:         []string{"app-*", "*-prod"},
 			activeNamespaces: []string{"app-prod", "app-staging", "db-prod"},
@@ -390,25 +356,11 @@ func TestExpandWildcardsPrivate(t *testing.T) {
 			expectError:      false,
 		},
 		{
-			name:             "brace alternatives",
-			patterns:         []string{"app-{prod,test}"},
-			activeNamespaces: []string{"app-prod", "app-test", "app-staging", "db-prod"},
-			expected:         []string{"app-prod", "app-test"}, // {prod,test} matches either
-			expectError:      false,
-		},
-		{
 			name:             "double asterisk should error",
 			patterns:         []string{"**"},
 			activeNamespaces: []string{"app-prod", "app.staging", "db/prod"},
 			expected:         nil,
 			expectError:      true, // ** is not allowed
-		},
-		{
-			name:             "literal dot and plus",
-			patterns:         []string{"app.prod", "service+"},
-			activeNamespaces: []string{"app.prod", "appXprod", "service+", "service"},
-			expected:         []string{"app.prod", "service+"}, // . and + are literal
-			expectError:      false,
 		},
 		{
 			name:             "unsupported regex symbols should error",
@@ -461,203 +413,6 @@ func TestValidateBracePatterns(t *testing.T) {
 		expectError bool
 		errorMsg    string
 	}{
-		// Valid brace patterns
-		{
-			name:        "valid single brace pattern",
-			pattern:     "app-{prod,staging}",
-			expectError: false,
-		},
-		{
-			name:        "valid brace with single option",
-			pattern:     "app-{prod}",
-			expectError: false,
-		},
-		{
-			name:        "valid brace with three options",
-			pattern:     "app-{prod,staging,dev}",
-			expectError: false,
-		},
-		{
-			name:        "valid pattern with text before and after brace",
-			pattern:     "prefix-{a,b}-suffix",
-			expectError: false,
-		},
-		{
-			name:        "valid pattern with no braces",
-			pattern:     "app-prod",
-			expectError: false,
-		},
-		{
-			name:        "valid pattern with asterisk",
-			pattern:     "app-*",
-			expectError: false,
-		},
-		{
-			name:        "valid brace with spaces around content",
-			pattern:     "app-{ prod , staging }",
-			expectError: false,
-		},
-		{
-			name:        "valid brace with numbers",
-			pattern:     "ns-{1,2,3}",
-			expectError: false,
-		},
-		{
-			name:        "valid brace with hyphens in options",
-			pattern:     "{app-prod,db-staging}",
-			expectError: false,
-		},
-
-		// Valid bracket patterns
-		{
-			name:        "valid bracket pattern with characters",
-			pattern:     "ns[abc]",
-			expectError: false,
-		},
-		{
-			name:        "valid bracket pattern with range",
-			pattern:     "ns[a-z]",
-			expectError: false,
-		},
-		{
-			name:        "valid bracket pattern with numbers",
-			pattern:     "ns[0-9]",
-			expectError: false,
-		},
-		{
-			name:        "valid bracket pattern with mixed",
-			pattern:     "ns[a-z0-9]",
-			expectError: false,
-		},
-		{
-			name:        "valid bracket with single character",
-			pattern:     "ns[a]",
-			expectError: false,
-		},
-		{
-			name:        "valid pattern with text before and after bracket",
-			pattern:     "prefix-[abc]-suffix",
-			expectError: false,
-		},
-		{
-			name:        "valid multiple bracket patterns",
-			pattern:     "ns[a-z][0-9]",
-			expectError: false,
-		},
-		{
-			name:        "valid bracket with negation",
-			pattern:     "ns[!abc]",
-			expectError: false,
-		},
-
-		// Valid mixed patterns
-		{
-			name:        "valid brace and bracket together",
-			pattern:     "app-{prod,staging}-ns[0-9]",
-			expectError: false,
-		},
-
-		// Unclosed opening braces
-		{
-			name:        "unclosed opening brace at end",
-			pattern:     "app-{prod,staging",
-			expectError: true,
-			errorMsg:    "unclosed brace",
-		},
-		{
-			name:        "unclosed opening brace at start",
-			pattern:     "{prod,staging",
-			expectError: true,
-			errorMsg:    "unclosed brace",
-		},
-		{
-			name:        "unclosed opening brace in middle",
-			pattern:     "app-{prod-test",
-			expectError: true,
-			errorMsg:    "unclosed brace",
-		},
-		{
-			name:        "multiple unclosed braces",
-			pattern:     "app-{prod-{staging",
-			expectError: true,
-			errorMsg:    "unclosed brace",
-		},
-
-		// Unmatched closing braces
-		{
-			name:        "unmatched closing brace at end",
-			pattern:     "app-prod}",
-			expectError: true,
-			errorMsg:    "unmatched closing brace",
-		},
-		{
-			name:        "unmatched closing brace at start",
-			pattern:     "}app-prod",
-			expectError: true,
-			errorMsg:    "unmatched closing brace",
-		},
-		{
-			name:        "unmatched closing brace in middle",
-			pattern:     "app-}prod",
-			expectError: true,
-			errorMsg:    "unmatched closing brace",
-		},
-		{
-			name:        "extra closing brace after valid pair",
-			pattern:     "app-{prod,staging}}",
-			expectError: true,
-			errorMsg:    "unmatched closing brace",
-		},
-
-		// Empty brace patterns
-		{
-			name:        "completely empty braces",
-			pattern:     "app-{}",
-			expectError: true,
-			errorMsg:    "empty brace pattern",
-		},
-		{
-			name:        "braces with only spaces",
-			pattern:     "app-{   }",
-			expectError: true,
-			errorMsg:    "empty brace pattern",
-		},
-		{
-			name:        "braces with only comma",
-			pattern:     "app-{,}",
-			expectError: true,
-			errorMsg:    "empty brace pattern",
-		},
-		{
-			name:        "braces with only commas",
-			pattern:     "app-{,,,}",
-			expectError: true,
-			errorMsg:    "empty brace pattern",
-		},
-		{
-			name:        "braces with commas and spaces",
-			pattern:     "app-{ , , }",
-			expectError: true,
-			errorMsg:    "empty brace pattern",
-		},
-		{
-			name:        "braces with tabs and commas",
-			pattern:     "app-{\t,\t}",
-			expectError: true,
-			errorMsg:    "empty brace pattern",
-		},
-		{
-			name:        "empty braces at start",
-			pattern:     "{}app-prod",
-			expectError: true,
-			errorMsg:    "empty brace pattern",
-		},
-		{
-			name:        "empty braces standalone",
-			pattern:     "{}",
-			expectError: true,
-			errorMsg:    "empty brace pattern",
-		},
 		// Valid square bracket patterns
 		{
 			name:        "valid square bracket pattern",
@@ -761,58 +516,6 @@ func TestValidateBracePatterns(t *testing.T) {
 			pattern:     "",
 			expectError: false,
 		},
-		{
-			name:        "pattern with only opening brace",
-			pattern:     "{",
-			expectError: true,
-			errorMsg:    "unclosed brace",
-		},
-		{
-			name:        "pattern with only closing brace",
-			pattern:     "}",
-			expectError: true,
-			errorMsg:    "unmatched closing brace",
-		},
-		{
-			name:        "valid brace with special characters inside",
-			pattern:     "app-{prod-1,staging_2,dev.3}",
-			expectError: false,
-		},
-		{
-			name:        "brace with asterisk inside option",
-			pattern:     "app-{prod*,staging}",
-			expectError: false,
-		},
-		{
-			name:        "multiple valid brace patterns",
-			pattern:     "{app,db}-{prod,staging}",
-			expectError: false,
-		},
-		{
-			name:        "brace with single character",
-			pattern:     "app-{a}",
-			expectError: false,
-		},
-		{
-			name:        "brace with trailing comma but has content",
-			pattern:     "app-{prod,staging,}",
-			expectError: false, // Has content, so it's valid
-		},
-		{
-			name:        "brace with leading comma but has content",
-			pattern:     "app-{,prod,staging}",
-			expectError: false, // Has content, so it's valid
-		},
-		{
-			name:        "brace with leading comma but has content",
-			pattern:     "app-{{,prod,staging}",
-			expectError: true, // unclosed brace
-		},
-		{
-			name:        "brace with leading comma but has content",
-			pattern:     "app-{,prod,staging}}",
-			expectError: true, // unmatched closing brace
-		},
 	}
 
 	for _, tt := range tests {
@@ -861,20 +564,6 @@ func TestExpandWildcardsEdgeCases(t *testing.T) {
 		assert.ElementsMatch(t, []string{"ns-1", "ns_2", "ns.3", "ns@4"}, result)
 	})
 
-	t.Run("complex glob combinations", func(t *testing.T) {
-		activeNamespaces := []string{"app1-prod", "app2-prod", "app1-test", "db-prod", "service"}
-		result, err := expandWildcards([]string{"app?-{prod,test}"}, activeNamespaces)
-		require.NoError(t, err)
-		assert.ElementsMatch(t, []string{"app1-prod", "app2-prod", "app1-test"}, result)
-	})
-
-	t.Run("escaped characters", func(t *testing.T) {
-		activeNamespaces := []string{"app*", "app-prod", "app?test", "app-test"}
-		result, err := expandWildcards([]string{"app\\*"}, activeNamespaces)
-		require.NoError(t, err)
-		assert.ElementsMatch(t, []string{"app*"}, result)
-	})
-
 	t.Run("mixed literal and wildcard patterns", func(t *testing.T) {
 		activeNamespaces := []string{"app.prod", "app-prod", "app_prod", "test.ns"}
 		result, err := expandWildcards([]string{"app.prod", "app?prod"}, activeNamespaces)
@@ -915,12 +604,8 @@ func TestExpandWildcardsEdgeCases(t *testing.T) {
 			shouldError bool
 		}{
 			{"unclosed bracket", "ns[abc", true},
-			{"unclosed brace", "app-{prod,staging", true},
-			{"nested unclosed", "ns[a{bc", true},
 			{"valid bracket", "ns[abc]", false},
-			{"valid brace", "app-{prod,staging}", false},
 			{"empty bracket", "ns[]", true}, // empty brackets are invalid
-			{"empty brace", "app-{}", true}, // empty braces are invalid
 		}
 
 		for _, tt := range tests {

@@ -680,9 +680,6 @@ func validateNamespaceName(ns string) []error {
 	// Note: Validation of wildcard patterns is handled by the wildcard package.
 	tmpNamespace = strings.ReplaceAll(tmpNamespace, "*", "x") // matches any sequence
 	tmpNamespace = strings.ReplaceAll(tmpNamespace, "?", "x") // matches single character
-	tmpNamespace = strings.ReplaceAll(tmpNamespace, "{", "x") // brace expansion start
-	tmpNamespace = strings.ReplaceAll(tmpNamespace, "}", "x") // brace expansion end
-	tmpNamespace = strings.ReplaceAll(tmpNamespace, ",", "x") // brace expansion separator
 	tmpNamespace = strings.ReplaceAll(tmpNamespace, "[", "x") // character class start
 	tmpNamespace = strings.ReplaceAll(tmpNamespace, "]", "x") // character class end
 
