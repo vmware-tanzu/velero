@@ -365,7 +365,7 @@ func VersionNoOlderThan(version string, targetVersion string) (bool, error) {
 			matches := tagRe.FindStringSubmatch(targetVersion)
 			targetMajor := matches[1]
 			targetMinor := matches[2]
-			if major > targetMajor && minor >= targetMinor {
+			if major >= targetMajor && minor >= targetMinor {
 				return true, nil
 			} else {
 				return false, nil
