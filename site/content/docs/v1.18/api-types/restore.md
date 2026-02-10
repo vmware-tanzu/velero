@@ -45,11 +45,11 @@ spec:
     writeSparseFiles: true
     # ParallelFilesDownload is the concurrency number setting for restore
     parallelFilesDownload: 10
-  # Array of namespaces to include in the restore. If unspecified, all namespaces are included.
+  # Array of namespaces to include in the restore. Accepts glob patterns. If unspecified, all namespaces are included.
   # Optional.
   includedNamespaces:
   - '*'
-  # Array of namespaces to exclude from the restore. Optional.
+  # Array of namespaces to exclude from the restore. Accepts glob patterns. Optional.
   excludedNamespaces:
   - some-namespace
   # Array of resources to include in the restore. Resources may be shortcuts (for example 'po' for 'pods')

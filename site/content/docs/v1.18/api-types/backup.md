@@ -42,11 +42,11 @@ spec:
   resourcePolicy:
     kind: configmap
     name: resource-policy-configmap
-  # Array of namespaces to include in the backup. If unspecified, all namespaces are included.
+  # Array of namespaces to include in the backup. Accepts glob patterns. If unspecified, all namespaces are included.
   # Optional.
   includedNamespaces:
   - '*'
-  # Array of namespaces to exclude from the backup. Optional.
+  # Array of namespaces to exclude from the backup. Accepts glob patterns. Optional.
   excludedNamespaces:
   - some-namespace
   # Array of resources to include in the backup. Resources may be shortcuts (for example 'po' for 'pods')
