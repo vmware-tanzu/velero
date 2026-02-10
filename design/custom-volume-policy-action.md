@@ -68,28 +68,20 @@ type VolumeHelper interface {
 }
 ```
 
-In `pkg/plugin/utils/volumehelper/volume_policy_helper.go`, the funcs
-corresponding to the above will be added, which can be called by
-plugins implementing custom volume actions:
-```go
-func ShouldPerformCustomActionWithVolumeHelper(
-	unstructured runtime.Unstructured,
-	groupResource schema.GroupResource,
-	map[string]any,
-	backup velerov1api.Backup,
-	crClient crclient.Client,
-	logger logrus.FieldLogger,
-	vh volumehelper.VolumeHelper,
-) (bool, error)
+In addition, since the VolumeHelper interface is expected to be called by external plugins, the interface (but not the implementation) should be moved from `internal/volumehelper` to `pkg/util/volumehelper`.
 
-func GetActionParameters(
-	unstructured runtime.Unstructured,
-	groupResource schema.GroupResource,
-	backup velerov1api.Backup,
-	crClient crclient.Client,
+In `pkg/plugin/utils/volumehelper/volume_policy_helper.go`, a new helper func will be added which delegates to the internal volumehelper.NewVolumeHelperImplWithNamespaces
+
+```go
+func NewVolumeHelper(
+	volumePolicy *resourcepolicies.Policies,
+	snapshotVolumes *bool,
 	logger logrus.FieldLogger,
-	vh volumehelper.VolumeHelper,
-) (map[string]any, error)
+	client crclient.Client,
+	defaultVolumesToFSBackup bool,
+	backupExcludePVC bool,
+	namespaces []string,
+) (VolumeHelper, error) {
 ```
 
 
