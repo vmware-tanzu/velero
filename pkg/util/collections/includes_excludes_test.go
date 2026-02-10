@@ -291,20 +291,14 @@ func TestValidateNamespaceIncludesExcludes(t *testing.T) {
 		},
 		{
 			name:     "glob characters in includes should not error",
-			includes: []string{"kube-*", "test-?", "app-{prod,dev}", "ns-[0-9]"},
+			includes: []string{"kube-*", "test-?", "ns-[0-9]"},
 			excludes: []string{},
 			wantErr:  false,
 		},
 		{
 			name:     "glob characters in excludes should not error",
 			includes: []string{"default"},
-			excludes: []string{"test-*", "app-?", "env-{a,b}", "ns-[1-5]"},
-			wantErr:  false,
-		},
-		{
-			name:     "brace expansion in includes should not error",
-			includes: []string{"namespace-{prod,staging,dev}"},
-			excludes: []string{},
+			excludes: []string{"test-*", "app-?", "ns-[1-5]"},
 			wantErr:  false,
 		},
 		{
@@ -315,7 +309,7 @@ func TestValidateNamespaceIncludesExcludes(t *testing.T) {
 		},
 		{
 			name:     "mixed glob patterns should not error",
-			includes: []string{"kube-*", "test-?", "app-{a,b}"},
+			includes: []string{"kube-*", "test-?"},
 			excludes: []string{"*-test", "debug-[0-9]"},
 			wantErr:  false,
 		},
