@@ -90,7 +90,7 @@ func TestShouldExpandWildcards(t *testing.T) {
 			name:     "brace alternatives wildcard",
 			includes: []string{"ns{prod,staging}"},
 			excludes: []string{},
-			expected: true, // brace alternatives are considered wildcard
+			expected: false, // brace alternatives are not supported
 		},
 		{
 			name:     "dot is literal - not wildcard",
@@ -237,9 +237,9 @@ func TestExpandWildcards(t *testing.T) {
 			activeNamespaces: []string{"app-prod", "app-staging", "app-dev", "db-prod"},
 			includes:         []string{"app-{prod,staging}"},
 			excludes:         []string{},
-			expectedIncludes: []string{"app-prod", "app-staging"}, // {prod,staging} matches either
+			expectedIncludes: nil,
 			expectedExcludes: nil,
-			expectError:      false,
+			expectError:      true,
 		},
 		{
 			name:             "literal dot and plus patterns",
