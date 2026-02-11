@@ -83,6 +83,8 @@ type DataUploadReconciler struct {
 	metrics               *metrics.ServerMetrics
 	cancelledDataUpload   map[string]time.Time
 	dataMovePriorityClass string
+	podLabels             map[string]string
+	podAnnotations        map[string]string
 }
 
 func NewDataUploadReconciler(
@@ -101,6 +103,8 @@ func NewDataUploadReconciler(
 	log logrus.FieldLogger,
 	metrics *metrics.ServerMetrics,
 	dataMovePriorityClass string,
+	podLabels map[string]string,
+	podAnnotations map[string]string,
 ) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:            client,
@@ -126,6 +130,8 @@ func NewDataUploadReconciler(
 		metrics:               metrics,
 		cancelledDataUpload:   make(map[string]time.Time),
 		dataMovePriorityClass: dataMovePriorityClass,
+		podLabels:             podLabels,
+		podAnnotations:        podAnnotations,
 	}
 }
 
@@ -292,8 +298,14 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted {
 		if peekErr := ep.PeekExposed(ctx, getOwnerObject(du)); peekErr != nil {
-			r.tryCancelDataUpload(ctx, du, fmt.Sprintf("found a du %s/%s with expose error: %s. mark it as cancel", du.Namespace, du.Name, peekErr))
 			log.Errorf("Cancel du %s/%s because of expose error %s", du.Namespace, du.Name, peekErr)
+
+			diags := strings.Split(ep.DiagnoseExpose(ctx, getOwnerObject(du)), "\n")
+			for _, diag := range diags {
+				log.Warnf("[Diagnose DU expose]%s", diag)
+			}
+
+			r.tryCancelDataUpload(ctx, du, fmt.Sprintf("found a du %s/%s with expose error: %s. mark it as cancel", du.Namespace, du.Name, peekErr))
 		} else if du.Status.AcceptedTimestamp != nil {
 			if time.Since(du.Status.AcceptedTimestamp.Time) >= r.preparingTimeout {
 				r.onPrepareTimeout(ctx, du)
@@ -936,24 +948,36 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 		}
 
 		hostingPodLabels := map[string]string{velerov1api.DataUploadLabel: du.Name}
-		for _, k := range util.ThirdPartyLabels {
-			if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, du.Namespace, k, nodeOS); err != nil {
-				if err != nodeagent.ErrNodeAgentLabelNotFound {
-					log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
-				}
-			} else {
+		if len(r.podLabels) > 0 {
+			for k, v := range r.podLabels {
 				hostingPodLabels[k] = v
+			}
+		} else {
+			for _, k := range util.ThirdPartyLabels {
+				if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, du.Namespace, k, nodeOS); err != nil {
+					if err != nodeagent.ErrNodeAgentLabelNotFound {
+						log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
+					}
+				} else {
+					hostingPodLabels[k] = v
+				}
 			}
 		}
 
 		hostingPodAnnotation := map[string]string{}
-		for _, k := range util.ThirdPartyAnnotations {
-			if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, du.Namespace, k, nodeOS); err != nil {
-				if err != nodeagent.ErrNodeAgentAnnotationNotFound {
-					log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
-				}
-			} else {
+		if len(r.podAnnotations) > 0 {
+			for k, v := range r.podAnnotations {
 				hostingPodAnnotation[k] = v
+			}
+		} else {
+			for _, k := range util.ThirdPartyAnnotations {
+				if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, du.Namespace, k, nodeOS); err != nil {
+					if err != nodeagent.ErrNodeAgentAnnotationNotFound {
+						log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
+					}
+				} else {
+					hostingPodAnnotation[k] = v
+				}
 			}
 		}
 

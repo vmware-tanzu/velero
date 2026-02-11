@@ -1307,6 +1307,7 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 					Message: "fake-pod-message",
 				},
 			},
+			Message: "fake-pod-message-1",
 		},
 	}
 
@@ -1501,7 +1502,7 @@ end diagnose CSI exposer`,
 				&backupVSWithoutStatus,
 			},
 			expected: `begin diagnose CSI exposer
-Pod velero/fake-backup, phase Pending, node name 
+Pod velero/fake-backup, phase Pending, node name , message fake-pod-message-1
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to 
 VS velero/fake-backup, bind to , readyToUse false, errMessage 
@@ -1518,7 +1519,7 @@ end diagnose CSI exposer`,
 				&backupVSWithoutVSC,
 			},
 			expected: `begin diagnose CSI exposer
-Pod velero/fake-backup, phase Pending, node name 
+Pod velero/fake-backup, phase Pending, node name , message fake-pod-message-1
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to 
 VS velero/fake-backup, bind to , readyToUse false, errMessage 
@@ -1535,7 +1536,7 @@ end diagnose CSI exposer`,
 				&backupVSWithoutVSC,
 			},
 			expected: `begin diagnose CSI exposer
-Pod velero/fake-backup, phase Pending, node name fake-node
+Pod velero/fake-backup, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 node-agent is not running in node fake-node, err: daemonset pod not found in running state in node fake-node
 PVC velero/fake-backup, phase Pending, binding to 
@@ -1554,7 +1555,7 @@ end diagnose CSI exposer`,
 				&backupVSWithoutVSC,
 			},
 			expected: `begin diagnose CSI exposer
-Pod velero/fake-backup, phase Pending, node name fake-node
+Pod velero/fake-backup, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to 
 VS velero/fake-backup, bind to , readyToUse false, errMessage 
@@ -1572,7 +1573,7 @@ end diagnose CSI exposer`,
 				&backupVSWithoutVSC,
 			},
 			expected: `begin diagnose CSI exposer
-Pod velero/fake-backup, phase Pending, node name fake-node
+Pod velero/fake-backup, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to fake-pv
 error getting backup pv fake-pv, err: persistentvolumes "fake-pv" not found
@@ -1592,7 +1593,7 @@ end diagnose CSI exposer`,
 				&backupVSWithoutVSC,
 			},
 			expected: `begin diagnose CSI exposer
-Pod velero/fake-backup, phase Pending, node name fake-node
+Pod velero/fake-backup, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to fake-pv
 PV fake-pv, phase Pending, reason , message fake-pv-message
@@ -1612,7 +1613,7 @@ end diagnose CSI exposer`,
 				&backupVSWithVSC,
 			},
 			expected: `begin diagnose CSI exposer
-Pod velero/fake-backup, phase Pending, node name fake-node
+Pod velero/fake-backup, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to fake-pv
 PV fake-pv, phase Pending, reason , message fake-pv-message
@@ -1634,7 +1635,7 @@ end diagnose CSI exposer`,
 				&backupVSC,
 			},
 			expected: `begin diagnose CSI exposer
-Pod velero/fake-backup, phase Pending, node name fake-node
+Pod velero/fake-backup, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to fake-pv
 PV fake-pv, phase Pending, reason , message fake-pv-message
@@ -1698,7 +1699,7 @@ end diagnose CSI exposer`,
 				&backupVSC,
 			},
 			expected: `begin diagnose CSI exposer
-Pod velero/fake-backup, phase Pending, node name fake-node
+Pod velero/fake-backup, phase Pending, node name fake-node, message 
 Pod condition Initialized, status True, reason , message fake-pod-message
 Pod event reason reason-2, message message-2
 Pod event reason reason-6, message message-6

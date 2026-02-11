@@ -116,11 +116,21 @@ type ObjectBackupStoreGetter interface {
 
 type objectBackupStoreGetter struct {
 	credentialStore credentials.FileStore
+	secretStore     credentials.SecretStore
 }
 
 // NewObjectBackupStoreGetter returns a ObjectBackupStoreGetter that can get a velero.BackupStore.
 func NewObjectBackupStoreGetter(credentialStore credentials.FileStore) ObjectBackupStoreGetter {
 	return &objectBackupStoreGetter{credentialStore: credentialStore}
+}
+
+// NewObjectBackupStoreGetterWithSecretStore returns an ObjectBackupStoreGetter with SecretStore
+// support for resolving caCertRef from Kubernetes Secrets.
+func NewObjectBackupStoreGetterWithSecretStore(credentialStore credentials.FileStore, secretStore credentials.SecretStore) ObjectBackupStoreGetter {
+	return &objectBackupStoreGetter{
+		credentialStore: credentialStore,
+		secretStore:     secretStore,
+	}
 }
 
 func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
@@ -160,7 +170,16 @@ func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocatio
 	objectStoreConfig["prefix"] = prefix
 
 	// Only include a CACert if it's specified in order to maintain compatibility with plugins that don't expect it.
-	if location.Spec.ObjectStorage.CACert != nil {
+	// Prefer caCertRef (from Secret) over inline caCert (deprecated).
+	if location.Spec.ObjectStorage.CACertRef != nil {
+		if b.secretStore != nil {
+			caCertString, err := b.secretStore.Get(location.Spec.ObjectStorage.CACertRef)
+			if err != nil {
+				return nil, errors.Wrap(err, "error getting CA certificate from secret")
+			}
+			objectStoreConfig["caCert"] = caCertString
+		}
+	} else if location.Spec.ObjectStorage.CACert != nil {
 		objectStoreConfig["caCert"] = string(location.Spec.ObjectStorage.CACert)
 	}
 
@@ -266,13 +285,12 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 	// Since the logic for all of these files is the exact same except for the name and the contents,
 	// use a map literal to iterate through them and write them to the bucket.
 	var backupObjs = map[string]io.Reader{
-		s.layout.getPodVolumeBackupsKey(info.Name):         info.PodVolumeBackups,
-		s.layout.getBackupVolumeSnapshotsKey(info.Name):    info.VolumeSnapshots,
-		s.layout.getBackupItemOperationsKey(info.Name):     info.BackupItemOperations,
-		s.layout.getBackupResourceListKey(info.Name):       info.BackupResourceList,
-		s.layout.getCSIVolumeSnapshotClassesKey(info.Name): info.CSIVolumeSnapshotClasses,
-		s.layout.getBackupResultsKey(info.Name):            info.BackupResults,
-		s.layout.getBackupVolumeInfoKey(info.Name):         info.BackupVolumeInfo,
+		s.layout.getPodVolumeBackupsKey(info.Name):      info.PodVolumeBackups,
+		s.layout.getBackupVolumeSnapshotsKey(info.Name): info.VolumeSnapshots,
+		s.layout.getBackupItemOperationsKey(info.Name):  info.BackupItemOperations,
+		s.layout.getBackupResourceListKey(info.Name):    info.BackupResourceList,
+		s.layout.getBackupResultsKey(info.Name):         info.BackupResults,
+		s.layout.getBackupVolumeInfoKey(info.Name):      info.BackupVolumeInfo,
 	}
 
 	for key, reader := range backupObjs {

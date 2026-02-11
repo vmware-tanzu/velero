@@ -1017,6 +1017,32 @@ func TestNewObjectBackupStoreGetterConfig(t *testing.T) {
 				"credentialsFile": "/tmp/credentials/secret-file",
 			},
 		},
+		{
+			name: "location with CACertRef is initialized with caCert from secret",
+			location: builder.ForBackupStorageLocation("", "").Provider(provider).Bucket(bucket).CACertRef(
+				builder.ForSecretKeySelector("cacert-secret", "ca.crt").Result(),
+			).Result(),
+			getter: NewObjectBackupStoreGetterWithSecretStore(
+				velerotest.NewFakeCredentialsFileStore("", nil),
+				velerotest.NewFakeCredentialsSecretStore("cacert-from-secret", nil),
+			),
+			wantConfig: map[string]string{
+				"bucket": "bucket",
+				"prefix": "",
+				"caCert": "cacert-from-secret",
+			},
+		},
+		{
+			name: "location with CACertRef and no SecretStore uses no caCert",
+			location: builder.ForBackupStorageLocation("", "").Provider(provider).Bucket(bucket).CACertRef(
+				builder.ForSecretKeySelector("cacert-secret", "ca.crt").Result(),
+			).Result(),
+			getter: NewObjectBackupStoreGetter(velerotest.NewFakeCredentialsFileStore("", nil)),
+			wantConfig: map[string]string{
+				"bucket": "bucket",
+				"prefix": "",
+			},
+		},
 	}
 
 	for _, tc := range tests {

@@ -290,9 +290,19 @@ func getJobConfig(
 		if globalResult.PriorityClassName != "" {
 			result.PriorityClassName = globalResult.PriorityClassName
 		}
+
+		// Pod's labels are only read from global config, not per-repository
+		if len(globalResult.PodLabels) > 0 {
+			result.PodLabels = globalResult.PodLabels
+		}
+
+		// Pod's annotations are only read from global config, not per-repository
+		if len(globalResult.PodAnnotations) > 0 {
+			result.PodAnnotations = globalResult.PodAnnotations
+		}
 	}
 
-	logger.Debugf("Didn't find content for repository %s in cm %s", repo.Name, repoMaintenanceJobConfig)
+	logger.Debugf("Configuration content for repository %s is %+v", repo.Name, result)
 
 	return result, nil
 }
@@ -580,17 +590,28 @@ func buildJob(
 	podLabels := map[string]string{
 		RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name),
 	}
-
-	for _, k := range util.ThirdPartyLabels {
-		if v := veleroutil.GetVeleroServerLabelValue(deployment, k); v != "" {
+	if config != nil && len(config.PodLabels) > 0 {
+		for k, v := range config.PodLabels {
 			podLabels[k] = v
+		}
+	} else {
+		for _, k := range util.ThirdPartyLabels {
+			if v := veleroutil.GetVeleroServerLabelValue(deployment, k); v != "" {
+				podLabels[k] = v
+			}
 		}
 	}
 
 	podAnnotations := map[string]string{}
-	for _, k := range util.ThirdPartyAnnotations {
-		if v := veleroutil.GetVeleroServerAnnotationValue(deployment, k); v != "" {
+	if config != nil && len(config.PodAnnotations) > 0 {
+		for k, v := range config.PodAnnotations {
 			podAnnotations[k] = v
+		}
+	} else {
+		for _, k := range util.ThirdPartyAnnotations {
+			if v := veleroutil.GetVeleroServerAnnotationValue(deployment, k); v != "" {
+				podAnnotations[k] = v
+			}
 		}
 	}
 
@@ -650,7 +671,8 @@ func buildJob(
 	}
 
 	if config != nil && len(config.LoadAffinities) > 0 {
-		affinity := kube.ToSystemAffinity(config.LoadAffinities)
+		// Maintenance job only takes the first loadAffinity.
+		affinity := kube.ToSystemAffinity([]*kube.LoadAffinity{config.LoadAffinities[0]})
 		job.Spec.Template.Spec.Affinity = affinity
 	}
 

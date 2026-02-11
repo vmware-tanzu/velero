@@ -89,8 +89,10 @@ type Options struct {
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
+	ConcurrentBackups               int
 	NodeAgentDisableHostPath        bool
 	kubeletRootDir                  string
+	Apply                           bool
 	ServerPriorityClassName         string
 	NodeAgentPriorityClassName      string
 }
@@ -101,6 +103,7 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.BucketName, "bucket", o.BucketName, "Name of the object storage bucket where backups should be stored")
 	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "File containing credentials for backup and volume provider. If not specified, --no-secret must be used for confirmation. Optional.")
 	flags.BoolVar(&o.NoSecret, "no-secret", o.NoSecret, "Flag indicating if a secret should be created. Must be used as confirmation if --secret-file is not provided. Optional.")
+	flags.BoolVar(&o.Apply, "apply", o.Apply, "Flag indicating if resources should be applied instead of created. This can be used for updating existing resources.")
 	flags.BoolVar(&o.NoDefaultBackupLocation, "no-default-backup-location", o.NoDefaultBackupLocation, "Flag indicating if a default backup location should be created. Must be used as confirmation if --bucket or --provider are not provided. Optional.")
 	flags.StringVar(&o.Image, "image", o.Image, "Image to use for the Velero and node agent pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
@@ -195,6 +198,12 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		"item-block-worker-count",
 		o.ItemBlockWorkerCount,
 		"Number of worker threads to process ItemBlocks. Default is one. Optional.",
+	)
+	flags.IntVar(
+		&o.ConcurrentBackups,
+		"concurrent-backups",
+		o.ConcurrentBackups,
+		"Number of backups to process concurrently. Default is one. Optional.",
 	)
 	flags.StringVar(
 		&o.ServerPriorityClassName,
@@ -313,6 +322,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		RepoMaintenanceJobConfigMap:     o.RepoMaintenanceJobConfigMap,
 		NodeAgentConfigMap:              o.NodeAgentConfigMap,
 		ItemBlockWorkerCount:            o.ItemBlockWorkerCount,
+		ConcurrentBackups:               o.ConcurrentBackups,
 		KubeletRootDir:                  o.kubeletRootDir,
 		NodeAgentDisableHostPath:        o.NodeAgentDisableHostPath,
 		ServerPriorityClassName:         o.ServerPriorityClassName,
@@ -408,7 +418,7 @@ func (o *Options) Run(c *cobra.Command, f client.Factory) error {
 
 	errorMsg := fmt.Sprintf("\n\nError installing Velero. Use `kubectl logs deploy/velero -n %s` to check the deploy logs", o.Namespace)
 
-	err = install.Install(dynamicFactory, kbClient, resources, os.Stdout)
+	err = install.Install(dynamicFactory, kbClient, resources, os.Stdout, o.Apply)
 	if err != nil {
 		return errors.Wrap(err, errorMsg)
 	}

@@ -46,6 +46,7 @@ type volumeConditions struct {
 	CSI          *csiVolumeSource  `yaml:"csi,omitempty"`
 	VolumeTypes  []SupportedVolume `yaml:"volumeTypes,omitempty"`
 	PVCLabels    map[string]string `yaml:"pvcLabels,omitempty"`
+	PVCPhase     []string          `yaml:"pvcPhase,omitempty"`
 }
 
 func (c *capacityCondition) validate() error {

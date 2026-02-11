@@ -1,9 +1,11 @@
 package volumehelper
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -11,6 +13,7 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -33,8 +36,16 @@ type volumeHelperImpl struct {
 	// to the volume policy check, but fs-backup is based on the pod resource,
 	// the resource filter on PVC and PV doesn't work on this scenario.
 	backupExcludePVC bool
+	// pvcPodCache provides cached PVC to Pod mappings for improved performance.
+	// When there are many PVCs and pods, using this cache avoids O(N*M) lookups.
+	pvcPodCache *podvolumeutil.PVCPodCache
 }
 
+// NewVolumeHelperImpl creates a VolumeHelper without PVC-to-Pod caching.
+//
+// Deprecated: Use NewVolumeHelperImplWithNamespaces or NewVolumeHelperImplWithCache instead
+// for better performance. These functions provide PVC-to-Pod caching which avoids O(N*M)
+// complexity when there are many PVCs and pods. See issue #9179 for details.
 func NewVolumeHelperImpl(
 	volumePolicy *resourcepolicies.Policies,
 	snapshotVolumes *bool,
@@ -43,6 +54,43 @@ func NewVolumeHelperImpl(
 	defaultVolumesToFSBackup bool,
 	backupExcludePVC bool,
 ) VolumeHelper {
+	// Pass nil namespaces - no cache will be built, so this never fails.
+	// This is used by plugins that don't need the cache optimization.
+	vh, _ := NewVolumeHelperImplWithNamespaces(
+		volumePolicy,
+		snapshotVolumes,
+		logger,
+		client,
+		defaultVolumesToFSBackup,
+		backupExcludePVC,
+		nil,
+	)
+	return vh
+}
+
+// NewVolumeHelperImplWithNamespaces creates a VolumeHelper with a PVC-to-Pod cache for improved performance.
+// The cache is built internally from the provided namespaces list.
+// This avoids O(N*M) complexity when there are many PVCs and pods.
+// See issue #9179 for details.
+// Returns an error if cache building fails - callers should not proceed with backup in this case.
+func NewVolumeHelperImplWithNamespaces(
+	volumePolicy *resourcepolicies.Policies,
+	snapshotVolumes *bool,
+	logger logrus.FieldLogger,
+	client crclient.Client,
+	defaultVolumesToFSBackup bool,
+	backupExcludePVC bool,
+	namespaces []string,
+) (VolumeHelper, error) {
+	var pvcPodCache *podvolumeutil.PVCPodCache
+	if len(namespaces) > 0 {
+		pvcPodCache = podvolumeutil.NewPVCPodCache()
+		if err := pvcPodCache.BuildCacheForNamespaces(context.Background(), namespaces, client); err != nil {
+			return nil, err
+		}
+		logger.Infof("Built PVC-to-Pod cache for %d namespaces", len(namespaces))
+	}
+
 	return &volumeHelperImpl{
 		volumePolicy:             volumePolicy,
 		snapshotVolumes:          snapshotVolumes,
@@ -50,7 +98,33 @@ func NewVolumeHelperImpl(
 		client:                   client,
 		defaultVolumesToFSBackup: defaultVolumesToFSBackup,
 		backupExcludePVC:         backupExcludePVC,
+		pvcPodCache:              pvcPodCache,
+	}, nil
+}
+
+// NewVolumeHelperImplWithCache creates a VolumeHelper using an externally managed PVC-to-Pod cache.
+// This is used by plugins that build the cache lazily per-namespace (following the pattern from PR #9226).
+// The cache can be nil, in which case PVC-to-Pod lookups will fall back to direct API calls.
+func NewVolumeHelperImplWithCache(
+	backup velerov1api.Backup,
+	client crclient.Client,
+	logger logrus.FieldLogger,
+	pvcPodCache *podvolumeutil.PVCPodCache,
+) (VolumeHelper, error) {
+	resourcePolicies, err := resourcepolicies.GetResourcePoliciesFromBackup(backup, client, logger)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get volume policies from backup")
 	}
+
+	return &volumeHelperImpl{
+		volumePolicy:             resourcePolicies,
+		snapshotVolumes:          backup.Spec.SnapshotVolumes,
+		logger:                   logger,
+		client:                   client,
+		defaultVolumesToFSBackup: boolptr.IsSetToTrue(backup.Spec.DefaultVolumesToFsBackup),
+		backupExcludePVC:         boolptr.IsSetToTrue(backup.Spec.SnapshotMoveData),
+		pvcPodCache:              pvcPodCache,
+	}, nil
 }
 
 func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, groupResource schema.GroupResource) (bool, error) {
@@ -60,6 +134,7 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 	pv := new(corev1api.PersistentVolume)
 	var err error
 
+	var pvNotFoundErr error
 	if groupResource == kuberesource.PersistentVolumeClaims {
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
 			v.logger.WithError(err).Error("fail to convert unstructured into PVC")
@@ -68,8 +143,10 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 
 		pv, err = kubeutil.GetPVForPVC(pvc, v.client)
 		if err != nil {
-			v.logger.WithError(err).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
-			return false, err
+			// Any error means PV not available - save to return later if no policy matches
+			v.logger.Debugf("PV not found for PVC %s: %v", pvc.Namespace+"/"+pvc.Name, err)
+			pvNotFoundErr = err
+			pv = nil
 		}
 	}
 
@@ -84,7 +161,7 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
 		action, err := v.volumePolicy.GetMatchAction(vfd)
 		if err != nil {
-			v.logger.WithError(err).Errorf("fail to get VolumePolicy match action for PV %s", pv.Name)
+			v.logger.WithError(err).Errorf("fail to get VolumePolicy match action for %+v", vfd)
 			return false, err
 		}
 
@@ -93,22 +170,30 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 		// If there is no match action, go on to the next check.
 		if action != nil {
 			if action.Type == resourcepolicies.Snapshot {
-				v.logger.Infof(fmt.Sprintf("performing snapshot action for pv %s", pv.Name))
+				v.logger.Infof("performing snapshot action for %+v", vfd)
 				return true, nil
 			} else {
-				v.logger.Infof("Skip snapshot action for pv %s as the action type is %s", pv.Name, action.Type)
+				v.logger.Infof("Skip snapshot action for %+v as the action type is %s", vfd, action.Type)
 				return false, nil
 			}
 		}
 	}
 
+	// If resource is PVC, and PV is nil (e.g., Pending/Lost PVC with no matching policy), return the original error
+	if groupResource == kuberesource.PersistentVolumeClaims && pv == nil && pvNotFoundErr != nil {
+		v.logger.WithError(pvNotFoundErr).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
+		return false, pvNotFoundErr
+	}
+
 	// If this PV is claimed, see if we've already taken a (pod volume backup)
 	// snapshot of the contents of this PV. If so, don't take a snapshot.
 	if pv.Spec.ClaimRef != nil {
-		pods, err := podvolumeutil.GetPodsUsingPVC(
+		// Use cached lookup if available for better performance with many PVCs/pods
+		pods, err := podvolumeutil.GetPodsUsingPVCWithCache(
 			pv.Spec.ClaimRef.Namespace,
 			pv.Spec.ClaimRef.Name,
 			v.client,
+			v.pvcPodCache,
 		)
 		if err != nil {
 			v.logger.WithError(err).Errorf("fail to get pod for PV %s", pv.Name)
@@ -133,7 +218,7 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 		return true, nil
 	}
 
-	v.logger.Infof(fmt.Sprintf("skipping snapshot action for pv %s possibly due to no volume policy setting or snapshotVolumes is false", pv.Name))
+	v.logger.Infof("skipping snapshot action for pv %s possibly due to no volume policy setting or snapshotVolumes is false", pv.Name)
 	return false, nil
 }
 
@@ -143,6 +228,7 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 		return false, nil
 	}
 
+	var pvNotFoundErr error
 	if v.volumePolicy != nil {
 		var resource any
 		var err error
@@ -154,10 +240,13 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 				v.logger.WithError(err).Errorf("fail to get PVC for pod %s", pod.Namespace+"/"+pod.Name)
 				return false, err
 			}
-			resource, err = kubeutil.GetPVForPVC(pvc, v.client)
+			pvResource, err := kubeutil.GetPVForPVC(pvc, v.client)
 			if err != nil {
-				v.logger.WithError(err).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
-				return false, err
+				// Any error means PV not available - save to return later if no policy matches
+				v.logger.Debugf("PV not found for PVC %s: %v", pvc.Namespace+"/"+pvc.Name, err)
+				pvNotFoundErr = err
+			} else {
+				resource = pvResource
 			}
 		}
 
@@ -183,6 +272,12 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 					volume.Name, pod.Namespace+"/"+pod.Name, action.Type)
 				return false, nil
 			}
+		}
+
+		// If no policy matched and PV was not found, return the original error
+		if pvNotFoundErr != nil {
+			v.logger.WithError(pvNotFoundErr).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
+			return false, pvNotFoundErr
 		}
 	}
 

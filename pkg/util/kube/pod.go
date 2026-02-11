@@ -140,7 +140,13 @@ func EnsureDeletePod(ctx context.Context, podGetter corev1client.CoreV1Interface
 func IsPodUnrecoverable(pod *corev1api.Pod, log logrus.FieldLogger) (bool, string) {
 	// Check the Phase field
 	if pod.Status.Phase == corev1api.PodFailed || pod.Status.Phase == corev1api.PodUnknown {
-		message := GetPodTerminateMessage(pod)
+		message := ""
+		if pod.Status.Message != "" {
+			message += pod.Status.Message + "/"
+		}
+
+		message += GetPodTerminateMessage(pod)
+
 		log.Warnf("Pod is in abnormal state %s, message [%s]", pod.Status.Phase, message)
 		return true, fmt.Sprintf("Pod is in abnormal state [%s], message [%s]", pod.Status.Phase, message)
 	}
@@ -269,7 +275,7 @@ func ToSystemAffinity(loadAffinities []*LoadAffinity) *corev1api.Affinity {
 }
 
 func DiagnosePod(pod *corev1api.Pod, events *corev1api.EventList) string {
-	diag := fmt.Sprintf("Pod %s/%s, phase %s, node name %s\n", pod.Namespace, pod.Name, pod.Status.Phase, pod.Spec.NodeName)
+	diag := fmt.Sprintf("Pod %s/%s, phase %s, node name %s, message %s\n", pod.Namespace, pod.Name, pod.Status.Phase, pod.Spec.NodeName, pod.Status.Message)
 
 	for _, condition := range pod.Status.Conditions {
 		diag += fmt.Sprintf("Pod condition %s, status %s, reason %s, message %s\n", condition.Type, condition.Status, condition.Reason, condition.Message)

@@ -1,1 +1,0 @@
-Protect VolumeSnapshot field from race condition during multi-thread backup

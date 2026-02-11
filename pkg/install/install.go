@@ -278,30 +278,45 @@ func GroupResources(resources *unstructured.UnstructuredList) *ResourceGroup {
 	return rg
 }
 
-// createResource attempts to create a resource in the cluster.
-// If the resource already exists in the cluster, it's merely logged.
-func createResource(r *unstructured.Unstructured, factory client.DynamicFactory, w io.Writer) error {
+// createOrApplyResource attempts to create or apply a resource in the cluster.
+// If apply is true, it uses server-side apply to update existing resources.
+// If apply is false and the resource already exists in the cluster, it's merely logged.
+func createOrApplyResource(r *unstructured.Unstructured, factory client.DynamicFactory, w io.Writer, apply bool) error {
 	id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
 
 	// Helper to reduce boilerplate message about the same object
-	log := func(f string, a ...any) {
-		format := strings.Join([]string{id, ": ", f, "\n"}, "")
-		fmt.Fprintf(w, format, a...)
+	log := func(f string) {
+		fmt.Fprintf(w, "%s: %s\n", id, f)
 	}
-	log("attempting to create resource")
 
 	c, err := CreateClient(r, factory, w)
 	if err != nil {
 		return err
 	}
 
-	if _, err := c.Create(r); apierrors.IsAlreadyExists(err) {
-		log("already exists, proceeding")
-	} else if err != nil {
-		return errors.Wrapf(err, "Error creating resource %s", id)
+	if apply {
+		log("attempting to apply resource")
+		// Set field manager for server-side apply and force to override conflicts
+		applyOpts := metav1.ApplyOptions{
+			FieldManager: "velero-cli",
+			Force:        true,
+		}
+
+		if _, err := c.Apply(r.GetName(), r, applyOpts); err != nil {
+			return errors.Wrapf(err, "Error applying resource %s", id)
+		}
+		log("applied")
+	} else {
+		log("attempting to create resource")
+		if _, err := c.Create(r); apierrors.IsAlreadyExists(err) {
+			log("already exists, proceeding")
+		} else if err != nil {
+			return errors.Wrapf(err, "Error creating resource %s", id)
+		} else {
+			log("created")
+		}
 	}
 
-	log("created")
 	return nil
 }
 
@@ -335,13 +350,14 @@ func CreateClient(r *unstructured.Unstructured, factory client.DynamicFactory, w
 // An unstructured list of resources is sent, one at a time, to the server. These are assumed to be in the preferred order already.
 // Resources will be sorted into CustomResourceDefinitions and any other resource type, and the function will wait up to 1 minute
 // for CRDs to be ready before proceeding.
+// If apply is true, it uses server-side apply to update existing resources.
 // An io.Writer can be used to output to a log or the console.
-func Install(dynamicFactory client.DynamicFactory, kbClient kbclient.Client, resources *unstructured.UnstructuredList, w io.Writer) error {
+func Install(dynamicFactory client.DynamicFactory, kbClient kbclient.Client, resources *unstructured.UnstructuredList, w io.Writer, apply bool) error {
 	rg := GroupResources(resources)
 
 	//Install CRDs first
 	for _, r := range rg.CRDResources {
-		if err := createResource(r, dynamicFactory, w); err != nil {
+		if err := createOrApplyResource(r, dynamicFactory, w, apply); err != nil {
 			return err
 		}
 	}
@@ -357,7 +373,7 @@ func Install(dynamicFactory client.DynamicFactory, kbClient kbclient.Client, res
 
 	// Install all other resources
 	for _, r := range rg.OtherResources {
-		if err = createResource(r, dynamicFactory, w); err != nil {
+		if err = createOrApplyResource(r, dynamicFactory, w, apply); err != nil {
 			return err
 		}
 	}

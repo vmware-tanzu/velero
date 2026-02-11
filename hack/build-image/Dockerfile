@@ -21,9 +21,11 @@ ENV GO111MODULE=on
 ENV GOPROXY=${GOPROXY}
 
 # kubebuilder test bundle is separated from kubebuilder. Need to setup it for CI test.
-RUN curl -sSLo envtest-bins.tar.gz https://go.kubebuilder.io/test-tools/1.22.1/linux/$(go env GOARCH) && \
-    mkdir /usr/local/kubebuilder && \
-    tar -C /usr/local/kubebuilder --strip-components=1 -zvxf envtest-bins.tar.gz
+# Using setup-envtest to download envtest binaries
+RUN go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest && \
+    mkdir -p /usr/local/kubebuilder/bin && \
+    ENVTEST_ASSETS_DIR=$(setup-envtest use 1.33.0 --bin-dir /usr/local/kubebuilder/bin -p path) && \
+    cp -r ${ENVTEST_ASSETS_DIR}/* /usr/local/kubebuilder/bin/
 
 RUN wget --quiet https://github.com/kubernetes-sigs/kubebuilder/releases/download/v3.2.0/kubebuilder_linux_$(go env GOARCH) && \
     mv kubebuilder_linux_$(go env GOARCH) /usr/local/kubebuilder/bin/kubebuilder && \
@@ -94,7 +96,7 @@ RUN ARCH=$(go env GOARCH) && \
     chmod +x /usr/bin/goreleaser
 
 # get golangci-lint
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.5.0
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.5.0
 
 # install kubectl
 RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/$(go env GOARCH)/kubectl

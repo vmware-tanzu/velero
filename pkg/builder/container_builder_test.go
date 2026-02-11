@@ -100,3 +100,50 @@ func TestGetName(t *testing.T) {
 		})
 	}
 }
+
+func TestGetNameWithLongPaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		image    string
+		validate func(t *testing.T, result string)
+	}{
+		{
+			name:  "plugin with deeply nested repository path exceeding 63 characters",
+			image: "arohcpsvcdev.azurecr.io/redhat-user-workloads/ocp-art-tenant/oadp-hypershift-oadp-plugin-main@sha256:adb840bf3890b4904a8cdda1a74c82cf8d96c52eba9944ac10e795335d6fd450",
+			validate: func(t *testing.T, result string) {
+				t.Helper()
+				// Should not exceed DNS-1123 label limit of 63 characters
+				assert.LessOrEqual(t, len(result), 63, "Container name must satisfy DNS-1123 label constraints (max 63 chars)")
+				// Should be exactly 63 characters (truncated with hash)
+				assert.Len(t, result, 63)
+				// Should be deterministic
+				result2 := getName("arohcpsvcdev.azurecr.io/redhat-user-workloads/ocp-art-tenant/oadp-hypershift-oadp-plugin-main@sha256:adb840bf3890b4904a8cdda1a74c82cf8d96c52eba9944ac10e795335d6fd450")
+				assert.Equal(t, result, result2)
+			},
+		},
+		{
+			name:  "plugin with normal path length (should remain unchanged)",
+			image: "arohcpsvcdev.azurecr.io/konveyor/velero-plugin-for-microsoft-azure@sha256:b2db5f09da514e817a74c992dcca5f90b77c2ab0b2797eba947d224271d6070e",
+			validate: func(t *testing.T, result string) {
+				t.Helper()
+				assert.Equal(t, "konveyor-velero-plugin-for-microsoft-azure", result)
+				assert.LessOrEqual(t, len(result), 63)
+			},
+		},
+		{
+			name:  "very long nested path",
+			image: "registry.example.com/org/team/project/subproject/component/service/application-name-with-many-words:v1.2.3",
+			validate: func(t *testing.T, result string) {
+				t.Helper()
+				assert.LessOrEqual(t, len(result), 63)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := getName(test.image)
+			test.validate(t, result)
+		})
+	}
+}

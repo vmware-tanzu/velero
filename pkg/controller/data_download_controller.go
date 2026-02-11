@@ -77,6 +77,8 @@ type DataDownloadReconciler struct {
 	cancelledDataDownload map[string]time.Time
 	dataMovePriorityClass string
 	repoConfigMgr         repository.ConfigManager
+	podLabels             map[string]string
+	podAnnotations        map[string]string
 }
 
 func NewDataDownloadReconciler(
@@ -96,6 +98,8 @@ func NewDataDownloadReconciler(
 	metrics *metrics.ServerMetrics,
 	dataMovePriorityClass string,
 	repoConfigMgr repository.ConfigManager,
+	podLabels map[string]string,
+	podAnnotations map[string]string,
 ) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:                client,
@@ -117,6 +121,8 @@ func NewDataDownloadReconciler(
 		cancelledDataDownload: make(map[string]time.Time),
 		dataMovePriorityClass: dataMovePriorityClass,
 		repoConfigMgr:         repoConfigMgr,
+		podLabels:             podLabels,
+		podAnnotations:        podAnnotations,
 	}
 }
 
@@ -286,8 +292,14 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	} else if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted {
 		if peekErr := r.restoreExposer.PeekExposed(ctx, getDataDownloadOwnerObject(dd)); peekErr != nil {
-			r.tryCancelDataDownload(ctx, dd, fmt.Sprintf("found a datadownload %s/%s with expose error: %s. mark it as cancel", dd.Namespace, dd.Name, peekErr))
 			log.Errorf("Cancel dd %s/%s because of expose error %s", dd.Namespace, dd.Name, peekErr)
+
+			diags := strings.Split(r.restoreExposer.DiagnoseExpose(ctx, getDataDownloadOwnerObject(dd)), "\n")
+			for _, diag := range diags {
+				log.Warnf("[Diagnose DD expose]%s", diag)
+			}
+
+			r.tryCancelDataDownload(ctx, dd, fmt.Sprintf("found a datadownload %s/%s with expose error: %s. mark it as cancel", dd.Namespace, dd.Name, peekErr))
 		} else if dd.Status.AcceptedTimestamp != nil {
 			if time.Since(dd.Status.AcceptedTimestamp.Time) >= r.preparingTimeout {
 				r.onPrepareTimeout(ctx, dd)
@@ -860,24 +872,36 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 	}
 
 	hostingPodLabels := map[string]string{velerov1api.DataDownloadLabel: dd.Name}
-	for _, k := range util.ThirdPartyLabels {
-		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, dd.Namespace, k, nodeOS); err != nil {
-			if err != nodeagent.ErrNodeAgentLabelNotFound {
-				log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
-			}
-		} else {
+	if len(r.podLabels) > 0 {
+		for k, v := range r.podLabels {
 			hostingPodLabels[k] = v
+		}
+	} else {
+		for _, k := range util.ThirdPartyLabels {
+			if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, dd.Namespace, k, nodeOS); err != nil {
+				if err != nodeagent.ErrNodeAgentLabelNotFound {
+					log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
+				}
+			} else {
+				hostingPodLabels[k] = v
+			}
 		}
 	}
 
 	hostingPodAnnotation := map[string]string{}
-	for _, k := range util.ThirdPartyAnnotations {
-		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, dd.Namespace, k, nodeOS); err != nil {
-			if err != nodeagent.ErrNodeAgentAnnotationNotFound {
-				log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
-			}
-		} else {
+	if len(r.podAnnotations) > 0 {
+		for k, v := range r.podAnnotations {
 			hostingPodAnnotation[k] = v
+		}
+	} else {
+		for _, k := range util.ThirdPartyAnnotations {
+			if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, dd.Namespace, k, nodeOS); err != nil {
+				if err != nodeagent.ErrNodeAgentAnnotationNotFound {
+					log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
+				}
+			} else {
+				hostingPodAnnotation[k] = v
+			}
 		}
 	}
 
@@ -900,7 +924,7 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 			cacheVolume = &exposer.CacheConfigs{
 				Limit:             limit,
 				StorageClass:      r.cacheVolumeConfigs.StorageClass,
-				ResidentThreshold: r.cacheVolumeConfigs.ResidentThreshold,
+				ResidentThreshold: r.cacheVolumeConfigs.ResidentThresholdInMB << 20,
 			}
 		}
 	}

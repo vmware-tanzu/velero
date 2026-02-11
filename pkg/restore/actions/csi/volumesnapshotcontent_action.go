@@ -108,6 +108,14 @@ func (p *volumeSnapshotContentRestoreItemAction) Execute(
 		return nil, errors.Errorf("fail to get snapshot handle from VSC %s status", vsc.Name)
 	}
 
+	if vsc.Spec.VolumeSnapshotClassName != nil {
+		// Delete VolumeSnapshotClass from the VolumeSnapshotContent.
+		// This is necessary to make the restore independent of the VolumeSnapshotClass.
+		vsc.Spec.VolumeSnapshotClassName = nil
+		p.log.Debugf("Deleted VolumeSnapshotClassName from VolumeSnapshotContent %s to make restore independent of VolumeSnapshotClass",
+			vsc.Name)
+	}
+
 	additionalItems := []velero.ResourceIdentifier{}
 	if csi.IsVolumeSnapshotContentHasDeleteSecret(&vsc) {
 		additionalItems = append(additionalItems,

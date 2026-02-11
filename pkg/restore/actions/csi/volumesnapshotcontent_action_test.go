@@ -55,13 +55,17 @@ func TestVSCExecute(t *testing.T) {
 		},
 		{
 			name: "Normal case, additional items should return    ",
-			vsc: builder.ForVolumeSnapshotContent("test").ObjectMeta(builder.WithAnnotationsMap(
-				map[string]string{
-					velerov1api.PrefixedSecretNameAnnotation:      "name",
-					velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
-				},
-			)).VolumeSnapshotRef("velero", "vsName", "vsUID").
-				Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).Result(),
+			vsc: builder.ForVolumeSnapshotContent("test").
+				ObjectMeta(builder.WithAnnotationsMap(
+					map[string]string{
+						velerov1api.PrefixedSecretNameAnnotation:      "name",
+						velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
+					},
+				)).
+				VolumeSnapshotRef("velero", "vsName", "vsUID").
+				VolumeSnapshotClassName("vsClass").
+				Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).
+				Result(),
 			restore: builder.ForRestore("velero", "restore").ObjectMeta(builder.WithUID("restoreUID")).
 				NamespaceMappings("velero", "restore").Result(),
 			expectErr: false,
@@ -72,15 +76,17 @@ func TestVSCExecute(t *testing.T) {
 					Name:          "name",
 				},
 			},
-			expectedVSC: builder.ForVolumeSnapshotContent(newVscName).ObjectMeta(builder.WithAnnotationsMap(
-				map[string]string{
-					velerov1api.PrefixedSecretNameAnnotation:      "name",
-					velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
-				},
-			)).VolumeSnapshotRef("restore", newVscName, "").
+			expectedVSC: builder.ForVolumeSnapshotContent(newVscName).
+				ObjectMeta(builder.WithAnnotationsMap(
+					map[string]string{
+						velerov1api.PrefixedSecretNameAnnotation:      "name",
+						velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
+					},
+				)).VolumeSnapshotRef("restore", newVscName, "").
 				Source(snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: &snapshotHandleName}).
 				DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).
-				Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).Result(),
+				Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).
+				Result(),
 		},
 		{
 			name: "VSC exists in cluster, same as the normal case",
