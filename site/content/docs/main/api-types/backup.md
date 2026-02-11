@@ -16,6 +16,8 @@ Backup belongs to the API group version `velero.io/v1`.
 
 Here is a sample `Backup` object with each of the fields documented:
 
+**Note:** Namespace includes/excludes support glob patterns (`*`, `?`, `[abc]`). See [Namespace Glob Patterns](../namespace-glob-patterns) for more details.
+
 ```yaml
 # Standard Kubernetes API Version declaration. Required.
 apiVersion: velero.io/v1
@@ -42,12 +44,12 @@ spec:
   resourcePolicy:
     kind: configmap
     name: resource-policy-configmap
-  # Array of namespaces to include in the backup. Accepts glob patterns. If unspecified, all namespaces are included.
+  # Array of namespaces to include in the backup. Accepts glob patterns (*, ?, [abc]).
   # Note: '*' alone is reserved for empty fields, which means all namespaces.
-  # Optional.
+  # If unspecified, all namespaces are included. Optional.
   includedNamespaces:
   - '*'
-  # Array of namespaces to exclude from the backup. Accepts glob patterns. Optional.
+  # Array of namespaces to exclude from the backup. Accepts glob patterns (*, ?, [abc]). Optional.
   excludedNamespaces:
   - some-namespace
   # Array of resources to include in the backup. Resources may be shortcuts (for example 'po' for 'pods')

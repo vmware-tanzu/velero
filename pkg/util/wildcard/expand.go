@@ -31,11 +31,11 @@ func ShouldExpandWildcards(includes []string, excludes []string) bool {
 }
 
 // containsWildcardPattern checks if a pattern contains any wildcard symbols
-// Supported patterns: *, ?, [abc], {a,b,c}
+// Supported patterns: *, ?, [abc]
 // Note: . and + are treated as literal characters (not wildcards)
 // Note: ** and consecutive asterisks are NOT supported (will cause validation error)
 func containsWildcardPattern(pattern string) bool {
-	return strings.ContainsAny(pattern, "*?[{")
+	return strings.ContainsAny(pattern, "*?[")
 }
 
 func validateWildcardPatterns(patterns []string) error {
@@ -49,8 +49,8 @@ func validateWildcardPatterns(patterns []string) error {
 
 func ValidateNamespaceName(pattern string) error {
 	// Check for invalid characters that are not supported in glob patterns
-	if strings.ContainsAny(pattern, "|()!") {
-		return errors.New("wildcard pattern contains unsupported characters: |, (, ), ! ")
+	if strings.ContainsAny(pattern, "|()!{},") {
+		return errors.New("wildcard pattern contains unsupported characters: |, (, ), !, {, }, ,")
 	}
 
 	// Check for consecutive asterisks (2 or more)
