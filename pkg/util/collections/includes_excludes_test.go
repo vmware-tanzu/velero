@@ -289,6 +289,54 @@ func TestValidateNamespaceIncludesExcludes(t *testing.T) {
 			excludes: []string{"bar"},
 			wantErr:  true,
 		},
+		{
+			name:     "glob characters in includes should not error",
+			includes: []string{"kube-*", "test-?", "ns-[0-9]"},
+			excludes: []string{},
+			wantErr:  false,
+		},
+		{
+			name:     "glob characters in excludes should not error",
+			includes: []string{"default"},
+			excludes: []string{"test-*", "app-?", "ns-[1-5]"},
+			wantErr:  false,
+		},
+		{
+			name:     "character class in includes should not error",
+			includes: []string{"ns-[abc]", "test-[0-9]"},
+			excludes: []string{},
+			wantErr:  false,
+		},
+		{
+			name:     "mixed glob patterns should not error",
+			includes: []string{"kube-*", "test-?"},
+			excludes: []string{"*-test", "debug-[0-9]"},
+			wantErr:  false,
+		},
+		{
+			name:     "pipe character in includes should error",
+			includes: []string{"namespace|other"},
+			excludes: []string{},
+			wantErr:  true,
+		},
+		{
+			name:     "parentheses in includes should error",
+			includes: []string{"namespace(prod)", "test-(dev)"},
+			excludes: []string{},
+			wantErr:  true,
+		},
+		{
+			name:     "exclamation mark in includes should error",
+			includes: []string{"!namespace", "test!"},
+			excludes: []string{},
+			wantErr:  true,
+		},
+		{
+			name:     "unsupported characters in excludes should error",
+			includes: []string{"default"},
+			excludes: []string{"test|prod", "app(staging)"},
+			wantErr:  true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -1083,16 +1131,6 @@ func TestExpandIncludesExcludes(t *testing.T) {
 			expectError:              false,
 		},
 		{
-			name:                     "brace wildcard pattern",
-			includes:                 []string{"app-{prod,dev}"},
-			excludes:                 []string{},
-			activeNamespaces:         []string{"app-prod", "app-dev", "app-test", "default"},
-			expectedIncludes:         []string{"app-prod", "app-dev"},
-			expectedExcludes:         []string{},
-			expectedWildcardExpanded: true,
-			expectError:              false,
-		},
-		{
 			name:                     "empty activeNamespaces with wildcards",
 			includes:                 []string{"kube-*"},
 			excludes:                 []string{},
@@ -1232,13 +1270,6 @@ func TestResolveNamespaceList(t *testing.T) {
 			activeNamespaces:   []string{"default", "kube-system", "kube-public"},
 			expectedNamespaces: []string{"kube-system", "kube-public"},
 			preExpandWildcards: true,
-		},
-		{
-			name:               "complex wildcard pattern",
-			includes:           []string{"app-{prod,dev}", "kube-*"},
-			excludes:           []string{"*-test"},
-			activeNamespaces:   []string{"app-prod", "app-dev", "app-test", "kube-system", "kube-test", "default"},
-			expectedNamespaces: []string{"app-prod", "app-dev", "kube-system"},
 		},
 		{
 			name:               "question mark wildcard pattern",

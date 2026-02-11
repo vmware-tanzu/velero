@@ -16,6 +16,8 @@ Restore belongs to the API group version `velero.io/v1`.
 
 Here is a sample `Restore` object with each of the fields documented:
 
+**Note:** Namespace includes/excludes support glob patterns (`*`, `?`, `[abc]`). See [Namespace Glob Patterns](../namespace-glob-patterns) for more details.
+
 ```yaml
 # Standard Kubernetes API Version declaration. Required.
 apiVersion: velero.io/v1
@@ -45,11 +47,11 @@ spec:
     writeSparseFiles: true
     # ParallelFilesDownload is the concurrency number setting for restore
     parallelFilesDownload: 10
-  # Array of namespaces to include in the restore. If unspecified, all namespaces are included.
-  # Optional.
+  # Array of namespaces to include in the restore. Accepts glob patterns (*, ?, [abc]).
+  # If unspecified, all namespaces are included. Optional.
   includedNamespaces:
   - '*'
-  # Array of namespaces to exclude from the restore. Optional.
+  # Array of namespaces to exclude from the restore. Accepts glob patterns (*, ?, [abc]). Optional.
   excludedNamespaces:
   - some-namespace
   # Array of resources to include in the restore. Resources may be shortcuts (for example 'po' for 'pods')
