@@ -41,6 +41,8 @@ The following patterns are **not supported** and will cause validation errors:
 - `|` - Alternation (regex operator)
 - `()` - Grouping (regex operators)
 - `!` - Negation
+- `{}` - Brace expansion
+- `,` - Comma (used in brace expansion)
 
 ## Special Cases
 
