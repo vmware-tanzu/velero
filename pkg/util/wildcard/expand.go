@@ -31,70 +31,77 @@ func ShouldExpandWildcards(includes []string, excludes []string) bool {
 }
 
 // containsWildcardPattern checks if a pattern contains any wildcard symbols
-// Supported patterns: *, ?, [abc], {a,b,c}
+// Supported patterns: *, ?, [abc]
 // Note: . and + are treated as literal characters (not wildcards)
 // Note: ** and consecutive asterisks are NOT supported (will cause validation error)
 func containsWildcardPattern(pattern string) bool {
-	return strings.ContainsAny(pattern, "*?[{")
+	return strings.ContainsAny(pattern, "*?[")
 }
 
 func validateWildcardPatterns(patterns []string) error {
 	for _, pattern := range patterns {
-		// Check for invalid regex-only patterns that we don't support
-		if strings.ContainsAny(pattern, "|()") {
-			return errors.New("wildcard pattern contains unsupported regex symbols: |, (, )")
-		}
-
-		// Check for consecutive asterisks (2 or more)
-		if strings.Contains(pattern, "**") {
-			return errors.New("wildcard pattern contains consecutive asterisks (only single * allowed)")
-		}
-
-		// Check for malformed brace patterns
-		if err := validateBracePatterns(pattern); err != nil {
+		if err := ValidateNamespaceName(pattern); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+func ValidateNamespaceName(pattern string) error {
+	// Check for invalid characters that are not supported in glob patterns
+	if strings.ContainsAny(pattern, "|()!{},") {
+		return errors.New("wildcard pattern contains unsupported characters: |, (, ), !, {, }, ,")
+	}
+
+	// Check for consecutive asterisks (2 or more)
+	if strings.Contains(pattern, "**") {
+		return errors.New("wildcard pattern contains consecutive asterisks (only single * allowed)")
+	}
+
+	// Check for malformed brace patterns
+	if err := validateBracePatterns(pattern); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // validateBracePatterns checks for malformed brace patterns like unclosed braces or empty braces
+// Also validates bracket patterns [] for character classes
 func validateBracePatterns(pattern string) error {
-	depth := 0
+	bracketDepth := 0
 
 	for i := 0; i < len(pattern); i++ {
-		if pattern[i] == '{' {
-			braceStart := i
-			depth++
+		if pattern[i] == '[' {
+			bracketStart := i
+			bracketDepth++
 
-			// Scan ahead to find the matching closing brace and validate content
-			for j := i + 1; j < len(pattern) && depth > 0; j++ {
-				if pattern[j] == '{' {
-					depth++
-				} else if pattern[j] == '}' {
-					depth--
-					if depth == 0 {
-						// Found matching closing brace - validate content
-						content := pattern[braceStart+1 : j]
-						if strings.Trim(content, ", \t") == "" {
-							return errors.New("wildcard pattern contains empty brace pattern '{}'")
+			// Scan ahead to find the matching closing bracket and validate content
+			for j := i + 1; j < len(pattern) && bracketDepth > 0; j++ {
+				if pattern[j] == ']' {
+					bracketDepth--
+					if bracketDepth == 0 {
+						// Found matching closing bracket - validate content
+						content := pattern[bracketStart+1 : j]
+						if content == "" {
+							return errors.New("wildcard pattern contains empty bracket pattern '[]'")
 						}
-						// Skip to the closing brace
+						// Skip to the closing bracket
 						i = j
 						break
 					}
 				}
 			}
 
-			// If we exited the loop without finding a match (depth > 0), brace is unclosed
-			if depth > 0 {
-				return errors.New("wildcard pattern contains unclosed brace '{'")
+			// If we exited the loop without finding a match (bracketDepth > 0), bracket is unclosed
+			if bracketDepth > 0 {
+				return errors.New("wildcard pattern contains unclosed bracket '['")
 			}
 
-			// i is now positioned at the closing brace; the outer loop will increment it
-		} else if pattern[i] == '}' {
-			// Found a closing brace without a matching opening brace
-			return errors.New("wildcard pattern contains unmatched closing brace '}'")
+			// i is now positioned at the closing bracket; the outer loop will increment it
+		} else if pattern[i] == ']' {
+			// Found a closing bracket without a matching opening bracket
+			return errors.New("wildcard pattern contains unmatched closing bracket ']'")
 		}
 	}
 
