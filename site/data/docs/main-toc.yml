@@ -33,6 +33,8 @@ toc:
         url: /enable-api-group-versions-feature
       - page: Resource filtering
         url: /resource-filtering
+      - page: Namespace glob patterns
+        url: /namespace-glob-patterns
       - page: Backup reference
         url: /backup-reference
       - page: Backup hooks
