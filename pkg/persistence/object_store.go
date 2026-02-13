@@ -74,6 +74,7 @@ type BackupStore interface {
 	PutBackupVolumeInfos(name string, volumeInfo io.Reader) error
 	GetBackupVolumeInfos(name string) ([]*volume.BackupVolumeInfo, error)
 	GetRestoreResults(name string) (map[string]results.Result, error)
+	GetBackupResults(name string) (map[string]results.Result, error)
 
 	// BackupExists checks if the backup metadata file exists in object storage.
 	BackupExists(bucket, backupName string) (bool, error)
@@ -539,6 +540,25 @@ func (s *objectBackupStore) GetRestoreResults(name string) (map[string]results.R
 	results := make(map[string]results.Result)
 
 	res, err := tryGet(s.objectStore, s.bucket, s.layout.getRestoreResultsKey(name))
+	if err != nil {
+		return results, err
+	}
+	if res == nil {
+		return results, nil
+	}
+	defer res.Close()
+
+	if err := decode(res, &results); err != nil {
+		return results, err
+	}
+
+	return results, nil
+}
+
+func (s *objectBackupStore) GetBackupResults(name string) (map[string]results.Result, error) {
+	results := make(map[string]results.Result)
+
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getBackupResultsKey(name))
 	if err != nil {
 		return results, err
 	}
