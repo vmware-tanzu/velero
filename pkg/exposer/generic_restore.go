@@ -493,13 +493,13 @@ func (e *genericRestoreExposer) createRestorePod(
 	containerName := string(ownerObject.UID)
 	volumeName := string(ownerObject.UID)
 
-	var podAffinity *corev1api.Affinity
-	if selectedNode == "" {
-		e.log.Infof("No selected node for restore pod. Try to get affinity from the node-agent config.")
+	if selectedNode != "" {
+		affinity = nil
+		e.log.Infof("Selected node for restore pod. Ignore affinity from the node-agent config.")
+	}
 
-		if affinity != nil {
-			podAffinity = kube.ToSystemAffinity([]*kube.LoadAffinity{affinity})
-		}
+	if affinity == nil {
+		affinity = &kube.LoadAffinity{}
 	}
 
 	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, nodeOS)
@@ -576,8 +576,13 @@ func (e *genericRestoreExposer) createRestorePod(
 			},
 		}
 
-		nodeSelector[kube.NodeOSLabel] = kube.NodeOSWindows
 		podOS.Name = kube.NodeOSWindows
+
+		affinity.NodeSelector.MatchExpressions = append(affinity.NodeSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+			Key:      kube.NodeOSLabel,
+			Values:   []string{kube.NodeOSWindows},
+			Operator: metav1.LabelSelectorOpIn,
+		})
 
 		toleration = append(toleration, []corev1api.Toleration{
 			{
@@ -599,9 +604,16 @@ func (e *genericRestoreExposer) createRestorePod(
 			RunAsUser: &userID,
 		}
 
-		nodeSelector[kube.NodeOSLabel] = kube.NodeOSLinux
 		podOS.Name = kube.NodeOSLinux
+
+		affinity.NodeSelector.MatchExpressions = append(affinity.NodeSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+			Key:      kube.NodeOSLabel,
+			Values:   []string{kube.NodeOSWindows},
+			Operator: metav1.LabelSelectorOpNotIn,
+		})
 	}
+
+	podAffinity := kube.ToSystemAffinity([]*kube.LoadAffinity{affinity})
 
 	pod := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{

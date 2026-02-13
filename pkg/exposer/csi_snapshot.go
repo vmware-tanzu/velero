@@ -320,7 +320,8 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1a
 	curLog.WithField("pod", pod.Name).Infof("Backup volume is found in pod at index %v", i)
 
 	var nodeOS *string
-	if os, found := pod.Spec.NodeSelector[kube.NodeOSLabel]; found {
+	if pod.Spec.OS != nil {
+		os := string(pod.Spec.OS.Name)
 		nodeOS = &os
 	}
 
@@ -643,6 +644,10 @@ func (e *csiSnapshotExposer) createBackupPod(
 	args = append(args, podInfo.logFormatArgs...)
 	args = append(args, podInfo.logLevelArgs...)
 
+	if affinity == nil {
+		affinity = &kube.LoadAffinity{}
+	}
+
 	var securityCtx *corev1api.PodSecurityContext
 	nodeSelector := map[string]string{}
 	podOS := corev1api.PodOS{}
@@ -654,8 +659,13 @@ func (e *csiSnapshotExposer) createBackupPod(
 			},
 		}
 
-		nodeSelector[kube.NodeOSLabel] = kube.NodeOSWindows
 		podOS.Name = kube.NodeOSWindows
+
+		affinity.NodeSelector.MatchExpressions = append(affinity.NodeSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+			Key:      kube.NodeOSLabel,
+			Values:   []string{kube.NodeOSWindows},
+			Operator: metav1.LabelSelectorOpIn,
+		})
 
 		toleration = append(toleration, []corev1api.Toleration{
 			{
@@ -683,11 +693,15 @@ func (e *csiSnapshotExposer) createBackupPod(
 			}
 		}
 
-		nodeSelector[kube.NodeOSLabel] = kube.NodeOSLinux
 		podOS.Name = kube.NodeOSLinux
+
+		affinity.NodeSelector.MatchExpressions = append(affinity.NodeSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+			Key:      kube.NodeOSLabel,
+			Values:   []string{kube.NodeOSWindows},
+			Operator: metav1.LabelSelectorOpNotIn,
+		})
 	}
 
-	var podAffinity *corev1api.Affinity
 	if len(intoleratableNodes) > 0 {
 		if affinity == nil {
 			affinity = &kube.LoadAffinity{}
@@ -700,9 +714,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 		})
 	}
 
-	if affinity != nil {
-		podAffinity = kube.ToSystemAffinity([]*kube.LoadAffinity{affinity})
-	}
+	podAffinity := kube.ToSystemAffinity([]*kube.LoadAffinity{affinity})
 
 	pod := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{

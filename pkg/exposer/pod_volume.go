@@ -434,6 +434,8 @@ func (e *podVolumeExposer) createHostingPod(
 	args = append(args, podInfo.logFormatArgs...)
 	args = append(args, podInfo.logLevelArgs...)
 
+	affinity := &kube.LoadAffinity{}
+
 	var securityCtx *corev1api.PodSecurityContext
 	var containerSecurityCtx *corev1api.SecurityContext
 	nodeSelector := map[string]string{}
@@ -446,8 +448,13 @@ func (e *podVolumeExposer) createHostingPod(
 			},
 		}
 
-		nodeSelector[kube.NodeOSLabel] = kube.NodeOSWindows
 		podOS.Name = kube.NodeOSWindows
+
+		affinity.NodeSelector.MatchExpressions = append(affinity.NodeSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+			Key:      kube.NodeOSLabel,
+			Values:   []string{kube.NodeOSWindows},
+			Operator: metav1.LabelSelectorOpIn,
+		})
 
 		toleration = append(toleration, []corev1api.Toleration{
 			{
@@ -472,9 +479,16 @@ func (e *podVolumeExposer) createHostingPod(
 			Privileged: &privileged,
 		}
 
-		nodeSelector[kube.NodeOSLabel] = kube.NodeOSLinux
 		podOS.Name = kube.NodeOSLinux
+
+		affinity.NodeSelector.MatchExpressions = append(affinity.NodeSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+			Key:      kube.NodeOSLabel,
+			Values:   []string{kube.NodeOSWindows},
+			Operator: metav1.LabelSelectorOpNotIn,
+		})
 	}
+
+	podAffinity := kube.ToSystemAffinity([]*kube.LoadAffinity{affinity})
 
 	pod := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -495,6 +509,7 @@ func (e *podVolumeExposer) createHostingPod(
 		Spec: corev1api.PodSpec{
 			NodeSelector: nodeSelector,
 			OS:           &podOS,
+			Affinity:     podAffinity,
 			Containers: []corev1api.Container{
 				{
 					Name:            containerName,
