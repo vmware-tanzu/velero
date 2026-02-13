@@ -146,6 +146,10 @@ type CSISnapshotInfo struct {
 
 	// The VolumeSnapshot's Status.ReadyToUse value
 	ReadyToUse *bool
+
+	// The VolumeGroupSnapshotHandle from VSC status, used to create stub VGSC during restore
+	// for CSI drivers that populate this field (e.g., Ceph RBD).
+	VolumeGroupSnapshotHandle string `json:"volumeGroupSnapshotHandle,omitempty"`
 }
 
 // SnapshotDataMovementInfo is used for displaying the snapshot data mover status.
@@ -456,6 +460,10 @@ func (v *BackupVolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 		if volumeSnapshotContent.Status.SnapshotHandle != nil {
 			snapshotHandle = *volumeSnapshotContent.Status.SnapshotHandle
 		}
+		volumeGroupSnapshotHandle := ""
+		if volumeSnapshotContent.Status != nil && volumeSnapshotContent.Status.VolumeGroupSnapshotHandle != nil {
+			volumeGroupSnapshotHandle = *volumeSnapshotContent.Status.VolumeGroupSnapshotHandle
+		}
 		if pvcPVInfo := v.pvMap.retrieve("", *volumeSnapshot.Spec.Source.PersistentVolumeClaimName, volumeSnapshot.Namespace); pvcPVInfo != nil {
 			volumeInfo := &BackupVolumeInfo{
 				BackupMethod:          CSISnapshot,
@@ -466,12 +474,13 @@ func (v *BackupVolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 				SnapshotDataMoved:     false,
 				PreserveLocalSnapshot: true,
 				CSISnapshotInfo: &CSISnapshotInfo{
-					VSCName:        *volumeSnapshot.Status.BoundVolumeSnapshotContentName,
-					Size:           size,
-					Driver:         volumeSnapshotContent.Spec.Driver,
-					SnapshotHandle: snapshotHandle,
-					OperationID:    operation.Spec.OperationID,
-					ReadyToUse:     volumeSnapshot.Status.ReadyToUse,
+					VSCName:                   *volumeSnapshot.Status.BoundVolumeSnapshotContentName,
+					Size:                      size,
+					Driver:                    volumeSnapshotContent.Spec.Driver,
+					SnapshotHandle:            snapshotHandle,
+					OperationID:               operation.Spec.OperationID,
+					ReadyToUse:                volumeSnapshot.Status.ReadyToUse,
+					VolumeGroupSnapshotHandle: volumeGroupSnapshotHandle,
 				},
 				PVInfo: &PVInfo{
 					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
