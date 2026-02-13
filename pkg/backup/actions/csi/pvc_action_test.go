@@ -842,9 +842,13 @@ volumePolicies:
 				crClient: client,
 			}
 
-			// Pass nil for VolumeHelper in tests - it will fall back to creating a new one per call
-			// This is the expected behavior for testing and third-party plugins
-			result, err := action.filterPVCsByVolumePolicy(tt.pvcs, backup, nil)
+			// Create a VolumeHelper using the same method the plugin would use
+			vh, err := action.getOrCreateVolumeHelper(backup)
+			require.NoError(t, err)
+			require.NotNil(t, vh)
+
+			// Test with the pre-created VolumeHelper
+			result, err := action.filterPVCsByVolumePolicy(tt.pvcs, vh)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
@@ -959,7 +963,7 @@ volumePolicies:
 	require.NotNil(t, vh)
 
 	// Test with the pre-created VolumeHelper (non-nil path)
-	result, err := action.filterPVCsByVolumePolicy(pvcs, backup, vh)
+	result, err := action.filterPVCsByVolumePolicy(pvcs, vh)
 	require.NoError(t, err)
 
 	// Should filter out the NFS PVC, leaving only the CSI PVC
