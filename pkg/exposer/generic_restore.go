@@ -498,7 +498,7 @@ func (e *genericRestoreExposer) createRestorePod(
 		e.log.Infof("No selected node for restore pod. Try to get affinity from the node-agent config.")
 
 		if affinity != nil {
-			podAffinity = kube.ToSystemAffinity([]*kube.LoadAffinity{affinity})
+			podAffinity = kube.ToSystemAffinity(affinity, nil)
 		}
 	}
 

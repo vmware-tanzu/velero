@@ -747,24 +747,23 @@ func TestCollectPodLogs(t *testing.T) {
 func TestToSystemAffinity(t *testing.T) {
 	tests := []struct {
 		name           string
-		loadAffinities []*LoadAffinity
+		loadAffinity   *LoadAffinity
+		volumeTopology *corev1api.NodeSelector
 		expected       *corev1api.Affinity
 	}{
 		{
 			name: "loadAffinity is nil",
 		},
 		{
-			name:           "loadAffinity is empty",
-			loadAffinities: []*LoadAffinity{},
+			name:         "loadAffinity is empty",
+			loadAffinity: &LoadAffinity{},
 		},
 		{
 			name: "with match label",
-			loadAffinities: []*LoadAffinity{
-				{
-					NodeSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"key-1": "value-1",
-						},
+			loadAffinity: &LoadAffinity{
+				NodeSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"key-1": "value-1",
 					},
 				},
 			},
@@ -788,23 +787,21 @@ func TestToSystemAffinity(t *testing.T) {
 		},
 		{
 			name: "with match expression",
-			loadAffinities: []*LoadAffinity{
-				{
-					NodeSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"key-2": "value-2",
+			loadAffinity: &LoadAffinity{
+				NodeSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"key-2": "value-2",
+					},
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key-3",
+							Values:   []string{"value-3-1", "value-3-2"},
+							Operator: metav1.LabelSelectorOpNotIn,
 						},
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "key-3",
-								Values:   []string{"value-3-1", "value-3-2"},
-								Operator: metav1.LabelSelectorOpNotIn,
-							},
-							{
-								Key:      "key-4",
-								Values:   []string{"value-4-1", "value-4-2", "value-4-3"},
-								Operator: metav1.LabelSelectorOpDoesNotExist,
-							},
+						{
+							Key:      "key-4",
+							Values:   []string{"value-4-1", "value-4-2", "value-4-3"},
+							Operator: metav1.LabelSelectorOpDoesNotExist,
 						},
 					},
 				},
@@ -838,19 +835,49 @@ func TestToSystemAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple load affinities",
-			loadAffinities: []*LoadAffinity{
-				{
-					NodeSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"key-1": "value-1",
+			name: "with olume topology",
+			volumeTopology: &corev1api.NodeSelector{
+				NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1api.NodeSelectorRequirement{
+							{
+								Key:      "key-5",
+								Values:   []string{"value-5-1", "value-5-2", "value-5-3"},
+								Operator: corev1api.NodeSelectorOpGt,
+							},
+							{
+								Key:      "key-6",
+								Values:   []string{"value-5-1", "value-5-2", "value-5-3"},
+								Operator: corev1api.NodeSelectorOpGt,
+							},
 						},
 					},
-				},
-				{
-					NodeSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"key-2": "value-2",
+					{
+						MatchExpressions: []corev1api.NodeSelectorRequirement{
+							{
+								Key:      "key-7",
+								Values:   []string{"value-7-1", "value-7-2", "value-7-3"},
+								Operator: corev1api.NodeSelectorOpGt,
+							},
+							{
+								Key:      "key-8",
+								Values:   []string{"value-8-1", "value-8-2", "value-8-3"},
+								Operator: corev1api.NodeSelectorOpGt,
+							},
+						},
+					},
+					{
+						MatchFields: []corev1api.NodeSelectorRequirement{
+							{
+								Key:      "key-9",
+								Values:   []string{"value-9-1", "value-9-2", "value-9-3"},
+								Operator: corev1api.NodeSelectorOpGt,
+							},
+							{
+								Key:      "key-a",
+								Values:   []string{"value-a-1", "value-a-2", "value-a-3"},
+								Operator: corev1api.NodeSelectorOpGt,
+							},
 						},
 					},
 				},
@@ -862,9 +889,176 @@ func TestToSystemAffinity(t *testing.T) {
 							{
 								MatchExpressions: []corev1api.NodeSelectorRequirement{
 									{
-										Key:      "key-1",
-										Values:   []string{"value-1"},
+										Key:      "key-5",
+										Values:   []string{"value-5-1", "value-5-2", "value-5-3"},
+										Operator: corev1api.NodeSelectorOpGt,
+									},
+									{
+										Key:      "key-6",
+										Values:   []string{"value-5-1", "value-5-2", "value-5-3"},
+										Operator: corev1api.NodeSelectorOpGt,
+									},
+								},
+							},
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "key-7",
+										Values:   []string{"value-7-1", "value-7-2", "value-7-3"},
+										Operator: corev1api.NodeSelectorOpGt,
+									},
+									{
+										Key:      "key-8",
+										Values:   []string{"value-8-1", "value-8-2", "value-8-3"},
+										Operator: corev1api.NodeSelectorOpGt,
+									},
+								},
+							},
+							{
+								MatchFields: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "key-9",
+										Values:   []string{"value-9-1", "value-9-2", "value-9-3"},
+										Operator: corev1api.NodeSelectorOpGt,
+									},
+									{
+										Key:      "key-a",
+										Values:   []string{"value-a-1", "value-a-2", "value-a-3"},
+										Operator: corev1api.NodeSelectorOpGt,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "with match expression and volume topology",
+			loadAffinity: &LoadAffinity{
+				NodeSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"key-2": "value-2",
+					},
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key-3",
+							Values:   []string{"value-3-1", "value-3-2"},
+							Operator: metav1.LabelSelectorOpNotIn,
+						},
+						{
+							Key:      "key-4",
+							Values:   []string{"value-4-1", "value-4-2", "value-4-3"},
+							Operator: metav1.LabelSelectorOpDoesNotExist,
+						},
+					},
+				},
+			},
+			volumeTopology: &corev1api.NodeSelector{
+				NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1api.NodeSelectorRequirement{
+							{
+								Key:      "key-5",
+								Values:   []string{"value-5-1", "value-5-2", "value-5-3"},
+								Operator: corev1api.NodeSelectorOpGt,
+							},
+							{
+								Key:      "key-6",
+								Values:   []string{"value-5-1", "value-5-2", "value-5-3"},
+								Operator: corev1api.NodeSelectorOpGt,
+							},
+						},
+					},
+					{
+						MatchExpressions: []corev1api.NodeSelectorRequirement{
+							{
+								Key:      "key-7",
+								Values:   []string{"value-7-1", "value-7-2", "value-7-3"},
+								Operator: corev1api.NodeSelectorOpGt,
+							},
+							{
+								Key:      "key-8",
+								Values:   []string{"value-8-1", "value-8-2", "value-8-3"},
+								Operator: corev1api.NodeSelectorOpGt,
+							},
+						},
+					},
+					{
+						MatchFields: []corev1api.NodeSelectorRequirement{
+							{
+								Key:      "key-9",
+								Values:   []string{"value-9-1", "value-9-2", "value-9-3"},
+								Operator: corev1api.NodeSelectorOpGt,
+							},
+							{
+								Key:      "key-a",
+								Values:   []string{"value-a-1", "value-a-2", "value-a-3"},
+								Operator: corev1api.NodeSelectorOpGt,
+							},
+						},
+					},
+				},
+			},
+			expected: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "key-5",
+										Values:   []string{"value-5-1", "value-5-2", "value-5-3"},
+										Operator: corev1api.NodeSelectorOpGt,
+									},
+									{
+										Key:      "key-6",
+										Values:   []string{"value-5-1", "value-5-2", "value-5-3"},
+										Operator: corev1api.NodeSelectorOpGt,
+									},
+									{
+										Key:      "key-2",
+										Values:   []string{"value-2"},
 										Operator: corev1api.NodeSelectorOpIn,
+									},
+									{
+										Key:      "key-3",
+										Values:   []string{"value-3-1", "value-3-2"},
+										Operator: corev1api.NodeSelectorOpNotIn,
+									},
+									{
+										Key:      "key-4",
+										Values:   []string{"value-4-1", "value-4-2", "value-4-3"},
+										Operator: corev1api.NodeSelectorOpDoesNotExist,
+									},
+								},
+							},
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "key-7",
+										Values:   []string{"value-7-1", "value-7-2", "value-7-3"},
+										Operator: corev1api.NodeSelectorOpGt,
+									},
+									{
+										Key:      "key-8",
+										Values:   []string{"value-8-1", "value-8-2", "value-8-3"},
+										Operator: corev1api.NodeSelectorOpGt,
+									},
+									{
+										Key:      "key-2",
+										Values:   []string{"value-2"},
+										Operator: corev1api.NodeSelectorOpIn,
+									},
+									{
+										Key:      "key-3",
+										Values:   []string{"value-3-1", "value-3-2"},
+										Operator: corev1api.NodeSelectorOpNotIn,
+									},
+									{
+										Key:      "key-4",
+										Values:   []string{"value-4-1", "value-4-2", "value-4-3"},
+										Operator: corev1api.NodeSelectorOpDoesNotExist,
 									},
 								},
 							},
@@ -874,6 +1068,28 @@ func TestToSystemAffinity(t *testing.T) {
 										Key:      "key-2",
 										Values:   []string{"value-2"},
 										Operator: corev1api.NodeSelectorOpIn,
+									},
+									{
+										Key:      "key-3",
+										Values:   []string{"value-3-1", "value-3-2"},
+										Operator: corev1api.NodeSelectorOpNotIn,
+									},
+									{
+										Key:      "key-4",
+										Values:   []string{"value-4-1", "value-4-2", "value-4-3"},
+										Operator: corev1api.NodeSelectorOpDoesNotExist,
+									},
+								},
+								MatchFields: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "key-9",
+										Values:   []string{"value-9-1", "value-9-2", "value-9-3"},
+										Operator: corev1api.NodeSelectorOpGt,
+									},
+									{
+										Key:      "key-a",
+										Values:   []string{"value-a-1", "value-a-2", "value-a-3"},
+										Operator: corev1api.NodeSelectorOpGt,
 									},
 								},
 							},
@@ -886,7 +1102,7 @@ func TestToSystemAffinity(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			affinity := ToSystemAffinity(test.loadAffinities)
+			affinity := ToSystemAffinity(test.loadAffinity, test.volumeTopology)
 			assert.True(t, reflect.DeepEqual(affinity, test.expected))
 		})
 	}

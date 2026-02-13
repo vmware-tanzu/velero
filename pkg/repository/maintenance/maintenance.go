@@ -671,8 +671,7 @@ func buildJob(
 	}
 
 	if config != nil && len(config.LoadAffinities) > 0 {
-		// Maintenance job only takes the first loadAffinity.
-		affinity := kube.ToSystemAffinity([]*kube.LoadAffinity{config.LoadAffinities[0]})
+		affinity := kube.ToSystemAffinity(config.LoadAffinities[0], nil)
 		job.Spec.Template.Spec.Affinity = affinity
 	}
 
