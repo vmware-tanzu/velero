@@ -99,6 +99,15 @@ var ImagesMatrix = map[string]map[string][]string{
 		"velero":                {"velero/velero:v1.16.2"},
 		"velero-restore-helper": {"velero/velero:v1.16.2"},
 	},
+	"v1.17": {
+		"aws":                   {"velero/velero-plugin-for-aws:v1.13.2"},
+		"azure":                 {"velero/velero-plugin-for-microsoft-azure:v1.13.2"},
+		"vsphere":               {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"velero/velero-plugin-for-gcp:v1.13.2"},
+		"datamover":             {"velero/velero-plugin-for-aws:v1.13.2"},
+		"velero":                {"velero/velero:v1.17.2"},
+		"velero-restore-helper": {"velero/velero:v1.17.2"},
+	},
 	"main": {
 		"aws":                   {"velero/velero-plugin-for-aws:main"},
 		"azure":                 {"velero/velero-plugin-for-microsoft-azure:main"},
@@ -128,16 +137,13 @@ func SetImagesToDefaultValues(config VeleroConfig, version string) (VeleroConfig
 
 	ret.Plugins = ""
 
-	versionWithoutPatch := "main"
-	if version != "main" {
-		versionWithoutPatch = semver.MajorMinor(version)
-	}
+	versionWithoutPatch := getVersionWithoutPatch(version)
 
 	// Read migration case needs images from the PluginsMatrix map.
 	images, ok := ImagesMatrix[versionWithoutPatch]
 	if !ok {
-		return config, fmt.Errorf("fail to read the images for version %s from the ImagesMatrix",
-			versionWithoutPatch)
+		fmt.Printf("Cannot read the images for version %s from the ImagesMatrix. Use the original values.\n", versionWithoutPatch)
+		return config, nil
 	}
 
 	ret.VeleroImage = images[Velero][0]
@@ -162,6 +168,27 @@ func SetImagesToDefaultValues(config VeleroConfig, version string) (VeleroConfig
 	}
 
 	return ret, nil
+}
+
+func getVersionWithoutPatch(version string) string {
+	versionWithoutPatch := ""
+
+	mainRe := regexp.MustCompile(`^main$`)
+	releaseRe := regexp.MustCompile(`^release-(\d+)\.(\d+)(-dev)?$`)
+
+	switch {
+	case mainRe.MatchString(version):
+		versionWithoutPatch = "main"
+	case releaseRe.MatchString(version):
+		matches := releaseRe.FindStringSubmatch(version)
+		versionWithoutPatch = fmt.Sprintf("v%s.%s", matches[1], matches[2])
+	default:
+		versionWithoutPatch = semver.MajorMinor(version)
+	}
+
+	fmt.Println("The version is ", versionWithoutPatch)
+
+	return versionWithoutPatch
 }
 
 func getPluginsByVersion(version string, cloudProvider string, needDataMoverPlugin bool) ([]string, error) {
