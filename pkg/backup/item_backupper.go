@@ -244,6 +244,12 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		return false, itemFiles, kubeerrs.NewAggregate(backupErrs)
 	}
 
+	// If err is nil and updatedObj is nil, it means the item is skipped by plugin action,
+	// we should return here to avoid backing up the item, and avoid potential NPE in the following code.
+	if updatedObj == nil {
+		return false, itemFiles, nil
+	}
+
 	itemFiles = append(itemFiles, additionalItemFiles...)
 	obj = updatedObj
 	if metadata, err = meta.Accessor(obj); err != nil {
@@ -398,6 +404,13 @@ func (ib *itemBackupper) executeActions(
 		}
 
 		u := &unstructured.Unstructured{Object: updatedItem.UnstructuredContent()}
+
+		if _, ok := u.GetAnnotations()[velerov1api.SkipFromBackupAnnotation]; ok {
+			log.Infof("Resource (groupResource=%s, namespace=%s, name=%s) is skipped from backup by action %s.",
+				groupResource.String(), namespace, name, actionName)
+			return nil, itemFiles, nil
+		}
+
 		if actionName == csiBIAPluginName {
 			if additionalItemIdentifiers == nil && u.GetAnnotations()[velerov1api.SkippedNoCSIPVAnnotation] == "true" {
 				// snapshot was skipped by CSI plugin
