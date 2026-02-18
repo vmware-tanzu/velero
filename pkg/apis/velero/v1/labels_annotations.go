@@ -101,6 +101,15 @@ const (
 	// ExcludeFromBackupLabel is the label to exclude k8s resource from backup,
 	// even if the resource contains a matching selector label.
 	ExcludeFromBackupLabel = "velero.io/exclude-from-backup"
+
+	// defaultVGSLabelKey is the default label key used to group PVCs under a VolumeGroupSnapshot
+	DefaultVGSLabelKey = "velero.io/volume-group"
+
+	// PVBLabel is the label key used to identify the pvb for pvb pod
+	PVBLabel = "velero.io/pod-volume-backup"
+
+	// PVRLabel is the label key used to identify the pvb for pvr pod
+	PVRLabel = "velero.io/pod-volume-restore"
 )
 
 type AsyncOperationIDPrefix string
@@ -127,6 +136,9 @@ const (
 	VolumeSnapshotClassDriverBackupAnnotationPrefix = "velero.io/csi-volumesnapshot-class"
 	VolumeSnapshotClassDriverPVCAnnotation          = "velero.io/csi-volumesnapshot-class"
 
+	// https://kubernetes.io/zh-cn/docs/concepts/storage/volume-snapshot-classes/
+	VolumeSnapshotClassKubernetesAnnotation = "snapshot.storage.kubernetes.io/is-default-class"
+
 	// There is no release w/ these constants exported. Using the strings for now.
 	// CSI Annotation volumesnapshotclass
 	// https://github.com/kubernetes-csi/external-snapshotter/blob/master/pkg/utils/util.go#L59-L60
@@ -148,4 +160,13 @@ const (
 
 	// DataUploadNameAnnotation is the label key for the DataUpload name
 	DataUploadNameAnnotation = "velero.io/data-upload-name"
+
+	// Label used on VolumeGroupSnapshotClass to mark it as Velero's default for a CSI driver
+	VolumeGroupSnapshotClassDefaultLabel = "velero.io/csi-volumegroupsnapshot-class"
+
+	// Annotation on PVC to override the VGS class to use
+	VolumeGroupSnapshotClassAnnotationPVC = "velero.io/csi-volume-group-snapshot-class"
+
+	// Annotation prefix on Backup to override VGS class per CSI driver
+	VolumeGroupSnapshotClassAnnotationBackupPrefix = "velero.io/csi-volumegroupsnapshot-class_"
 )

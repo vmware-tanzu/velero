@@ -19,17 +19,20 @@ package backend
 import (
 	"context"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/kopia/kopia/repo/blob"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/azure"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/logging"
 )
 
 type AzureBackend struct {
 	option azure.Option
 }
 
-func (c *AzureBackend) Setup(ctx context.Context, flags map[string]string) error {
+func (c *AzureBackend) Setup(ctx context.Context, flags map[string]string, logger logrus.FieldLogger) error {
 	if flags[udmrepo.StoreOptionCACert] != "" {
 		flags["caCertEncoded"] = "true"
 	}
@@ -40,6 +43,7 @@ func (c *AzureBackend) Setup(ctx context.Context, flags map[string]string) error
 	return nil
 }
 
-func (c *AzureBackend) Connect(ctx context.Context, isCreate bool) (blob.Storage, error) {
+func (c *AzureBackend) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
+	ctx = logging.WithLogger(ctx, logger)
 	return azure.NewStorage(ctx, &c.option, false)
 }

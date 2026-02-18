@@ -17,7 +17,9 @@ limitations under the License.
 package csi
 
 import (
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	"fmt"
+
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -26,6 +28,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/util"
@@ -100,18 +103,37 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 	// DeletionPolicy to Retain.
 	resetVolumeSnapshotAnnotation(&vs)
 
+	if vs.Spec.VolumeSnapshotClassName != nil {
+		// Delete VolumeSnapshotClass from the VolumeSnapshot.
+		// This is necessary to make the restore independent of the VolumeSnapshotClass.
+		vs.Spec.VolumeSnapshotClassName = nil
+		p.log.Debugf("Deleted VolumeSnapshotClassName from VolumeSnapshot %s/%s to make restore independent of VolumeSnapshotClass",
+			vs.Namespace, vs.Name)
+	}
+
 	vsMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&vs)
 	if err != nil {
 		p.log.Errorf("Fail to convert VS %s to unstructured", vs.Namespace+"/"+vs.Name)
 		return nil, errors.WithStack(err)
 	}
 
+	if vsFromBackup.Status == nil ||
+		vsFromBackup.Status.BoundVolumeSnapshotContentName == nil {
+		p.log.Errorf("VS %s doesn't have bound VSC", vsFromBackup.Name)
+		return nil, fmt.Errorf("VS %s doesn't have bound VSC", vsFromBackup.Name)
+	}
+
+	vsc := velero.ResourceIdentifier{
+		GroupResource: kuberesource.VolumeSnapshotContents,
+		Name:          *vsFromBackup.Status.BoundVolumeSnapshotContentName,
+	}
+
 	p.log.Infof(`Returning from VolumeSnapshotRestoreItemAction with 
-		no additionalItems`)
+		VolumeSnapshotContent in additionalItems`)
 
 	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem:     &unstructured.Unstructured{Object: vsMap},
-		AdditionalItems: []velero.ResourceIdentifier{},
+		AdditionalItems: []velero.ResourceIdentifier{vsc},
 	}, nil
 }
 

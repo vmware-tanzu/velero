@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -70,7 +70,7 @@ func TestVSCExecute(t *testing.T) {
 		},
 		{
 			name:      "Normal case, VolumeSnapshot should be deleted",
-			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
+			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).VolumeSnapshotClassName("volumesnapshotclass").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
 			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
 			expectErr: false,
 			function: func(
@@ -82,7 +82,7 @@ func TestVSCExecute(t *testing.T) {
 			},
 		},
 		{
-			name:      "Normal case, VolumeSnapshot should be deleted",
+			name:      "Error case, deletion fails",
 			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
 			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
 			expectErr: true,
@@ -194,13 +194,12 @@ func TestCheckVSCReadiness(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
 			crClient := velerotest.NewFakeControllerRuntimeClient(t)
 			if test.createVSC {
-				require.NoError(t, crClient.Create(ctx, test.vsc))
+				require.NoError(t, crClient.Create(t.Context(), test.vsc))
 			}
 
-			ready, err := checkVSCReadiness(ctx, test.vsc, crClient)
+			ready, err := checkVSCReadiness(t.Context(), test.vsc, crClient)
 			require.Equal(t, test.ready, ready)
 			if test.expectErr {
 				require.Error(t, err)

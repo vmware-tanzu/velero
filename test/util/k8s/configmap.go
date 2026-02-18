@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"time"
 
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -31,8 +32,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-func CreateConfigMap(c clientset.Interface, ns, name string, labels, data map[string]string) (*v1.ConfigMap, error) {
-	cm := &v1.ConfigMap{
+func CreateConfigMap(c clientset.Interface, ns, name string, labels, data map[string]string) (*corev1api.ConfigMap, error) {
+	cm := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
@@ -45,7 +46,7 @@ func CreateConfigMap(c clientset.Interface, ns, name string, labels, data map[st
 func CreateConfigMapFromYAMLData(c clientset.Interface, yamlData, cmName, namespace string) error {
 	cmData := make(map[string]string)
 	cmData[cmName] = yamlData
-	cm := &v1.ConfigMap{
+	cm := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
 			Namespace: namespace,
@@ -67,7 +68,7 @@ func WaitForConfigMapComplete(c clientset.Interface, ns, cmName string) error {
 	})
 }
 
-func GetConfigMap(c clientset.Interface, ns, secretName string) (*v1.ConfigMap, error) {
+func GetConfigMap(c clientset.Interface, ns, secretName string) (*corev1api.ConfigMap, error) {
 	return c.CoreV1().ConfigMaps(ns).Get(context.TODO(), secretName, metav1.GetOptions{})
 }
 

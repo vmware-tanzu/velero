@@ -17,7 +17,6 @@ limitations under the License.
 package backend
 
 import (
-	"context"
 	"testing"
 
 	"github.com/kopia/kopia/repo/logging"
@@ -79,7 +78,7 @@ func TestOptionalHaveBool(t *testing.T) {
 				tc.logger.On("Check", mock.Anything, mock.Anything).Run(tc.retFuncCheck).Return(&zapcore.CheckedEntry{})
 			}
 
-			ctx := logging.WithLogger(context.Background(), func(module string) logging.Logger {
+			ctx := logging.WithLogger(t.Context(), func(module string) logging.Logger {
 				return zap.New(tc.logger).Sugar()
 			})
 
@@ -144,7 +143,7 @@ func TestOptionalHaveIntWithDefault(t *testing.T) {
 				tc.logger.On("Check", mock.Anything, mock.Anything).Run(tc.retFuncCheck).Return(&zapcore.CheckedEntry{})
 			}
 
-			ctx := logging.WithLogger(context.Background(), func(module string) logging.Logger {
+			ctx := logging.WithLogger(t.Context(), func(module string) logging.Logger {
 				return zap.New(tc.logger).Sugar()
 			})
 

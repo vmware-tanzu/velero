@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -54,6 +54,8 @@ var (
 	DefaultNodeAgentPodMemLimit   = "0"
 
 	DefaultVeleroNamespace = "velero"
+
+	DefaultKubeletRootDir = "/var/lib/kubelet"
 )
 
 func Labels() map[string]string {
@@ -92,8 +94,8 @@ func podAnnotations(userAnnotations map[string]string) map[string]string {
 	return base
 }
 
-func containerPorts() []corev1.ContainerPort {
-	return []corev1.ContainerPort{
+func containerPorts() []corev1api.ContainerPort {
+	return []corev1api.ContainerPort{
 		{
 			Name:          "metrics",
 			ContainerPort: 8085,
@@ -109,14 +111,14 @@ func objectMeta(namespace, name string) metav1.ObjectMeta {
 	}
 }
 
-func ServiceAccount(namespace string, annotations map[string]string) *corev1.ServiceAccount {
+func ServiceAccount(namespace string, annotations map[string]string) *corev1api.ServiceAccount {
 	objMeta := objectMeta(namespace, defaultServiceAccountName)
 	objMeta.Annotations = annotations
-	return &corev1.ServiceAccount{
+	return &corev1api.ServiceAccount{
 		ObjectMeta: objMeta,
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ServiceAccount",
-			APIVersion: corev1.SchemeGroupVersion.String(),
+			APIVersion: corev1api.SchemeGroupVersion.String(),
 		},
 	}
 }
@@ -149,12 +151,12 @@ func ClusterRoleBinding(namespace string) *rbacv1.ClusterRoleBinding {
 	return crb
 }
 
-func Namespace(namespace string) *corev1.Namespace {
-	ns := &corev1.Namespace{
+func Namespace(namespace string) *corev1api.Namespace {
+	ns := &corev1api.Namespace{
 		ObjectMeta: objectMeta("", namespace),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Namespace",
-			APIVersion: corev1.SchemeGroupVersion.String(),
+			APIVersion: corev1api.SchemeGroupVersion.String(),
 		},
 	}
 
@@ -204,17 +206,17 @@ func VolumeSnapshotLocation(namespace, provider string, config map[string]string
 	}
 }
 
-func Secret(namespace string, data []byte) *corev1.Secret {
-	return &corev1.Secret{
+func Secret(namespace string, data []byte) *corev1api.Secret {
+	return &corev1api.Secret{
 		ObjectMeta: objectMeta(namespace, "cloud-credentials"),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
-			APIVersion: corev1.SchemeGroupVersion.String(),
+			APIVersion: corev1api.SchemeGroupVersion.String(),
 		},
 		Data: map[string][]byte{
 			"cloud": data,
 		},
-		Type: corev1.SecretTypeOpaque,
+		Type: corev1api.SecretTypeOpaque,
 	}
 }
 
@@ -241,8 +243,8 @@ type VeleroOptions struct {
 	PodLabels                       map[string]string
 	ServiceAccountAnnotations       map[string]string
 	ServiceAccountName              string
-	VeleroPodResources              corev1.ResourceRequirements
-	NodeAgentPodResources           corev1.ResourceRequirements
+	VeleroPodResources              corev1api.ResourceRequirements
+	NodeAgentPodResources           corev1api.ResourceRequirements
 	SecretData                      []byte
 	RestoreOnly                     bool
 	UseNodeAgent                    bool
@@ -269,6 +271,11 @@ type VeleroOptions struct {
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
+	ConcurrentBackups               int
+	KubeletRootDir                  string
+	NodeAgentDisableHostPath        bool
+	ServerPriorityClassName         string
+	NodeAgentPriorityClassName      string
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -356,6 +363,11 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		WithPodResources(o.PodResources),
 		WithKeepLatestMaintenanceJobs(o.KeepLatestMaintenanceJobs),
 		WithItemBlockWorkerCount(o.ItemBlockWorkerCount),
+		WithConcurrentBackups(o.ConcurrentBackups),
+	}
+
+	if o.ServerPriorityClassName != "" {
+		deployOpts = append(deployOpts, WithPriorityClassName(o.ServerPriorityClassName))
 	}
 
 	if len(o.Features) > 0 {
@@ -404,6 +416,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 			WithResources(o.NodeAgentPodResources),
 			WithSecret(secretPresent),
 			WithServiceAccountName(serviceAccountName),
+			WithNodeAgentDisableHostPath(o.NodeAgentDisableHostPath),
 		}
 		if len(o.Features) > 0 {
 			dsOpts = append(dsOpts, WithFeatures(o.Features))
@@ -413,6 +426,18 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		}
 		if len(o.NodeAgentConfigMap) > 0 {
 			dsOpts = append(dsOpts, WithNodeAgentConfigMap(o.NodeAgentConfigMap))
+		}
+
+		if len(o.BackupRepoConfigMap) > 0 {
+			dsOpts = append(dsOpts, WithBackupRepoConfigMap(o.BackupRepoConfigMap))
+		}
+
+		if len(o.KubeletRootDir) > 0 {
+			dsOpts = append(dsOpts, WithKubeletRootDir(o.KubeletRootDir))
+		}
+
+		if o.NodeAgentPriorityClassName != "" {
+			dsOpts = append(dsOpts, WithPriorityClassName(o.NodeAgentPriorityClassName))
 		}
 
 		if o.UseNodeAgent {

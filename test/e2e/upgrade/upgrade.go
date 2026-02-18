@@ -115,7 +115,10 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				//Download velero CLI if it's empty according to velero CLI version
 				By(fmt.Sprintf("Install the expected old version Velero CLI (%s) for installing Velero",
 					veleroCLI2Version.VeleroVersion), func() {
-					veleroCLI2Version.VeleroCLI, err = InstallVeleroCLI(veleroCLI2Version.VeleroVersion)
+					veleroCLI2Version.VeleroCLI, err = InstallVeleroCLI(
+						oneHourTimeout,
+						veleroCLI2Version.VeleroVersion,
+					)
 					Expect(err).To(Succeed())
 				})
 			}
@@ -157,9 +160,18 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			})
 
 			By("Deploy sample workload of Kibishii", func() {
-				Expect(KibishiiPrepareBeforeBackup(oneHourTimeout, *veleroCfg.ClientToInstallVelero, tmpCfg.CloudProvider,
-					upgradeNamespace, tmpCfg.RegistryCredentialFile, tmpCfg.Features,
-					tmpCfg.KibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData)).To(Succeed())
+				Expect(KibishiiPrepareBeforeBackup(
+					oneHourTimeout,
+					*veleroCfg.ClientToInstallVelero,
+					tmpCfg.CloudProvider,
+					upgradeNamespace,
+					tmpCfg.RegistryCredentialFile,
+					tmpCfg.Features,
+					tmpCfg.KibishiiDirectory,
+					DefaultKibishiiData,
+					tmpCfg.ImageRegistryProxy,
+					veleroCfg.WorkerOS,
+				)).To(Succeed())
 			})
 
 			By(fmt.Sprintf("Backup namespace %s", upgradeNamespace), func() {
@@ -190,8 +202,17 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				var snapshotCheckPoint SnapshotCheckPoint
 				snapshotCheckPoint.NamespaceBackedUp = upgradeNamespace
 				By("Snapshot should be created in cloud object store", func() {
-					snapshotCheckPoint, err := GetSnapshotCheckPoint(*veleroCfg.ClientToInstallVelero, veleroCfg, 2,
-						upgradeNamespace, backupName, KibishiiPVCNameList)
+					backupVolumeInfo, err := GetVolumeInfo(
+						veleroCfg.ObjectStoreProvider,
+						veleroCfg.CloudCredentialsFile,
+						veleroCfg.BSLBucket,
+						veleroCfg.BSLPrefix,
+						veleroCfg.BSLConfig,
+						backupName,
+						BackupObjectsPrefix+"/"+backupName,
+					)
+					Expect(err).NotTo(HaveOccurred(), "Failed to get volume info for backup")
+					snapshotCheckPoint, err := BuildSnapshotCheckPointFromVolumeInfo(veleroCfg, backupVolumeInfo, 2, upgradeNamespace, backupName, KibishiiPVCNameList)
 					Expect(err).NotTo(HaveOccurred(), "Fail to get snapshot checkpoint")
 					Expect(CheckSnapshotsInProvider(
 						veleroCfg,
@@ -239,6 +260,9 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				}
 			})
 
+			// Wait for 70s to make sure the backups are synced after Velero reinstall
+			time.Sleep(70 * time.Second)
+
 			By(fmt.Sprintf("Restore %s", upgradeNamespace), func() {
 				Expect(VeleroRestore(oneHourTimeout, tmpCfg.VeleroCLI,
 					tmpCfg.VeleroNamespace, restoreName, backupName, "")).To(Succeed(), func() string {
@@ -249,8 +273,14 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			})
 
 			By(fmt.Sprintf("Verify workload %s after restore ", upgradeNamespace), func() {
-				Expect(KibishiiVerifyAfterRestore(*veleroCfg.ClientToInstallVelero, upgradeNamespace,
-					oneHourTimeout, DefaultKibishiiData, "")).To(Succeed(), "Fail to verify workload after restore")
+				Expect(KibishiiVerifyAfterRestore(
+					*veleroCfg.ClientToInstallVelero,
+					upgradeNamespace,
+					oneHourTimeout,
+					DefaultKibishiiData,
+					"",
+					veleroCfg.WorkerOS,
+				)).To(Succeed(), "Fail to verify workload after restore")
 			})
 		})
 	})

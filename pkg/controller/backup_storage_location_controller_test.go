@@ -17,15 +17,17 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"testing"
 	"time"
+
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -91,6 +93,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			},
 			newPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			backupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
+			metrics:           metrics.NewServerMetrics(),
 			log:               velerotest.NewLogger(),
 		}
 
@@ -156,6 +159,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			},
 			newPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			backupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
+			metrics:           metrics.NewServerMetrics(),
 			log:               velerotest.NewLogger(),
 		}
 
@@ -238,12 +242,13 @@ func TestEnsureSingleDefaultBSL(t *testing.T) {
 
 	for _, test := range tests {
 		// Setup reconciler
-		assert.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
+		require.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
 		t.Run(test.name, func(t *testing.T) {
 			r := &backupStorageLocationReconciler{
-				ctx:                       context.Background(),
+				ctx:                       t.Context(),
 				client:                    fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(&test.locations).Build(),
 				defaultBackupLocationInfo: test.defaultBackupInfo,
+				metrics:                   metrics.NewServerMetrics(),
 				log:                       velerotest.NewLogger(),
 			}
 			defaultFound, err := r.ensureSingleDefaultBSL(test.locations)
@@ -282,18 +287,131 @@ func TestBSLReconcile(t *testing.T) {
 	pluginManager.On("CleanupClients").Return(nil)
 	for _, test := range tests {
 		// Setup reconciler
-		assert.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
+		require.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
 		t.Run(test.name, func(t *testing.T) {
 			r := &backupStorageLocationReconciler{
-				ctx:              context.Background(),
+				ctx:              t.Context(),
 				client:           fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(&test.locationList).Build(),
 				newPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+				metrics:          metrics.NewServerMetrics(),
 				log:              velerotest.NewLogger(),
 			}
 
-			result, err := r.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: velerov1api.DefaultNamespace, Name: "location-1"}})
+			result, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: velerov1api.DefaultNamespace, Name: "location-1"}})
 			assert.Equal(t, test.expectedError, err)
 			assert.Equal(t, ctrl.Result{}, result)
+		})
+	}
+}
+
+func TestSanitizeStorageError(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    error
+		expected string
+	}{
+		{
+			name:     "Nil error",
+			input:    nil,
+			expected: "",
+		},
+		{
+			name:     "Simple error without Azure formatting",
+			input:    errors.New("simple error message"),
+			expected: "simple error message",
+		},
+		{
+			name:     "AWS style error",
+			input:    errors.New("NoSuchBucket: The specified bucket does not exist"),
+			expected: "NoSuchBucket: The specified bucket does not exist",
+		},
+		{
+			name: "Azure container not found error with full HTTP response",
+			input: errors.New(`rpc error: code = Unknown desc = GET https://oadp100711zl59k.blob.core.windows.net/oadp100711zl59k1
+--------------------------------------------------------------------------------
+RESPONSE 404: 404 The specified container does not exist.
+ERROR CODE: ContainerNotFound
+--------------------------------------------------------------------------------
+<?xml version="1.0" encoding="utf-8"?><Error><Code>ContainerNotFound</Code><Message>The specified container does not exist.
+RequestId:63cf34d8-801e-0078-09b4-2e4682000000
+Time:2024-11-04T12:23:04.5623627Z</Message></Error>
+--------------------------------------------------------------------------------
+`),
+			expected: "rpc error: code = Unknown desc = ContainerNotFound: The specified container does not exist.",
+		},
+		{
+			name: "Azure blob not found error",
+			input: errors.New(`rpc error: code = Unknown desc = GET https://storage.blob.core.windows.net/container/blob
+--------------------------------------------------------------------------------
+RESPONSE 404: 404 The specified blob does not exist.
+ERROR CODE: BlobNotFound
+--------------------------------------------------------------------------------
+<?xml version="1.0" encoding="utf-8"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.
+RequestId:12345678-1234-1234-1234-123456789012
+Time:2024-11-04T12:23:04.5623627Z</Message></Error>
+--------------------------------------------------------------------------------
+`),
+			expected: "rpc error: code = Unknown desc = BlobNotFound: The specified blob does not exist.",
+		},
+		{
+			name: "Azure error with plain text response (no XML)",
+			input: errors.New(`rpc error: code = Unknown desc = GET https://storage.blob.core.windows.net/container
+--------------------------------------------------------------------------------
+RESPONSE 404: 404 The specified container does not exist.
+ERROR CODE: ContainerNotFound
+--------------------------------------------------------------------------------
+`),
+			expected: "rpc error: code = Unknown desc = ContainerNotFound: The specified container does not exist.",
+		},
+		{
+			name: "Azure error without XML message but with error code",
+			input: errors.New(`rpc error: code = Unknown desc = operation failed
+RESPONSE 403: 403 Forbidden
+ERROR CODE: AuthorizationFailure
+--------------------------------------------------------------------------------
+`),
+			expected: "rpc error: code = Unknown desc = AuthorizationFailure: Forbidden",
+		},
+		{
+			name: "Error with Azure SAS token in URL",
+			input: errors.New(`rpc error: code = Unknown desc = GET https://storage.blob.core.windows.net/backup?sv=2020-08-04&sig=abc123secrettoken&se=2024-12-31T23:59:59Z&sp=rwdl
+--------------------------------------------------------------------------------
+RESPONSE 404: 404 The specified container does not exist.
+ERROR CODE: ContainerNotFound
+--------------------------------------------------------------------------------
+`),
+			expected: "rpc error: code = Unknown desc = ContainerNotFound: The specified container does not exist.",
+		},
+		{
+			name:     "Error with multiple SAS parameters",
+			input:    errors.New(`GET https://mystorageaccount.blob.core.windows.net/container?sv=2020-08-04&ss=b&srt=sco&sp=rwdlac&se=2024-12-31&st=2024-01-01&sip=168.1.5.60&spr=https&sig=SIGNATURE_HASH`),
+			expected: "GET https://mystorageaccount.blob.core.windows.net/container?sv=***REDACTED***&ss=***REDACTED***&srt=***REDACTED***&sp=***REDACTED***&se=***REDACTED***&st=***REDACTED***&sip=***REDACTED***&spr=***REDACTED***&sig=***REDACTED***",
+		},
+		{
+			name:     "Simple URL without SAS tokens unchanged",
+			input:    errors.New("GET https://storage.blob.core.windows.net/container/blob"),
+			expected: "GET https://storage.blob.core.windows.net/container/blob",
+		},
+		{
+			name: "Azure error with SAS token in full HTTP response",
+			input: errors.New(`rpc error: code = Unknown desc = GET https://oadp100711zl59k.blob.core.windows.net/backup?sig=secretsignature123&se=2024-12-31
+--------------------------------------------------------------------------------
+RESPONSE 404: 404 The specified container does not exist.
+ERROR CODE: ContainerNotFound
+--------------------------------------------------------------------------------
+<?xml version="1.0" encoding="utf-8"?><Error><Code>ContainerNotFound</Code><Message>The specified container does not exist.
+RequestId:63cf34d8-801e-0078-09b4-2e4682000000
+Time:2024-11-04T12:23:04.5623627Z</Message></Error>
+--------------------------------------------------------------------------------
+`),
+			expected: "rpc error: code = Unknown desc = ContainerNotFound: The specified container does not exist.",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := sanitizeStorageError(test.input)
+			assert.Equal(t, test.expected, actual)
 		})
 	}
 }

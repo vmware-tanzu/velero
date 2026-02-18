@@ -23,6 +23,8 @@ import (
 	"os"
 	"strings"
 
+	"context"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
@@ -36,7 +38,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	. "github.com/vmware-tanzu/velero/test"
@@ -62,6 +63,35 @@ var environments = map[string]cloud.Configuration{
 	"AZUREPUBLICCLOUD":       cloud.AzurePublic,
 	"AZUREUSGOVERNMENT":      cloud.AzureGovernment,
 	"AZUREUSGOVERNMENTCLOUD": cloud.AzureGovernment,
+}
+
+// newAzureCredential returns either an EnvironmentCredential (when
+// AZURE_CLIENT_SECRET / certificate / username‑password variables are present)
+// or DefaultAzureCredential (which supports Managed Identity, Workload
+// Identity + many others).  Both satisfy azcore.TokenCredential.
+func newAzureCredential(cloudCfg cloud.Configuration) (azcore.TokenCredential, error) {
+	// Try environment‑based first
+	envCred, envErr := azidentity.NewEnvironmentCredential(&azidentity.EnvironmentCredentialOptions{
+		ClientOptions: azcore.ClientOptions{Cloud: cloudCfg},
+	})
+	if envErr == nil {
+		// envCred succeeds only when enough env vars are set;
+		_, testErr := envCred.GetToken(context.Background(), policy.TokenRequestOptions{
+			Scopes: []string{cloudCfg.Services[cloud.ResourceManager].Audience + "/.default"},
+		})
+		if testErr == nil {
+			return envCred, nil
+		}
+	}
+
+	// Fall back to DefaultAzureCredential (includes Managed Identity & OIDC Workload Identity)
+	defaultCred, defErr := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
+		ClientOptions: azcore.ClientOptions{Cloud: cloudCfg},
+	})
+	if defErr != nil {
+		return nil, fmt.Errorf("EnvironmentCredential failed: %v; DefaultAzureCredential failed: %v", envErr, defErr)
+	}
+	return defaultCred, nil
 }
 
 // cloudConfigurationFromName returns cloud configuration based on the common name specified.
@@ -102,6 +132,7 @@ func loadCredentialsIntoEnv(credentialsFile string) error {
 	}
 	return nil
 }
+
 func parseCloudConfiguration(cloudName string) (cloud.Configuration, error) {
 	if cloudName == "" {
 		fmt.Println("cloudName is empty")
@@ -111,6 +142,7 @@ func parseCloudConfiguration(cloudName string) (cloud.Configuration, error) {
 	cloudConfiguration, err := cloudConfigurationFromName(cloudName)
 	return cloudConfiguration, errors.WithStack(err)
 }
+
 func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resourceGroupCfg string) (string, error) {
 	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
 		return "", err
@@ -144,13 +176,9 @@ func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resource
 		return "", errors.New("azure subscription ID not found in object store's config or in environment variable")
 	}
 
-	cred, err := azidentity.NewEnvironmentCredential(&azidentity.EnvironmentCredentialOptions{
-		ClientOptions: azcore.ClientOptions{
-			Cloud: cloudConfiguration,
-		},
-	})
+	cred, err := newAzureCredential(cloudConfiguration)
 	if err != nil {
-		return "", errors.Wrap(err, "error getting credential from environment")
+		return "", errors.Wrap(err, "failed to obtain Azure credential")
 	}
 
 	// get storageAccountsClient
@@ -187,6 +215,7 @@ func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resource
 
 	return storageKey, nil
 }
+
 func handleErrors(err error) {
 	if err != nil {
 		if bloberror.HasCode(err, bloberror.ContainerAlreadyExists) {
@@ -219,6 +248,7 @@ func deleteBlob(client *azblob.Client, containerName, blobName string) error {
 	_, err := client.DeleteBlob(context.Background(), containerName, blobName, nil)
 	return err
 }
+
 func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName string) (bool, error) {
 	ctx := context.Background()
 	accountName, accountKey, err := getStorageCredential(cloudCredentialsFile, bslConfig)
@@ -313,6 +343,7 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupN
 	if err != nil {
 		return errors.Wrap(err, "unable to get all required environment variables")
 	}
+	fmt.Printf("Using Azure subscription ID %s and resource group %s\n", envVars[subscriptionIDEnvVar], envVars[resourceGroupEnvVar])
 
 	// Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
 	// exist, parseCloudConfiguration will return cloud.AzurePublic.
@@ -324,14 +355,13 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupN
 	// set a different subscriptionId for snapshots if specified
 	snapshotsSubscriptionID := envVars[subscriptionIDEnvVar]
 
-	cred, err := azidentity.NewEnvironmentCredential(&azidentity.EnvironmentCredentialOptions{
-		ClientOptions: azcore.ClientOptions{
-			Cloud: cloudConfiguration,
-		},
-	})
+	cred, err := newAzureCredential(cloudConfiguration)
 	if err != nil {
-		return errors.Wrap(err, "error getting credential from environment")
+		return errors.Wrap(err, "failed to get Azure credential")
 	}
+
+	credType := fmt.Sprintf("%T", cred)
+	fmt.Printf("Azure credential resolved to %s\n", credType)
 
 	// set up clients
 	snapshotsClient, err := armcompute.NewSnapshotsClient(snapshotsSubscriptionID, cred, &arm.ClientOptions{
@@ -353,12 +383,13 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupN
 		if page.Value == nil {
 			return errors.New(fmt.Sprintf("No snapshots in Azure resource group %s\n", envVars[resourceGroupEnvVar]))
 		}
+		fmt.Printf("Found %d snapshots in Azure resource group %s\n", len(page.Value), envVars[resourceGroupEnvVar])
 		for _, v := range page.Value {
 			if snapshotCheck.EnableCSI {
 				for _, s := range snapshotCheck.SnapshotIDList {
 					fmt.Println("Azure CSI local snapshot CR: " + s)
 					fmt.Println("Azure provider snapshot name: " + *v.Name)
-					if s == *v.Name {
+					if strings.Contains(s, *v.Name) {
 						fmt.Printf("Azure snapshot %s is created.\n", s)
 						snapshotCountFound++
 					}

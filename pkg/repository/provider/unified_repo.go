@@ -20,13 +20,13 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"maps"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/kopia/kopia/repo"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -46,6 +46,12 @@ type unifiedRepoProvider struct {
 	log              logrus.FieldLogger
 }
 
+type unifiedRepoConfigProvider struct {
+	repoService udmrepo.BackupRepoService
+	repoBackend string
+	log         logrus.FieldLogger
+}
+
 // this func is assigned to a package-level variable so it can be
 // replaced when unit-testing
 var getS3Credentials = repoconfig.GetS3Credentials
@@ -53,7 +59,7 @@ var getGCPCredentials = repoconfig.GetGCPCredentials
 var getS3BucketRegion = repoconfig.GetAWSBucketRegion
 
 type localFuncTable struct {
-	getStorageVariables   func(*velerov1api.BackupStorageLocation, string, string, map[string]string) (map[string]string, error)
+	getStorageVariables   func(*velerov1api.BackupStorageLocation, string, string, map[string]string, credentials.CredentialGetter) (map[string]string, error)
 	getStorageCredentials func(*velerov1api.BackupStorageLocation, credentials.FileStore) (map[string]string, error)
 }
 
@@ -81,7 +87,21 @@ func NewUnifiedRepoProvider(
 		log:              log,
 	}
 
-	repo.repoService = createRepoService(log)
+	repo.repoService = createRepoService(repoBackend, log)
+
+	return &repo
+}
+
+func NewUnifiedRepoConfigProvider(
+	repoBackend string,
+	log logrus.FieldLogger,
+) ConfigProvider {
+	repo := unifiedRepoConfigProvider{
+		repoBackend: repoBackend,
+		log:         log,
+	}
+
+	repo.repoService = createRepoService(repoBackend, log)
 
 	return &repo
 }
@@ -116,7 +136,7 @@ func (urp *unifiedRepoProvider) InitRepo(ctx context.Context, param RepoParam) e
 		return errors.Wrap(err, "error to get repo options")
 	}
 
-	err = urp.repoService.Init(ctx, *repoOption, true)
+	err = urp.repoService.Create(ctx, *repoOption)
 	if err != nil {
 		return errors.Wrap(err, "error to init backup repo")
 	}
@@ -152,7 +172,7 @@ func (urp *unifiedRepoProvider) ConnectToRepo(ctx context.Context, param RepoPar
 		return errors.Wrap(err, "error to get repo options")
 	}
 
-	err = urp.repoService.Init(ctx, *repoOption, false)
+	err = urp.repoService.Connect(ctx, *repoOption)
 	if err != nil {
 		return errors.Wrap(err, "error to connect backup repo")
 	}
@@ -169,7 +189,7 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 		"repo UID":  param.BackupRepo.UID,
 	})
 
-	log.Debug("Start to prepare repo")
+	log.Info("Start to prepare repo")
 
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
@@ -188,25 +208,23 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 		return errors.Wrap(err, "error to get repo options")
 	}
 
-	err = urp.repoService.Init(ctx, *repoOption, false)
-	if err == nil {
-		log.Debug("Repo has already been initialized remotely")
+	if created, err := urp.repoService.IsCreated(ctx, *repoOption); err != nil {
+		return errors.Wrap(err, "error to check backup repo")
+	} else if created {
+		log.Info("Repo has already been initialized")
 		return nil
-	}
-	if !errors.Is(err, repo.ErrRepositoryNotInitialized) {
-		return errors.Wrap(err, "error to connect to backup repo")
 	}
 
 	if param.BackupLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
 		return errors.Errorf("cannot create new backup repo for read-only backup storage location %s/%s", param.BackupLocation.Namespace, param.BackupLocation.Name)
 	}
 
-	err = urp.repoService.Init(ctx, *repoOption, true)
+	err = urp.repoService.Create(ctx, *repoOption)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup repo")
 	}
 
-	log.Debug("Prepare repo complete")
+	log.Info("Prepare repo complete")
 
 	return nil
 }
@@ -372,8 +390,12 @@ func (urp *unifiedRepoProvider) BatchForget(ctx context.Context, snapshotIDs []s
 	return errs
 }
 
-func (urp *unifiedRepoProvider) DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration {
+func (urp *unifiedRepoProvider) DefaultMaintenanceFrequency() time.Duration {
 	return urp.repoService.DefaultMaintenanceFrequency()
+}
+
+func (urp *unifiedRepoProvider) ClientSideCacheLimit(repoOption map[string]string) int64 {
+	return urp.repoService.ClientSideCacheLimit(repoOption)
 }
 
 func (urp *unifiedRepoProvider) GetPassword(param any) (string, error) {
@@ -405,7 +427,7 @@ func (urp *unifiedRepoProvider) GetStoreOptions(param any) (map[string]string, e
 		return map[string]string{}, errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
 	}
 
-	storeVar, err := funcTable.getStorageVariables(repoParam.BackupLocation, urp.repoBackend, repoParam.BackupRepo.Spec.VolumeNamespace, repoParam.BackupRepo.Spec.RepositoryConfig)
+	storeVar, err := funcTable.getStorageVariables(repoParam.BackupLocation, urp.repoBackend, repoParam.BackupRepo.Spec.VolumeNamespace, repoParam.BackupRepo.Spec.RepositoryConfig, urp.credentialGetter)
 	if err != nil {
 		return map[string]string{}, errors.Wrap(err, "error to get storage variables")
 	}
@@ -416,15 +438,22 @@ func (urp *unifiedRepoProvider) GetStoreOptions(param any) (map[string]string, e
 	}
 
 	storeOptions := make(map[string]string)
-	for k, v := range storeVar {
-		storeOptions[k] = v
-	}
+	maps.Copy(storeOptions, storeVar)
+	maps.Copy(storeOptions, storeCred)
 
-	for k, v := range storeCred {
-		storeOptions[k] = v
+	if repoParam.CacheDir != "" {
+		storeOptions[udmrepo.StoreOptionCacheDir] = repoParam.CacheDir
 	}
 
 	return storeOptions, nil
+}
+
+func (urcp *unifiedRepoConfigProvider) DefaultMaintenanceFrequency() time.Duration {
+	return urcp.repoService.DefaultMaintenanceFrequency()
+}
+
+func (urcp *unifiedRepoConfigProvider) ClientSideCacheLimit(repoOption map[string]string) int64 {
+	return urcp.repoService.ClientSideCacheLimit(repoOption)
 }
 
 func getRepoPassword(secretStore credentials.SecretStore) (string, error) {
@@ -510,7 +539,7 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 // so we would accept only the options that are well defined in the internal system.
 // Users' inputs should not be treated as safe any time.
 // We remove the unnecessary parameters and keep the modules/logics below safe
-func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoBackend string, repoName string, backupRepoConfig map[string]string) (map[string]string, error) {
+func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoBackend string, repoName string, backupRepoConfig map[string]string, credGetter credentials.CredentialGetter) (map[string]string, error) {
 	result := make(map[string]string)
 
 	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider, backupLocation.Spec.Config)
@@ -574,8 +603,23 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 
 	result[udmrepo.StoreOptionOssBucket] = bucket
 	result[udmrepo.StoreOptionPrefix] = prefix
-	if backupLocation.Spec.ObjectStorage != nil && backupLocation.Spec.ObjectStorage.CACert != nil {
-		result[udmrepo.StoreOptionCACert] = base64.StdEncoding.EncodeToString(backupLocation.Spec.ObjectStorage.CACert)
+	if backupLocation.Spec.ObjectStorage != nil {
+		var caCertData []byte
+
+		// Try CACertRef first (new method), then fall back to CACert (deprecated)
+		if backupLocation.Spec.ObjectStorage.CACertRef != nil {
+			caCertString, err := credGetter.FromSecret.Get(backupLocation.Spec.ObjectStorage.CACertRef)
+			if err != nil {
+				return nil, errors.Wrap(err, "error getting CA certificate from secret")
+			}
+			caCertData = []byte(caCertString)
+		} else if backupLocation.Spec.ObjectStorage.CACert != nil {
+			caCertData = backupLocation.Spec.ObjectStorage.CACert
+		}
+
+		if caCertData != nil {
+			result[udmrepo.StoreOptionCACert] = base64.StdEncoding.EncodeToString(caCertData)
+		}
 	}
 	result[udmrepo.StoreOptionOssRegion] = strings.Trim(region, "/")
 	result[udmrepo.StoreOptionFsPath] = config["fspath"]
@@ -597,6 +641,6 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 	return result, nil
 }
 
-func createRepoService(log logrus.FieldLogger) udmrepo.BackupRepoService {
-	return reposervice.Create(log)
+func createRepoService(repoBackend string, log logrus.FieldLogger) udmrepo.BackupRepoService {
+	return reposervice.Create(repoBackend, log)
 }

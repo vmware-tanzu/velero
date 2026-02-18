@@ -16,13 +16,14 @@ limitations under the License.
 package kube
 
 import (
+	"context"
 	"math"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -65,7 +66,7 @@ func NewEventRecorder(kubeClient kubernetes.Interface, scheme *runtime.Scheme, e
 		// The callers (i.e., data mover pods) have controlled the rate and total number outside. E.g., the progress is designed to be updated every 10 seconds and is changeable.
 		BurstSize: math.MaxInt32,
 		MaxEvents: 1,
-		MessageFunc: func(event *v1.Event) string {
+		MessageFunc: func(event *corev1api.Event) string {
 			return event.Message
 		},
 	})
@@ -75,7 +76,7 @@ func NewEventRecorder(kubeClient kubernetes.Interface, scheme *runtime.Scheme, e
 		sink:     kubeClient.CoreV1().Events(""),
 	})
 
-	res.recorder = res.broadcaster.NewRecorder(scheme, v1.EventSource{
+	res.recorder = res.broadcaster.NewRecorder(scheme, corev1api.EventSource{
 		Component: eventSource,
 		Host:      eventNode,
 	})
@@ -88,9 +89,9 @@ func (er *eventRecorder) Event(object runtime.Object, warning bool, reason strin
 		return
 	}
 
-	eventType := v1.EventTypeNormal
+	eventType := corev1api.EventTypeNormal
 	if warning {
-		eventType = v1.EventTypeWarning
+		eventType = corev1api.EventTypeWarning
 	}
 
 	if len(a) > 0 {
@@ -113,7 +114,7 @@ func (er *eventRecorder) EndingEvent(object runtime.Object, warning bool, reason
 	if er.endingSentinel == nil {
 		sentinelEvent = uuid.NewString()
 		er.endingSentinel = &eventElement{
-			t:      v1.EventTypeNormal,
+			t:      corev1api.EventTypeNormal,
 			r:      sentinelEvent,
 			m:      sentinelEvent,
 			sinked: make(chan struct{}),
@@ -161,7 +162,7 @@ func (er *eventRecorder) Shutdown() {
 	er.lock.Unlock()
 }
 
-func (er *eventRecorder) sentinelWatch(event *v1.Event) bool {
+func (er *eventRecorder) sentinelWatch(event *corev1api.Event) bool {
 	er.lock.Lock()
 	defer er.lock.Unlock()
 
@@ -177,18 +178,18 @@ func (er *eventRecorder) sentinelWatch(event *v1.Event) bool {
 	return false
 }
 
-func (es *eventSink) Create(event *v1.Event) (*v1.Event, error) {
+func (es *eventSink) Create(event *corev1api.Event) (*corev1api.Event, error) {
 	if es.recorder.sentinelWatch(event) {
 		return event, nil
 	}
 
-	return es.sink.CreateWithEventNamespace(event)
+	return es.sink.CreateWithEventNamespaceWithContext(context.Background(), event)
 }
 
-func (es *eventSink) Update(event *v1.Event) (*v1.Event, error) {
-	return es.sink.UpdateWithEventNamespace(event)
+func (es *eventSink) Update(event *corev1api.Event) (*corev1api.Event, error) {
+	return es.sink.UpdateWithEventNamespaceWithContext(context.Background(), event)
 }
 
-func (es *eventSink) Patch(event *v1.Event, data []byte) (*v1.Event, error) {
-	return es.sink.PatchWithEventNamespace(event, data)
+func (es *eventSink) Patch(event *corev1api.Event, data []byte) (*corev1api.Event, error) {
+	return es.sink.PatchWithEventNamespaceWithContext(context.Background(), event, data)
 }

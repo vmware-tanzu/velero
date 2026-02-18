@@ -68,7 +68,7 @@ func TestMergeHook_Fire(t *testing.T) {
 			// method under test
 			err := hook.Fire(&test.entry)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if test.expectHook {
 				assert.NotNil(t, test.entry.Logger.Out.(*hookWriter))
@@ -94,7 +94,7 @@ func (fw *fakeWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestMergeHook_Write(t *testing.T) {
-	sourceFile, err := os.CreateTemp("", "")
+	sourceFile, err := os.CreateTemp(t.TempDir(), "")
 	require.NoError(t, err)
 
 	logMessage := "fake-message-1\nfake-message-2"
@@ -161,7 +161,7 @@ func TestMergeHook_Write(t *testing.T) {
 			n, err := writer.Write(test.content)
 
 			if test.expectError == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				expectStr := string(test.content)
 				if expectStr == ListeningMessage {
@@ -174,7 +174,7 @@ func TestMergeHook_Write(t *testing.T) {
 				writtenStr := string(fakeWriter.p)
 				assert.Equal(t, writtenStr, expectStr)
 			} else {
-				assert.EqualError(t, err, test.expectError)
+				require.EqualError(t, err, test.expectError)
 			}
 
 			if test.needRollBackHook {

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -84,61 +84,43 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 		return nil, nil, "", nil, errors.WithStack(err)
 	}
 
-	volumeSnapshotClassName := ""
-	if vs.Spec.VolumeSnapshotClassName != nil {
-		volumeSnapshotClassName = *vs.Spec.VolumeSnapshotClassName
-	}
-
-	additionalItems := []velero.ResourceIdentifier{
-		{
-			GroupResource: kuberesource.VolumeSnapshotClasses,
-			Name:          volumeSnapshotClassName,
-		},
-	}
-
-	// determine if we are backing up a VolumeSnapshot that was created by velero while
-	// performing backup of a CSI backed PVC.
-	// For VolumeSnapshots that were created during the backup of a CSI backed PVC,
-	// we will wait for the VolumeSnapshotContents to be available.
-	// For VolumeSnapshots created outside of velero, we expect the VolumeSnapshotContent
-	// to be available prior to backing up the VolumeSnapshot. In case of a failure,
-	// backup should be re-attempted after the CSI driver has reconciled the VolumeSnapshot.
-	// existence of the velerov1api.BackupNameLabel indicates that the VolumeSnapshot was
-	// created while backing up a CSI backed PVC.
-
-	// We want to await reconciliation of only those VolumeSnapshots created during the
-	// ongoing backup.  For this we will wait only if the backup label exists on the
-	// VolumeSnapshot object and the backup name is the same as that of the value of the
-	// backup label.
-	backupOngoing := vs.Labels[velerov1api.BackupNameLabel] == label.GetValidName(backup.Name)
-
-	p.log.Infof("Getting VolumesnapshotContent for Volumesnapshot %s/%s",
-		vs.Namespace, vs.Name)
-
-	vsc, err := csi.WaitUntilVSCHandleIsReady(
-		vs,
-		p.crClient,
-		p.log,
-		backupOngoing,
-		backup.Spec.CSISnapshotTimeout.Duration,
-	)
-	if err != nil {
-		csi.CleanupVolumeSnapshot(vs, p.crClient, p.log)
-		return nil, nil, "", nil, errors.WithStack(err)
-	}
-
 	if backup.Status.Phase == velerov1api.BackupPhaseFinalizing ||
 		backup.Status.Phase == velerov1api.BackupPhaseFinalizingPartiallyFailed {
 		p.log.
 			WithField("Backup", fmt.Sprintf("%s/%s", backup.Namespace, backup.Name)).
 			WithField("BackupPhase", backup.Status.Phase).Debugf("Cleaning VolumeSnapshots.")
 
-		if vsc == nil {
-			vsc = &snapshotv1api.VolumeSnapshotContent{}
-		}
-
-		csi.DeleteReadyVolumeSnapshot(*vs, *vsc, p.crClient, p.log)
+		csi.DeleteReadyVolumeSnapshot(*vs, p.crClient, p.log)
 		return item, nil, "", nil, nil
+	}
+
+	additionalItems := make([]velero.ResourceIdentifier, 0)
+
+	if vs.Spec.VolumeSnapshotClassName != nil {
+		// This is still needed to add the VolumeSnapshotClass to the backup.
+		// The secret with VolumeSnapshotClass is still relevant to backup.
+		additionalItems = append(
+			additionalItems,
+			velero.ResourceIdentifier{
+				GroupResource: kuberesource.VolumeSnapshotClasses,
+				Name:          *vs.Spec.VolumeSnapshotClassName,
+			},
+		)
+
+		// Because async operation will update VolumeSnapshot during finalizing phase.
+		// No matter what we do, VolumeSnapshotClass cannot be deleted. So skip it.
+		// Just deleting VolumeSnapshotClass during restore and delete is enough.
+	}
+
+	p.log.Infof("Getting VolumesnapshotContent for Volumesnapshot %s/%s",
+		vs.Namespace, vs.Name)
+
+	ctx := context.TODO()
+
+	vsc, err := csi.GetVSCForVS(ctx, vs, p.crClient)
+	if err != nil {
+		csi.CleanupVolumeSnapshot(vs, p.crClient, p.log)
+		return nil, nil, "", nil, errors.WithStack(err)
 	}
 
 	annotations := make(map[string]string)
@@ -171,42 +153,40 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 			}
 		}
 
-		if backupOngoing {
-			p.log.Infof("Patching VolumeSnapshotContent %s with velero BackupNameLabel",
-				vsc.Name)
-			// If we created the VolumeSnapshotContent object during this ongoing backup,
-			// we would have created it with a DeletionPolicy of Retain.
-			// But, we want to retain these VolumeSnapshotContent ONLY for the lifetime
-			// of the backup. To that effect, during velero backup
-			// deletion, we will update the DeletionPolicy of the VolumeSnapshotContent
-			// and then delete the VolumeSnapshot object which will cascade delete the
-			// VolumeSnapshotContent and the associated snapshot in the storage
-			// provider (handled by the CSI driver and the CSI common controller).
-			// However, in the event that the VolumeSnapshot object is deleted outside
-			// of the backup deletion process, it is possible that the dynamically created
-			// VolumeSnapshotContent object will be left as an orphaned and non-discoverable
-			// resource in the cluster as well as in the storage provider. To avoid piling
-			// up of such orphaned resources, we will want to discover and delete the
-			// dynamically created VolumeSnapshotContent. We do that by adding
-			// the "velero.io/backup-name" label on the VolumeSnapshotContent.
-			// Further, we want to add this label only on VolumeSnapshotContents that
-			// were created during an ongoing velero backup.
-			originVSC := vsc.DeepCopy()
-			kubeutil.AddLabels(
-				&vsc.ObjectMeta,
-				map[string]string{
-					velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
-				},
-			)
+		p.log.Infof("Patching VolumeSnapshotContent %s with velero BackupNameLabel",
+			vsc.Name)
+		// If we created the VolumeSnapshotContent object during this ongoing backup,
+		// we would have created it with a DeletionPolicy of Retain.
+		// But, we want to retain these VolumeSnapshotContent ONLY for the lifetime
+		// of the backup. To that effect, during velero backup
+		// deletion, we will update the DeletionPolicy of the VolumeSnapshotContent
+		// and then delete the VolumeSnapshot object which will cascade delete the
+		// VolumeSnapshotContent and the associated snapshot in the storage
+		// provider (handled by the CSI driver and the CSI common controller).
+		// However, in the event that the VolumeSnapshot object is deleted outside
+		// of the backup deletion process, it is possible that the dynamically created
+		// VolumeSnapshotContent object will be left as an orphaned and non-discoverable
+		// resource in the cluster as well as in the storage provider. To avoid piling
+		// up of such orphaned resources, we will want to discover and delete the
+		// dynamically created VolumeSnapshotContent. We do that by adding
+		// the "velero.io/backup-name" label on the VolumeSnapshotContent.
+		// Further, we want to add this label only on VolumeSnapshotContents that
+		// were created during an ongoing velero backup.
+		originVSC := vsc.DeepCopy()
+		kubeutil.AddLabels(
+			&vsc.ObjectMeta,
+			map[string]string{
+				velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
+			},
+		)
 
-			if vscPatchError := p.crClient.Patch(
-				context.TODO(),
-				vsc,
-				crclient.MergeFrom(originVSC),
-			); vscPatchError != nil {
-				p.log.Warnf("Failed to patch VolumeSnapshotContent %s: %v",
-					vsc.Name, vscPatchError)
-			}
+		if vscPatchError := p.crClient.Patch(
+			context.TODO(),
+			vsc,
+			crclient.MergeFrom(originVSC),
+		); vscPatchError != nil {
+			p.log.Warnf("Failed to patch VolumeSnapshotContent %s: %v",
+				vsc.Name, vscPatchError)
 		}
 	}
 
@@ -244,20 +224,18 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 	var itemToUpdate []velero.ResourceIdentifier
 
 	// Only return Async operation for VSC created for this backup.
-	if backupOngoing {
-		// The operationID is of the form <namespace>/<volumesnapshot-name>/<started-time>
-		operationID = vs.Namespace + "/" + vs.Name + "/" + time.Now().Format(time.RFC3339)
-		itemToUpdate = []velero.ResourceIdentifier{
-			{
-				GroupResource: kuberesource.VolumeSnapshots,
-				Namespace:     vs.Namespace,
-				Name:          vs.Name,
-			},
-			{
-				GroupResource: kuberesource.VolumeSnapshotContents,
-				Name:          vsc.Name,
-			},
-		}
+	// The operationID is of the form <namespace>/<volumesnapshot-name>/<started-time>
+	operationID = vs.Namespace + "/" + vs.Name + "/" + time.Now().Format(time.RFC3339)
+	itemToUpdate = []velero.ResourceIdentifier{
+		{
+			GroupResource: kuberesource.VolumeSnapshots,
+			Namespace:     vs.Namespace,
+			Name:          vs.Name,
+		},
+		{
+			GroupResource: kuberesource.VolumeSnapshotContents,
+			Name:          vsc.Name,
+		},
 	}
 
 	return &unstructured.Unstructured{Object: vsMap},

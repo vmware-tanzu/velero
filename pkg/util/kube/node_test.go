@@ -17,12 +17,11 @@ limitations under the License.
 package kube
 
 import (
-	"context"
 	"testing"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -40,7 +39,7 @@ func TestIsLinuxNode(t *testing.T) {
 	nodeLinux := builder.ForNode("fake-node").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
 
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	tests := []struct {
 		name          string
@@ -80,7 +79,7 @@ func TestIsLinuxNode(t *testing.T) {
 
 			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
 
-			err := IsLinuxNode(context.TODO(), "fake-node", fakeClient)
+			err := IsLinuxNode(t.Context(), "fake-node", fakeClient)
 			if err != nil {
 				assert.EqualError(t, err, test.err)
 			} else {
@@ -95,7 +94,7 @@ func TestWithLinuxNode(t *testing.T) {
 	nodeLinux := builder.ForNode("fake-node-2").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
 
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	tests := []struct {
 		name          string
@@ -128,7 +127,7 @@ func TestWithLinuxNode(t *testing.T) {
 
 			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
 
-			result := withOSNode(context.TODO(), fakeClient, "linux", velerotest.NewLogger())
+			result := withOSNode(t.Context(), fakeClient, "linux", velerotest.NewLogger())
 			assert.Equal(t, test.result, result)
 		})
 	}
@@ -139,7 +138,7 @@ func TestGetNodeOSType(t *testing.T) {
 	nodeWindows := builder.ForNode("fake-node").Labels(map[string]string{"kubernetes.io/os": "windows"}).Result()
 	nodeLinux := builder.ForNode("fake-node").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 	tests := []struct {
 		name           string
 		kubeClientObj  []runtime.Object
@@ -174,7 +173,7 @@ func TestGetNodeOSType(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeKubeClient := kubeClientFake.NewSimpleClientset(test.kubeClientObj...)
-			osType, err := GetNodeOS(context.TODO(), "fake-node", fakeKubeClient.CoreV1())
+			osType, err := GetNodeOS(t.Context(), "fake-node", fakeKubeClient.CoreV1())
 			if err != nil {
 				assert.EqualError(t, err, test.err)
 			} else {
@@ -190,7 +189,7 @@ func TestHasNodeWithOS(t *testing.T) {
 	nodeLinux := builder.ForNode("fake-node-3").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
 
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	tests := []struct {
 		name          string
@@ -250,7 +249,7 @@ func TestHasNodeWithOS(t *testing.T) {
 				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
 			}
 
-			err := HasNodeWithOS(context.TODO(), test.os, fakeKubeClient.CoreV1())
+			err := HasNodeWithOS(t.Context(), test.os, fakeKubeClient.CoreV1())
 			if test.err != "" {
 				assert.EqualError(t, err, test.err)
 			} else {

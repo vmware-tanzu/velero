@@ -35,7 +35,7 @@ import (
 )
 
 func TestShimRepo(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	backupRepo := &mocks.BackupRepo{}
 	backupRepo.On("Time").Return(time.Time{})
 	shim := NewShimRepo(backupRepo)
@@ -107,7 +107,7 @@ func TestOpenObject(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			reader, err := NewShimRepo(tc.backupRepo).OpenObject(ctx, object.ID{})
 			if tc.isOpenObjectError {
 				require.ErrorContains(t, err, "failed to open object")
@@ -149,7 +149,7 @@ func TestFindManifests(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			_, err := NewShimRepo(tc.backupRepo).FindManifests(ctx, map[string]string{})
 			if tc.isGetManifestError {
 				require.ErrorContains(t, err, "failed")
@@ -274,13 +274,13 @@ func TestReplaceManifests(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			id, err := NewShimRepo(tc.backupRepo).ReplaceManifests(ctx, map[string]string{}, nil)
 
 			if tc.expectedError != "" {
-				assert.EqualError(t, err, tc.expectedError)
+				require.EqualError(t, err, tc.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, tc.expectedID, id)
@@ -337,7 +337,7 @@ func TestConcatenateObjects(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			_, err := NewShimRepo(tc.backupRepo).ConcatenateObjects(ctx, tc.objectIDs, repo.ConcatenateOptions{})
 
 			if tc.expectedError != "" {

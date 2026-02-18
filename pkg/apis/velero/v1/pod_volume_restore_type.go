@@ -54,15 +54,27 @@ type PodVolumeRestoreSpec struct {
 	// +optional
 	// +nullable
 	UploaderSettings map[string]string `json:"uploaderSettings,omitempty"`
+
+	// Cancel indicates request to cancel the ongoing PodVolumeRestore. It can be set
+	// when the PodVolumeRestore is in InProgress phase
+	Cancel bool `json:"cancel,omitempty"`
+
+	// SnapshotSize is the logical size in Bytes of the snapshot.
+	// +optional
+	SnapshotSize int64 `json:"snapshotSize,omitempty"`
 }
 
 // PodVolumeRestorePhase represents the lifecycle phase of a PodVolumeRestore.
-// +kubebuilder:validation:Enum=New;InProgress;Completed;Failed
+// +kubebuilder:validation:Enum=New;Accepted;Prepared;InProgress;Canceling;Canceled;Completed;Failed
 type PodVolumeRestorePhase string
 
 const (
 	PodVolumeRestorePhaseNew        PodVolumeRestorePhase = "New"
+	PodVolumeRestorePhaseAccepted   PodVolumeRestorePhase = "Accepted"
+	PodVolumeRestorePhasePrepared   PodVolumeRestorePhase = "Prepared"
 	PodVolumeRestorePhaseInProgress PodVolumeRestorePhase = "InProgress"
+	PodVolumeRestorePhaseCanceling  PodVolumeRestorePhase = "Canceling"
+	PodVolumeRestorePhaseCanceled   PodVolumeRestorePhase = "Canceled"
 	PodVolumeRestorePhaseCompleted  PodVolumeRestorePhase = "Completed"
 	PodVolumeRestorePhaseFailed     PodVolumeRestorePhase = "Failed"
 )
@@ -95,6 +107,16 @@ type PodVolumeRestoreStatus struct {
 	// about the restore operation.
 	// +optional
 	Progress shared.DataMoveOperationProgress `json:"progress,omitempty"`
+
+	// AcceptedTimestamp records the time the pod volume restore is to be prepared.
+	// The server's time is used for AcceptedTimestamp
+	// +optional
+	// +nullable
+	AcceptedTimestamp *metav1.Time `json:"acceptedTimestamp,omitempty"`
+
+	// Node is name of the node where the pod volume restore is processed.
+	// +optional
+	Node string `json:"node,omitempty"`
 }
 
 // TODO(2.0) After converting all resources to use the runtime-controller client, the genclient and k8s:deepcopy markers will no longer be needed and should be removed.
@@ -103,14 +125,14 @@ type PodVolumeRestoreStatus struct {
 // +kubebuilder:object:generate=true
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
-// +kubebuilder:printcolumn:name="Namespace",type="string",JSONPath=".spec.pod.namespace",description="Namespace of the pod containing the volume to be restored"
-// +kubebuilder:printcolumn:name="Pod",type="string",JSONPath=".spec.pod.name",description="Name of the pod containing the volume to be restored"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="PodVolumeRestore status such as New/InProgress"
+// +kubebuilder:printcolumn:name="Started",type="date",JSONPath=".status.startTimestamp",description="Time duration since this PodVolumeRestore was started"
+// +kubebuilder:printcolumn:name="Bytes Done",type="integer",format="int64",JSONPath=".status.progress.bytesDone",description="Completed bytes"
+// +kubebuilder:printcolumn:name="Total Bytes",type="integer",format="int64",JSONPath=".status.progress.totalBytes",description="Total bytes"
+// +kubebuilder:printcolumn:name="Storage Location",type="string",JSONPath=".spec.backupStorageLocation",description="Name of the Backup Storage Location where the backup data is stored"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Time duration since this PodVolumeRestore was created"
+// +kubebuilder:printcolumn:name="Node",type="string",JSONPath=".status.node",description="Name of the node where the PodVolumeRestore is processed"
 // +kubebuilder:printcolumn:name="Uploader Type",type="string",JSONPath=".spec.uploaderType",description="The type of the uploader to handle data transfer"
-// +kubebuilder:printcolumn:name="Volume",type="string",JSONPath=".spec.volume",description="Name of the volume to be restored"
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Pod Volume Restore status such as New/InProgress"
-// +kubebuilder:printcolumn:name="TotalBytes",type="integer",format="int64",JSONPath=".status.progress.totalBytes",description="Pod Volume Restore status such as New/InProgress"
-// +kubebuilder:printcolumn:name="BytesDone",type="integer",format="int64",JSONPath=".status.progress.bytesDone",description="Pod Volume Restore status such as New/InProgress"
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 type PodVolumeRestore struct {
 	metav1.TypeMeta `json:",inline"`

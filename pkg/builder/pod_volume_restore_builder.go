@@ -97,3 +97,45 @@ func (b *PodVolumeRestoreBuilder) UploaderType(uploaderType string) *PodVolumeRe
 	b.object.Spec.UploaderType = uploaderType
 	return b
 }
+
+// OwnerReference sets the OwnerReference for this PodVolumeRestore.
+func (b *PodVolumeRestoreBuilder) OwnerReference(ownerRef []metav1.OwnerReference) *PodVolumeRestoreBuilder {
+	b.object.OwnerReferences = ownerRef
+	return b
+}
+
+// Cancel sets the DataDownload's Cancel.
+func (b *PodVolumeRestoreBuilder) Cancel(cancel bool) *PodVolumeRestoreBuilder {
+	b.object.Spec.Cancel = cancel
+	return b
+}
+
+// AcceptedTimestamp sets the PodVolumeRestore's AcceptedTimestamp.
+func (b *PodVolumeRestoreBuilder) AcceptedTimestamp(acceptedTimestamp *metav1.Time) *PodVolumeRestoreBuilder {
+	b.object.Status.AcceptedTimestamp = acceptedTimestamp
+	return b
+}
+
+// Finalizers sets the PodVolumeRestore's Finalizers.
+func (b *PodVolumeRestoreBuilder) Finalizers(finalizers []string) *PodVolumeRestoreBuilder {
+	b.object.Finalizers = finalizers
+	return b
+}
+
+// Message sets the PodVolumeRestore's Message.
+func (b *PodVolumeRestoreBuilder) Message(msg string) *PodVolumeRestoreBuilder {
+	b.object.Status.Message = msg
+	return b
+}
+
+// Message sets the PodVolumeRestore's Node.
+func (b *PodVolumeRestoreBuilder) Node(node string) *PodVolumeRestoreBuilder {
+	b.object.Status.Node = node
+	return b
+}
+
+// Labels sets the PodVolumeRestoreBuilder's Labels.
+func (b *PodVolumeRestoreBuilder) Labels(label map[string]string) *PodVolumeRestoreBuilder {
+	b.object.Labels = label
+	return b
+}

@@ -27,28 +27,33 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path"
 	"path/filepath"
 	"reflect"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
 	"golang.org/x/mod/semver"
+	schedulingv1api "k8s.io/api/scheduling/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	ver "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	"github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test"
 	common "github.com/vmware-tanzu/velero/test/util/common"
-	util "github.com/vmware-tanzu/velero/test/util/csi"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -57,79 +62,72 @@ const RestoreObjectsPrefix = "restores"
 const PluginsObjectsPrefix = "plugins"
 
 var ImagesMatrix = map[string]map[string][]string{
-	"v1.10": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.6.0"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.6.0"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.6.0"},
-		"csi":                   {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.4.0"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.10.2"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.10.2"},
-	},
-	"v1.11": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.7.0"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.7.0"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.7.0"},
-		"csi":                   {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.5.0"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.11.1"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.11.1"},
-	},
-	"v1.12": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.8.0"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.8.0"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.8.0"},
-		"csi":                   {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.6.0"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.12.4"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.12.4"},
-	},
 	"v1.13": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.9.2"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.9.2"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.9.2"},
-		"csi":                   {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.7.1"},
-		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.9.2"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.13.2"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.13.2"},
+		"aws":                   {"velero/velero-plugin-for-aws:v1.9.2"},
+		"azure":                 {"velero/velero-plugin-for-microsoft-azure:v1.9.2"},
+		"vsphere":               {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"velero/velero-plugin-for-gcp:v1.9.2"},
+		"csi":                   {"velero/velero-plugin-for-csi:v0.7.1"},
+		"datamover":             {"velero/velero-plugin-for-aws:v1.9.2"},
+		"velero":                {"velero/velero:v1.13.2"},
+		"velero-restore-helper": {"velero/velero-restore-helper:v1.13.2"},
 	},
 	"v1.14": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.10.1"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.10.1"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.10.1"},
-		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.10.1"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.14.1"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.14.1"},
+		"aws":                   {"velero/velero-plugin-for-aws:v1.10.1"},
+		"azure":                 {"velero/velero-plugin-for-microsoft-azure:v1.10.1"},
+		"vsphere":               {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"velero/velero-plugin-for-gcp:v1.10.1"},
+		"datamover":             {"velero/velero-plugin-for-aws:v1.10.1"},
+		"velero":                {"velero/velero:v1.14.1"},
+		"velero-restore-helper": {"velero/velero-restore-helper:v1.14.1"},
 	},
 	"v1.15": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.11.0"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.11.0"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.11.0"},
-		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.11.0"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.15.0"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.15.0"},
+		"aws":                   {"velero/velero-plugin-for-aws:v1.11.0"},
+		"azure":                 {"velero/velero-plugin-for-microsoft-azure:v1.11.0"},
+		"vsphere":               {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"velero/velero-plugin-for-gcp:v1.11.0"},
+		"datamover":             {"velero/velero-plugin-for-aws:v1.11.0"},
+		"velero":                {"velero/velero:v1.15.2"},
+		"velero-restore-helper": {"velero/velero-restore-helper:v1.15.2"},
 	},
 	"v1.16": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.12.0"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.12.0"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.12.0"},
-		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.12.0"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.15.0"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero:v1.16.0"},
+		"aws":                   {"velero/velero-plugin-for-aws:v1.12.2"},
+		"azure":                 {"velero/velero-plugin-for-microsoft-azure:v1.12.2"},
+		"vsphere":               {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"velero/velero-plugin-for-gcp:v1.12.2"},
+		"datamover":             {"velero/velero-plugin-for-aws:v1.12.2"},
+		"velero":                {"velero/velero:v1.16.2"},
+		"velero-restore-helper": {"velero/velero:v1.16.2"},
+	},
+	"v1.17": {
+		"aws":                   {"velero/velero-plugin-for-aws:v1.13.2"},
+		"azure":                 {"velero/velero-plugin-for-microsoft-azure:v1.13.2"},
+		"vsphere":               {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"velero/velero-plugin-for-gcp:v1.13.2"},
+		"datamover":             {"velero/velero-plugin-for-aws:v1.13.2"},
+		"velero":                {"velero/velero:v1.17.2"},
+		"velero-restore-helper": {"velero/velero:v1.17.2"},
 	},
 	"main": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:main"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:main"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:main"},
-		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:main"},
-		"velero":                {"gcr.io/velero-gcp/velero:main"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:main"},
+		"aws":                   {"velero/velero-plugin-for-aws:main"},
+		"azure":                 {"velero/velero-plugin-for-microsoft-azure:main"},
+		"vsphere":               {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"velero/velero-plugin-for-gcp:main"},
+		"datamover":             {"velero/velero-plugin-for-aws:main"},
+		"velero":                {"velero/velero:main"},
+		"velero-restore-helper": {"velero/velero-restore-helper:main"},
 	},
+}
+
+// UpdateImagesMatrixByProxy is used to append the proxy to the image lists.
+func UpdateImagesMatrixByProxy(imageRegistryProxy string) {
+	if imageRegistryProxy != "" {
+		for i := range ImagesMatrix {
+			for j := range ImagesMatrix[i] {
+				ImagesMatrix[i][j][0] = path.Join(imageRegistryProxy, ImagesMatrix[i][j][0])
+			}
+		}
+	}
 }
 
 func SetImagesToDefaultValues(config VeleroConfig, version string) (VeleroConfig, error) {
@@ -139,12 +137,13 @@ func SetImagesToDefaultValues(config VeleroConfig, version string) (VeleroConfig
 
 	ret.Plugins = ""
 
-	versionWithoutPatch := semver.MajorMinor(version)
+	versionWithoutPatch := getVersionWithoutPatch(version)
+
 	// Read migration case needs images from the PluginsMatrix map.
 	images, ok := ImagesMatrix[versionWithoutPatch]
 	if !ok {
-		return config, fmt.Errorf("fail to read the images for version %s from the ImagesMatrix",
-			versionWithoutPatch)
+		fmt.Printf("Cannot read the images for version %s from the ImagesMatrix. Use the original values.\n", versionWithoutPatch)
+		return config, nil
 	}
 
 	ret.VeleroImage = images[Velero][0]
@@ -164,17 +163,32 @@ func SetImagesToDefaultValues(config VeleroConfig, version string) (VeleroConfig
 		ret.Plugins = images[AWS][0]
 	}
 
-	// Because Velero CSI plugin is deprecated in v1.14,
-	// only need to install it for version lower than v1.14.
-	if strings.Contains(ret.Features, FeatureCSI) &&
-		semver.Compare(versionWithoutPatch, "v1.14") < 0 {
-		ret.Plugins = ret.Plugins + "," + images[CSI][0]
-	}
 	if ret.SnapshotMoveData && ret.CloudProvider == Azure {
 		ret.Plugins = ret.Plugins + "," + images[AWS][0]
 	}
 
 	return ret, nil
+}
+
+func getVersionWithoutPatch(version string) string {
+	versionWithoutPatch := ""
+
+	mainRe := regexp.MustCompile(`^main$`)
+	releaseRe := regexp.MustCompile(`^release-(\d+)\.(\d+)(-dev)?$`)
+
+	switch {
+	case mainRe.MatchString(version):
+		versionWithoutPatch = "main"
+	case releaseRe.MatchString(version):
+		matches := releaseRe.FindStringSubmatch(version)
+		versionWithoutPatch = fmt.Sprintf("v%s.%s", matches[1], matches[2])
+	default:
+		versionWithoutPatch = semver.MajorMinor(version)
+	}
+
+	fmt.Println("The version is ", versionWithoutPatch)
+
+	return versionWithoutPatch
 }
 
 func getPluginsByVersion(version string, cloudProvider string, needDataMoverPlugin bool) ([]string, error) {
@@ -259,6 +273,12 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	io.VolumeSnapshotConfig = flag.NewMap()
 	io.VolumeSnapshotConfig.Set(veleroCfg.VSLConfig)
 
+	io.PodLabels = flag.NewMap()
+	io.PodLabels.Set(veleroCfg.PodLabels)
+
+	io.ServiceAccountAnnotations = flag.NewMap()
+	io.ServiceAccountAnnotations.Set(veleroCfg.ServiceAccountAnnotations)
+
 	io.Plugins = flag.NewStringArray(plugins...)
 	io.Features = veleroCfg.Features
 	io.DefaultVolumesToFsBackup = veleroCfg.DefaultVolumesToFsBackup
@@ -280,6 +300,12 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	io.VeleroPodMemLimit = veleroCfg.VeleroPodMemLimit
 	io.VeleroPodMemRequest = veleroCfg.VeleroPodMemRequest
 	io.DisableInformerCache = veleroCfg.DisableInformerCache
+	io.ItemBlockWorkerCount = veleroCfg.ItemBlockWorkerCount
+	io.ServerPriorityClassName = veleroCfg.ServerPriorityClassName
+	io.NodeAgentPriorityClassName = veleroCfg.NodeAgentPriorityClassName
+	io.RepoMaintenanceJobConfigMap = veleroCfg.RepoMaintenanceJobConfigMap
+	io.BackupRepoConfigMap = veleroCfg.BackupRepoConfigMap
+	io.NodeAgentConfigMap = veleroCfg.NodeAgentConfigMap
 
 	return io, nil
 }
@@ -659,7 +685,12 @@ func VeleroCreateBackupLocation(ctx context.Context,
 	if secretName != "" && secretKey != "" {
 		args = append(args, "--credential", fmt.Sprintf("%s=%s", secretName, secretKey))
 	}
-	return VeleroCmdExec(ctx, veleroCLI, args)
+
+	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
+		return err
+	}
+
+	return CheckBSL(ctx, veleroNamespace, name)
 }
 
 func VeleroVersion(ctx context.Context, veleroCLI, veleroNamespace string) error {
@@ -672,37 +703,44 @@ func VeleroVersion(ctx context.Context, veleroCLI, veleroNamespace string) error
 	return nil
 }
 
-// getProviderPlugins only provide plugin for specific cloud provider
-func getProviderPlugins(ctx context.Context, veleroCLI string, cloudProvider string) ([]string, error) {
-	if cloudProvider == "" {
-		return []string{}, errors.New("CloudProvider should be provided")
-	}
+// GetPlugins will collect all kinds plugins for VeleroInstall, such as provider
+// plugins(cloud provider/object store provider, if object store provider is not
+// provided, it should be set to value as cloud provider's), feature plugins (CSI/Datamover)
+func GetPlugins(ctx context.Context, veleroCfg VeleroConfig, defaultBSL bool) ([]string, error) {
+	veleroCLI := veleroCfg.VeleroCLI
+	cloudProvider := veleroCfg.CloudProvider
+	objectStoreProvider := veleroCfg.ObjectStoreProvider
+	providerPlugins := veleroCfg.Plugins
+	needDataMoverPlugin := false
+	var plugins []string
 
 	version, err := GetVeleroVersion(ctx, veleroCLI, true)
 	if err != nil {
 		return nil, errors.WithMessage(err, "failed to get velero version")
 	}
 
-	plugins, err := getPluginsByVersion(version, cloudProvider, false)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", cloudProvider, version)
+	// Read the plugins for the additional BSL here.
+	if defaultBSL == false {
+		fmt.Printf("Additional BSL provider = %s\n", veleroCfg.AdditionalBSLProvider)
+		fmt.Printf("Additional BSL plugins = %v\n", veleroCfg.AddBSLPlugins)
+
+		if veleroCfg.AddBSLPlugins == "" {
+			if veleroCfg.AdditionalBSLProvider == "" {
+				return []string{}, errors.New("AdditionalBSLProvider should be provided.")
+			}
+
+			plugins, err = getPluginsByVersion(version, veleroCfg.AdditionalBSLProvider, false)
+			if err != nil {
+				return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", veleroCfg.AdditionalBSLProvider, version)
+			}
+		} else {
+			plugins = append(plugins, veleroCfg.AddBSLPlugins)
+		}
+
+		return plugins, nil
 	}
 
-	return plugins, nil
-}
-
-// getPlugins will collect all kinds plugins for VeleroInstall, such as provider
-// plugins(cloud provider/object store provider, if object store provider is not
-// provided, it should be set to value as cloud provider's), feature plugins (CSI/Datamover)
-func getPlugins(ctx context.Context, veleroCfg VeleroConfig) ([]string, error) {
-	veleroCLI := veleroCfg.VeleroCLI
-	cloudProvider := veleroCfg.CloudProvider
-	objectStoreProvider := veleroCfg.ObjectStoreProvider
-	providerPlugins := veleroCfg.Plugins
-	needDataMoverPlugin := false
-
 	// Fetch the plugins for the provider before checking for the object store provider below.
-	var plugins []string
 	if len(providerPlugins) > 0 {
 		plugins = strings.Split(providerPlugins, ",")
 	} else {
@@ -713,47 +751,30 @@ func getPlugins(ctx context.Context, veleroCfg VeleroConfig) ([]string, error) {
 			objectStoreProvider = cloudProvider
 		}
 
-		var version string
-		var err error
 		if veleroCfg.VeleroVersion != "" {
 			version = veleroCfg.VeleroVersion
-		} else {
-			version, err = GetVeleroVersion(ctx, veleroCLI, true)
-			if err != nil {
-				return nil, errors.WithMessage(err, "failed to get velero version")
-			}
 		}
+
 		if veleroCfg.SnapshotMoveData && veleroCfg.DataMoverPlugin == "" && !veleroCfg.IsUpgradeTest {
 			needDataMoverPlugin = true
 		}
+
 		plugins, err = getPluginsByVersion(version, cloudProvider, needDataMoverPlugin)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", objectStoreProvider, version)
 		}
 	}
+
 	return plugins, nil
 }
 
-// VeleroAddPluginsForProvider determines which plugins need to be installed for a provider and
-// installs them in the current Velero installation, skipping over those that are already installed.
-func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string, plugin string) error {
-	var err error
-	var plugins []string
-	if plugin == "" {
-		plugins, err = getProviderPlugins(ctx, veleroCLI, provider)
-	} else {
-		plugins = append(plugins, plugin)
-	}
-	fmt.Printf("provider cmd = %v\n", provider)
-	fmt.Printf("plugins cmd = %v\n", plugins)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to get plugins")
-	}
+// AddPlugins installs them in the current Velero installation, skipping over those that are already installed.
+func AddPlugins(plugins []string, veleroCfg VeleroConfig) error {
 	for _, plugin := range plugins {
 		stdoutBuf := new(bytes.Buffer)
 		stderrBuf := new(bytes.Buffer)
 
-		installPluginCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "plugin", "add", plugin, "--confirm")
+		installPluginCmd := exec.CommandContext(context.TODO(), veleroCfg.VeleroCLI, "--namespace", veleroCfg.VeleroNamespace, "plugin", "add", plugin, "--confirm")
 		fmt.Printf("installPluginCmd cmd =%v\n", installPluginCmd)
 		installPluginCmd.Stdout = stdoutBuf
 		installPluginCmd.Stderr = stderrBuf
@@ -919,12 +940,12 @@ func CheckVeleroVersion(ctx context.Context, veleroCLI string, expectedVer strin
 	return nil
 }
 
-func InstallVeleroCLI(version string) (string, error) {
+func InstallVeleroCLI(ctx context.Context, version string) (string, error) {
 	var tempVeleroCliDir string
 	name := "velero-" + version + "-" + runtime.GOOS + "-" + runtime.GOARCH
 	postfix := ".tar.gz"
 	tarball := name + postfix
-	err := wait.PollImmediate(time.Second*5, time.Minute*5, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, time.Second*5, time.Minute*5, true, func(ctx context.Context) (bool, error) {
 		tempFile, err := getVeleroCliTarball("https://github.com/vmware-tanzu/velero/releases/download/" + version + "/" + tarball)
 		if err != nil {
 			return false, errors.WithMessagef(err, "failed to get Velero CLI tarball")
@@ -934,7 +955,7 @@ func InstallVeleroCLI(version string) (string, error) {
 			return false, errors.WithMessagef(err, "failed to create temp dir for tarball extraction")
 		}
 
-		cmd := exec.Command("tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir)
+		cmd := exec.CommandContext(ctx, "tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir)
 		defer os.Remove(tempFile.Name())
 
 		if _, err := cmd.Output(); err != nil {
@@ -1295,20 +1316,38 @@ func GetRepositories(ctx context.Context, veleroNamespace, targetNamespace strin
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
-func GetSnapshotCheckPoint(client TestClient, veleroCfg VeleroConfig, expectCount int, namespaceBackedUp, backupName string, KibishiiPVCNameList []string) (SnapshotCheckPoint, error) {
-	var err error
+// BuildSnapshotCheckPointFromVolumeInfo pulls snapshot handles directly
+func BuildSnapshotCheckPointFromVolumeInfo(
+	veleroCfg VeleroConfig,
+	backupVolumeInfo []*volume.BackupVolumeInfo,
+	expectCount int,
+	namespaceBackedUp string,
+	backupName string,
+	KibishiiPVCNameList []string) (SnapshotCheckPoint, error) {
 	var snapshotCheckPoint SnapshotCheckPoint
 
 	snapshotCheckPoint.ExpectCount = expectCount
 	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
 	snapshotCheckPoint.PodName = KibishiiPVCNameList
+
 	if (veleroCfg.CloudProvider == Azure || veleroCfg.CloudProvider == AWS) && strings.EqualFold(veleroCfg.Features, FeatureCSI) {
 		snapshotCheckPoint.EnableCSI = true
 
-		if snapshotCheckPoint.SnapshotIDList, err = util.CheckVolumeSnapshotCR(client, map[string]string{"backupNameLabel": backupName}, expectCount); err != nil {
-			return snapshotCheckPoint, errors.Wrapf(err, "Fail to get Azure CSI snapshot content")
+		var VscCount = 0
+		for _, volumeInfo := range backupVolumeInfo {
+			if *volumeInfo.CSISnapshotInfo.ReadyToUse == true {
+				snapshotCheckPoint.SnapshotIDList = append(snapshotCheckPoint.SnapshotIDList, volumeInfo.CSISnapshotInfo.SnapshotHandle)
+				VscCount++
+			} else {
+				return snapshotCheckPoint, errors.New("CSI snapshot is not ready to use")
+			}
+		}
+
+		if VscCount != expectCount {
+			return snapshotCheckPoint, errors.New(fmt.Sprintf("CSI snapshot count %d is not as expected %d", VscCount, expectCount))
 		}
 	}
+
 	fmt.Printf("snapshotCheckPoint: %v \n", snapshotCheckPoint)
 	return snapshotCheckPoint, nil
 }
@@ -1417,7 +1456,7 @@ func VeleroUpgrade(ctx context.Context, veleroCfg VeleroConfig) error {
 			return errors.Wrap(err, "Fail to update node agent")
 		}
 	}
-	return waitVeleroReady(ctx, veleroCfg.VeleroNamespace, veleroCfg.UseNodeAgent)
+	return waitVeleroReady(ctx, veleroCfg.VeleroNamespace, veleroCfg.UseNodeAgent, veleroCfg.UseNodeAgentWindows)
 }
 
 func ApplyCRDs(ctx context.Context, veleroCLI string) ([]string, error) {
@@ -1443,14 +1482,6 @@ func UpdateVeleroDeployment(ctx context.Context, veleroCfg VeleroConfig) ([]stri
 	cmd := &common.OsCommandLine{
 		Cmd:  "kubectl",
 		Args: []string{"get", "deploy", "-n", veleroCfg.VeleroNamespace, "-ojson"},
-	}
-	cmds = append(cmds, cmd)
-
-	args := fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"gcr.io\\/velero-gcp\\/nightly\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
-
-	cmd = &common.OsCommandLine{
-		Cmd:  "sed",
-		Args: []string{args},
 	}
 	cmds = append(cmds, cmd)
 
@@ -1496,14 +1527,6 @@ func UpdateNodeAgent(ctx context.Context, veleroCfg VeleroConfig, dsjson string)
 	}
 	cmds = append(cmds, cmd)
 
-	args := fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"gcr.io\\/velero-gcp\\/nightly\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
-
-	cmd = &common.OsCommandLine{
-		Cmd:  "sed",
-		Args: []string{args},
-	}
-	cmds = append(cmds, cmd)
-
 	cmd = &common.OsCommandLine{
 		Cmd:  "sed",
 		Args: []string{"s#\\\"name\\\"\\: \\\"restic\\\"#\\\"name\\\"\\: \\\"node-agent\\\"#g"},
@@ -1542,41 +1565,33 @@ func ListVeleroPods(ctx context.Context, veleroNamespace string) ([]string, erro
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
-func GetVeleroResource(ctx context.Context, veleroNamespace, namespace, resourceName string) ([]string, error) {
-	cmds := []*common.OsCommandLine{}
-	cmd := &common.OsCommandLine{
-		Cmd:  "kubectl",
-		Args: []string{"get", resourceName, "-n", veleroNamespace},
-	}
-	cmds = append(cmds, cmd)
+func BackupPVBNum(ctx context.Context, veleroNamespace, backupName string) (int, error) {
+	outputList, err := common.GetResourceWithLabel(
+		ctx,
+		veleroNamespace,
+		"PodVolumeBackup",
+		map[string]string{
+			velerov1api.BackupNameLabel: backupName,
+		},
+	)
 
-	cmd = &common.OsCommandLine{
-		Cmd:  "grep",
-		Args: []string{namespace},
-	}
-	cmds = append(cmds, cmd)
-
-	cmd = &common.OsCommandLine{
-		Cmd:  "awk",
-		Args: []string{"{print $1}"},
-	}
-	cmds = append(cmds, cmd)
-
-	return common.GetListByCmdPipes(ctx, cmds)
+	return len(outputList), err
 }
 
-func GetPVB(ctx context.Context, veleroNamespace, namespace string) ([]string, error) {
-	return GetVeleroResource(ctx, veleroNamespace, namespace, "podvolumebackup")
-}
+func RestorePVRNum(ctx context.Context, veleroNamespace, restoreName string) (int, error) {
+	outputList, err := common.GetResourceWithLabel(
+		ctx,
+		veleroNamespace,
+		"PodVolumeRestore",
+		map[string]string{
+			velerov1api.RestoreNameLabel: restoreName,
+		},
+	)
 
-func GetPVR(ctx context.Context, veleroNamespace, namespace string) ([]string, error) {
-	return GetVeleroResource(ctx, veleroNamespace, namespace, "podvolumerestore")
+	return len(outputList), err
 }
 
 func IsSupportUploaderType(version string) (bool, error) {
-	if strings.Contains(version, "self") {
-		return true, nil
-	}
 	verSupportUploaderType, err := ver.ParseSemantic("v1.10.0")
 	if err != nil {
 		return false, err
@@ -1825,4 +1840,44 @@ func KubectlGetAllDeleteBackupRequest(ctx context.Context, backupName, veleroNam
 	cmds = append(cmds, cmd)
 
 	return common.GetListByCmdPipes(ctx, cmds)
+}
+
+func CreatePriorityClasses(ctx context.Context, client kbclient.Client) error {
+	dataMoverPriorityClass := builder.ForPriorityClass(test.PriorityClassNameForDataMover).
+		Value(90000).PreemptionPolicy("Never").Result()
+	if err := client.Create(ctx, dataMoverPriorityClass); err != nil {
+		fmt.Printf("Fail to create PriorityClass %s: %s\n", test.PriorityClassNameForDataMover, err.Error())
+		return fmt.Errorf("fail to create PriorityClass %s: %w", test.PriorityClassNameForDataMover, err)
+	}
+
+	repoMaintenancePriorityClass := builder.ForPriorityClass(test.PriorityClassNameForRepoMaintenance).
+		Value(80000).PreemptionPolicy("Never").Result()
+	if err := client.Create(ctx, repoMaintenancePriorityClass); err != nil {
+		fmt.Printf("Fail to create PriorityClass %s: %s\n", test.PriorityClassNameForRepoMaintenance, err.Error())
+		return fmt.Errorf("fail to create PriorityClass %s: %w", test.PriorityClassNameForRepoMaintenance, err)
+	}
+
+	return nil
+}
+
+func DeletePriorityClasses(ctx context.Context, client kbclient.Client) error {
+	priorityClassDataMover := &schedulingv1api.PriorityClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: test.PriorityClassNameForDataMover,
+		},
+	}
+	if err := client.Delete(ctx, priorityClassDataMover); err != nil {
+		return err
+	}
+
+	priorityClassRepoMaintenance := &schedulingv1api.PriorityClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: test.PriorityClassNameForRepoMaintenance,
+		},
+	}
+	if err := client.Delete(ctx, priorityClassRepoMaintenance); err != nil {
+		return err
+	}
+
+	return nil
 }

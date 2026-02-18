@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"time"
 
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -31,8 +32,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-func CreateSecret(c clientset.Interface, ns, name string, labels map[string]string) (*v1.Secret, error) {
-	secret := &v1.Secret{
+func CreateSecret(c clientset.Interface, ns, name string, labels map[string]string) (*corev1api.Secret, error) {
+	secret := &corev1api.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
@@ -69,6 +70,6 @@ func WaitForSecretsComplete(c clientset.Interface, ns, secretName string) error 
 	})
 }
 
-func GetSecret(c clientset.Interface, ns, secretName string) (*v1.Secret, error) {
+func GetSecret(c clientset.Interface, ns, secretName string) (*corev1api.Secret, error) {
 	return c.CoreV1().Secrets(ns).Get(context.TODO(), secretName, metav1.GetOptions{})
 }

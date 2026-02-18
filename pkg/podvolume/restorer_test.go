@@ -26,7 +26,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	appv1 "k8s.io/api/apps/v1"
+	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,34 +57,34 @@ func TestGetVolumesRepositoryType(t *testing.T) {
 		{
 			name: "empty repository type, first one",
 			volumes: map[string]volumeBackupInfo{
-				"volume1": {"fake-snapshot-id-1", "fake-uploader-1", ""},
-				"volume2": {"", "", "fake-type"},
+				"volume1": {"fake-snapshot-id-1", 0, "fake-uploader-1", ""},
+				"volume2": {"", 0, "", "fake-type"},
 			},
 			expectedErr: "empty repository type found among volume snapshots, snapshot ID fake-snapshot-id-1, uploader fake-uploader-1",
 		},
 		{
 			name: "empty repository type, last one",
 			volumes: map[string]volumeBackupInfo{
-				"volume1": {"", "", "fake-type"},
-				"volume2": {"", "", "fake-type"},
-				"volume3": {"fake-snapshot-id-3", "fake-uploader-3", ""},
+				"volume1": {"", 0, "", "fake-type"},
+				"volume2": {"", 0, "", "fake-type"},
+				"volume3": {"fake-snapshot-id-3", 0, "fake-uploader-3", ""},
 			},
 			expectedErr: "empty repository type found among volume snapshots, snapshot ID fake-snapshot-id-3, uploader fake-uploader-3",
 		},
 		{
 			name: "empty repository type, middle one",
 			volumes: map[string]volumeBackupInfo{
-				"volume1": {"", "", "fake-type"},
-				"volume2": {"fake-snapshot-id-2", "fake-uploader-2", ""},
-				"volume3": {"", "", "fake-type"},
+				"volume1": {"", 0, "", "fake-type"},
+				"volume2": {"fake-snapshot-id-2", 0, "fake-uploader-2", ""},
+				"volume3": {"", 0, "", "fake-type"},
 			},
 			expectedErr: "empty repository type found among volume snapshots, snapshot ID fake-snapshot-id-2, uploader fake-uploader-2",
 		},
 		{
 			name: "mismatch repository type",
 			volumes: map[string]volumeBackupInfo{
-				"volume1": {"", "", "fake-type1"},
-				"volume2": {"fake-snapshot-id-2", "fake-uploader-2", "fake-type2"},
+				"volume1": {"", 0, "", "fake-type1"},
+				"volume2": {"fake-snapshot-id-2", 0, "fake-uploader-2", "fake-type2"},
 			},
 			prefixOnly:  true,
 			expectedErr: "multiple repository type in one backup",
@@ -92,9 +92,9 @@ func TestGetVolumesRepositoryType(t *testing.T) {
 		{
 			name: "success",
 			volumes: map[string]volumeBackupInfo{
-				"volume1": {"", "", "fake-type"},
-				"volume2": {"", "", "fake-type"},
-				"volume3": {"", "", "fake-type"},
+				"volume1": {"", 0, "", "fake-type"},
+				"volume2": {"", 0, "", "fake-type"},
+				"volume3": {"", 0, "", "fake-type"},
 			},
 			expected: "fake-type",
 		},
@@ -121,8 +121,8 @@ func TestGetVolumesRepositoryType(t *testing.T) {
 	}
 }
 
-func createNodeAgentDaemonset() *appv1.DaemonSet {
-	ds := &appv1.DaemonSet{
+func createNodeAgentDaemonset() *appsv1api.DaemonSet {
+	ds := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "node-agent",
 			Namespace: velerov1api.DefaultNamespace,
@@ -164,7 +164,7 @@ func TestRestorePodVolumes(t *testing.T) {
 	velerov1api.AddToScheme(scheme)
 	corev1api.AddToScheme(scheme)
 
-	ctxWithCancel, cancel := context.WithCancel(context.Background())
+	ctxWithCancel, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	failedPVR := createPVRObj(true, 1)
@@ -314,30 +314,6 @@ func TestRestorePodVolumes(t *testing.T) {
 			},
 		},
 		{
-			name: "pod is not running on linux nodes",
-			pvbs: []*velerov1api.PodVolumeBackup{
-				createPVBObj(true, true, 1, "kopia"),
-			},
-			kubeClientObj: []runtime.Object{
-				createNodeAgentDaemonset(),
-				createWindowsNodeObj(),
-				createPVCObj(1),
-				createPodObj(true, true, true, 1),
-			},
-			ctlClientObj: []runtime.Object{
-				createBackupRepoObj(),
-			},
-			restoredPod:     createPodObj(true, true, true, 1),
-			sourceNamespace: "fake-ns",
-			bsl:             "fake-bsl",
-			runtimeScheme:   scheme,
-			errs: []expectError{
-				{
-					err: "restored pod fake-ns/fake-pod is not running in linux node(fake-node-name): os type windows for node fake-node-name is not linux",
-				},
-			},
-		},
-		{
 			name: "node-agent pod is not running",
 			pvbs: []*velerov1api.PodVolumeBackup{
 				createPVBObj(true, true, 1, "kopia"),
@@ -388,7 +364,7 @@ func TestRestorePodVolumes(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			if test.ctx != nil {
 				ctx = test.ctx
 			}

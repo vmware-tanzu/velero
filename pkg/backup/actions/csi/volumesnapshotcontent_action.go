@@ -19,7 +19,7 @@ package csi
 import (
 	"fmt"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -96,6 +96,10 @@ func (p *volumeSnapshotContentBackupItemAction) Execute(
 			velerov1api.MustIncludeAdditionalItemAnnotation: "true",
 		})
 	}
+
+	// Because async operation will update VolumeSnapshotContent during finalizing phase.
+	// No matter what we do, VolumeSnapshotClass cannot be deleted. So skip it.
+	// Just deleting VolumeSnapshotClass during restore and delete is enough.
 
 	snapContMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&snapCont)
 	if err != nil {

@@ -113,17 +113,5 @@ func newConfigCredential(creds map[string]string, options configCredentialOption
 		return azidentity.NewClientCertificateCredential(tenantID, clientID, certs, key, o)
 	}
 
-	// username/password
-	if username := creds[CredentialKeyUsername]; username != "" {
-		if password := creds[CredentialKeyPassword]; password != "" {
-			return azidentity.NewUsernamePasswordCredential(tenantID, clientID, username, password,
-				&azidentity.UsernamePasswordCredentialOptions{
-					AdditionallyAllowedTenants: options.AdditionallyAllowedTenants,
-					ClientOptions:              options.ClientOptions,
-				})
-		}
-		return nil, errors.Errorf("%s is required", CredentialKeyPassword)
-	}
-
 	return nil, errors.New("incomplete credential configuration. Only AZURE_TENANT_ID and AZURE_CLIENT_ID are set")
 }

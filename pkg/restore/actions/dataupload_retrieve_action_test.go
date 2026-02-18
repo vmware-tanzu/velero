@@ -17,11 +17,10 @@ limitations under the License.
 package actions
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,13 +38,13 @@ import (
 func TestDataUploadRetrieveActionExectue(t *testing.T) {
 	scheme := runtime.NewScheme()
 	velerov1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	tests := []struct {
 		name                     string
 		dataUpload               *velerov2alpha1.DataUpload
 		restore                  *velerov1.Restore
-		expectedDataUploadResult *corev1.ConfigMap
+		expectedDataUploadResult *corev1api.ConfigMap
 		expectedErr              string
 		runtimeScheme            *runtime.Scheme
 		veleroObjs               []runtime.Object
@@ -59,13 +58,13 @@ func TestDataUploadRetrieveActionExectue(t *testing.T) {
 		},
 		{
 			name:          "DataUploadRetrieve Action test",
-			dataUpload:    builder.ForDataUpload("velero", "testDU").SourceNamespace("testNamespace").SourcePVC("testPVC").Result(),
+			dataUpload:    builder.ForDataUpload("velero", "testDU").SourceNamespace("testNamespace").SourcePVC("testPVC").SnapshotID("fake-id").TotalBytes(1000).Result(),
 			restore:       builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("testingUID")).Backup("testBackup").Result(),
 			runtimeScheme: scheme,
 			veleroObjs: []runtime.Object{
 				builder.ForBackup("velero", "testBackup").StorageLocation("testLocation").Result(),
 			},
-			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "testNamespace.testPVC", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"testLocation","sourceNamespace":"testNamespace"}`).Result(),
+			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "testNamespace.testPVC", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"testLocation","snapshotID":"fake-id","sourceNamespace":"testNamespace","snapshotSize":1000}`).Result(),
 		},
 		{
 			name:          "Long source namespace and PVC name should also work",
@@ -110,8 +109,8 @@ func TestDataUploadRetrieveActionExectue(t *testing.T) {
 			}
 
 			if tc.expectedDataUploadResult != nil {
-				var cmList corev1.ConfigMapList
-				err := fakeClient.List(context.Background(), &cmList, &client.ListOptions{
+				var cmList corev1api.ConfigMapList
+				err := fakeClient.List(t.Context(), &cmList, &client.ListOptions{
 					LabelSelector: labels.SelectorFromSet(map[string]string{
 						velerov1.RestoreUIDLabel:       "testingUID",
 						velerov1.PVCNamespaceNameLabel: label.GetValidName(tc.dataUpload.Spec.SourceNamespace + "." + tc.dataUpload.Spec.SourcePVC),

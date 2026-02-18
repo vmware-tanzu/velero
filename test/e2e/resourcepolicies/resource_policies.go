@@ -19,15 +19,17 @@ package resourcepolicies
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -110,8 +112,17 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
+
+		nsLabels := make(map[string]string)
+		if r.VeleroCfg.WorkerOS == common.WorkerOSWindows {
+			nsLabels = map[string]string{
+				"pod-security.kubernetes.io/enforce":         "privileged",
+				"pod-security.kubernetes.io/enforce-version": "latest",
+			}
+		}
+
 		By(fmt.Sprintf("Create namespaces %s for workload\n", namespace), func() {
-			Expect(CreateNamespace(r.Ctx, r.Client, namespace)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespace))
+			Expect(CreateNamespaceWithLabel(r.Ctx, r.Client, namespace, nsLabels)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespace))
 		})
 
 		volName := fmt.Sprintf("vol-%s-%00000d", r.CaseBaseName, nsNum)
@@ -151,18 +162,26 @@ func (r *ResourcePoliciesCase) Verify() error {
 					if vol.Name != volName {
 						continue
 					}
-					content, _, err := ReadFileFromPodVolume(r.Ctx, ns, pod.Name, "container-busybox", vol.Name, FileName)
+					content, _, err := ReadFileFromPodVolume(
+						ns,
+						pod.Name,
+						"container-busybox",
+						vol.Name,
+						FileName,
+						r.VeleroCfg.WorkerOS,
+					)
 					if i%2 == 0 {
 						Expect(err).To(HaveOccurred(), "Expected file not found") // File should not exist
 					} else {
 						Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Fail to read file %s from volume %s of pod %s in namespace %s",
 							FileName, vol.Name, pod.Name, ns))
 
-						content = strings.Replace(content, "\n", "", -1)
-						originContent := strings.Replace(fmt.Sprintf("ns-%s pod-%s volume-%s", ns, pod.Name, vol.Name), "\n", "", -1)
+						content = strings.TrimRightFunc(content, unicode.IsSpace)
+						originContent := fmt.Sprintf("ns-%s pod-%s volume-%s", ns, pod.Name, vol.Name)
 
-						Expect(content).To(Equal(originContent), fmt.Sprintf("File %s does not exist in volume %s of pod %s in namespace %s",
-							FileName, vol.Name, pod.Name, ns))
+						Expect(content).To(Equal(originContent),
+							fmt.Sprintf("Content not match.\n origin: %s\n result: %s\n", originContent, content),
+						)
 					}
 				}
 			}
@@ -186,7 +205,7 @@ func (r *ResourcePoliciesCase) Clean() error {
 	return nil
 }
 
-func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []*v1.Volume) error {
+func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []*corev1api.Volume) error {
 	var err error
 	for i := range volList {
 		pvcName := fmt.Sprintf("pvc-%d", i)
@@ -208,8 +227,15 @@ func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []
 	return nil
 }
 
-func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volList []*v1.Volume) error {
-	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"resource-policies": "resource-policies"}, nil).WithVolume(volList).Result()
+func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volList []*corev1api.Volume) error {
+	deployment := NewDeployment(
+		r.CaseBaseName,
+		namespace,
+		1,
+		map[string]string{"resource-policies": "resource-policies"},
+		r.VeleroCfg.ImageRegistryProxy,
+		r.VeleroCfg.WorkerOS,
+	).WithVolume(volList).Result()
 	deployment, err := CreateDeployment(r.Client.ClientGo, namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create deloyment %s the namespace %q", deployment.Name, namespace))
@@ -231,7 +257,15 @@ func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) erro
 			if vol.Name != volName {
 				continue
 			}
-			err := CreateFileToPod(r.Ctx, namespace, pod.Name, "container-busybox", vol.Name, FileName, fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, pod.Name, vol.Name))
+			err := CreateFileToPod(
+				namespace,
+				pod.Name,
+				"container-busybox",
+				vol.Name,
+				FileName,
+				fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, pod.Name, vol.Name),
+				r.VeleroCfg.WorkerOS,
+			)
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("failed to create file into pod %s in namespace: %q", pod.Name, namespace))
 			}

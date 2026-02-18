@@ -15,10 +15,7 @@ package datamover
 
 import (
 	"context"
-	"fmt"
-	"os"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -44,31 +41,4 @@ type dataPathService interface {
 	Init() error
 	RunCancelableDataPath(context.Context) (string, error)
 	Shutdown()
-}
-
-var funcExit = os.Exit
-var funcCreateFile = os.Create
-
-func exitWithMessage(logger logrus.FieldLogger, succeed bool, message string, a ...any) {
-	exitCode := 0
-	if !succeed {
-		exitCode = 1
-	}
-
-	toWrite := fmt.Sprintf(message, a...)
-
-	podFile, err := funcCreateFile("/dev/termination-log")
-	if err != nil {
-		logger.WithError(err).Error("Failed to create termination log file")
-		exitCode = 1
-	} else {
-		if _, err := podFile.WriteString(toWrite); err != nil {
-			logger.WithError(err).Error("Failed to write error to termination log file")
-			exitCode = 1
-		}
-
-		podFile.Close()
-	}
-
-	funcExit(exitCode)
 }

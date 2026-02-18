@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -63,12 +64,26 @@ func (f *FilteringCase) CreateResources() error {
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", f.CaseBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
-		if err := CreateNamespace(f.Ctx, f.Client, namespace); err != nil {
+		nsLabels := make(map[string]string)
+		if f.VeleroCfg.WorkerOS == common.WorkerOSWindows {
+			nsLabels = map[string]string{
+				"pod-security.kubernetes.io/enforce":         "privileged",
+				"pod-security.kubernetes.io/enforce-version": "latest",
+			}
+		}
+		if err := CreateNamespaceWithLabel(f.Ctx, f.Client, namespace, nsLabels); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
-		deployment := NewDeployment(f.CaseBaseName, namespace, f.replica, f.labels, nil).Result()
+		deployment := NewDeployment(
+			f.CaseBaseName,
+			namespace,
+			f.replica,
+			f.labels,
+			f.VeleroCfg.ImageRegistryProxy,
+			f.VeleroCfg.WorkerOS,
+		).Result()
 		deployment, err := CreateDeployment(f.Client.ClientGo, namespace, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))

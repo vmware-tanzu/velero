@@ -18,6 +18,7 @@ package kube
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -25,7 +26,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
-	storagev1api "k8s.io/api/storage/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -53,6 +54,11 @@ const (
 	KubeAnnMigratedTo             = "pv.kubernetes.io/migrated-to"
 	KubeAnnSelectedNode           = "volume.kubernetes.io/selected-node"
 )
+
+// VolumeSnapshotContentManagedByLabel is applied by the snapshot controller
+// to the VolumeSnapshotContent object in case distributed snapshotting is enabled.
+// The value contains the name of the node that handles the snapshot for the volume local to that node.
+const VolumeSnapshotContentManagedByLabel = "snapshot.storage.kubernetes.io/managed-by"
 
 var ErrorPodVolumeIsNotPVC = errors.New("pod volume is not a PVC")
 
@@ -148,8 +154,8 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 // GetVolumeDirectory gets the name of the directory on the host, under /var/lib/kubelet/pods/<podUID>/volumes/,
 // where the specified volume lives.
 // For volumes with a CSIVolumeSource, append "/mount" to the directory name.
-func GetVolumeDirectory(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, cli client.Client) (string, error) {
-	pvc, pv, volume, err := GetPodPVCVolume(ctx, log, pod, volumeName, cli)
+func GetVolumeDirectory(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, kubeClient kubernetes.Interface) (string, error) {
+	pvc, pv, volume, err := GetPodPVCVolume(ctx, log, pod, volumeName, kubeClient)
 	if err != nil {
 		// This case implies the administrator created the PV and attached it directly, without PVC.
 		// Note that only one VolumeSource can be populated per Volume on a pod
@@ -164,7 +170,7 @@ func GetVolumeDirectory(ctx context.Context, log logrus.FieldLogger, pod *corev1
 
 	// Most common case is that we have a PVC VolumeSource, and we need to check the PV it points to for a CSI source.
 	// PV's been created with a CSI source.
-	isProvisionedByCSI, err := isProvisionedByCSI(log, pv, cli)
+	isProvisionedByCSI, err := isProvisionedByCSI(log, pv, kubeClient)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -179,9 +185,9 @@ func GetVolumeDirectory(ctx context.Context, log logrus.FieldLogger, pod *corev1
 }
 
 // GetVolumeMode gets the uploader.PersistentVolumeMode of the volume.
-func GetVolumeMode(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, cli client.Client) (
+func GetVolumeMode(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, kubeClient kubernetes.Interface) (
 	uploader.PersistentVolumeMode, error) {
-	_, pv, _, err := GetPodPVCVolume(ctx, log, pod, volumeName, cli)
+	_, pv, _, err := GetPodPVCVolume(ctx, log, pod, volumeName, kubeClient)
 
 	if err != nil {
 		if err == ErrorPodVolumeIsNotPVC {
@@ -198,7 +204,7 @@ func GetVolumeMode(ctx context.Context, log logrus.FieldLogger, pod *corev1api.P
 
 // GetPodPVCVolume gets the PVC, PV and volume for a pod volume name.
 // Returns pod volume in case of ErrorPodVolumeIsNotPVC error
-func GetPodPVCVolume(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, cli client.Client) (
+func GetPodPVCVolume(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, kubeClient kubernetes.Interface) (
 	*corev1api.PersistentVolumeClaim, *corev1api.PersistentVolume, *corev1api.Volume, error) {
 	var volume *corev1api.Volume
 
@@ -217,14 +223,12 @@ func GetPodPVCVolume(ctx context.Context, log logrus.FieldLogger, pod *corev1api
 		return nil, nil, volume, ErrorPodVolumeIsNotPVC // There is a pod volume but it is not a PVC
 	}
 
-	pvc := &corev1api.PersistentVolumeClaim{}
-	err := cli.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: volume.VolumeSource.PersistentVolumeClaim.ClaimName}, pvc)
+	pvc, err := kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(ctx, volume.VolumeSource.PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, nil, errors.WithStack(err)
 	}
 
-	pv := &corev1api.PersistentVolume{}
-	err = cli.Get(ctx, client.ObjectKey{Name: pvc.Spec.VolumeName}, pv)
+	pv, err := kubeClient.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, nil, errors.WithStack(err)
 	}
@@ -235,7 +239,7 @@ func GetPodPVCVolume(ctx context.Context, log logrus.FieldLogger, pod *corev1api
 // isProvisionedByCSI function checks whether this is a CSI PV by annotation.
 // Either "pv.kubernetes.io/provisioned-by" or "pv.kubernetes.io/migrated-to" indicates
 // PV is provisioned by CSI.
-func isProvisionedByCSI(log logrus.FieldLogger, pv *corev1api.PersistentVolume, kbClient client.Client) (bool, error) {
+func isProvisionedByCSI(log logrus.FieldLogger, pv *corev1api.PersistentVolume, kubeClient kubernetes.Interface) (bool, error) {
 	if pv.Spec.CSI != nil {
 		return true, nil
 	}
@@ -245,10 +249,11 @@ func isProvisionedByCSI(log logrus.FieldLogger, pv *corev1api.PersistentVolume, 
 		driverName := pv.Annotations[KubeAnnDynamicallyProvisioned]
 		migratedDriver := pv.Annotations[KubeAnnMigratedTo]
 		if len(driverName) > 0 || len(migratedDriver) > 0 {
-			list := &storagev1api.CSIDriverList{}
-			if err := kbClient.List(context.TODO(), list); err != nil {
+			list, err := kubeClient.StorageV1().CSIDrivers().List(context.TODO(), metav1.ListOptions{})
+			if err != nil {
 				return false, err
 			}
+
 			for _, driver := range list.Items {
 				if driverName == driver.Name || migratedDriver == driver.Name {
 					log.Debugf("the annotation %s or %s equals to %s indicates the volume is provisioned by a CSI driver", KubeAnnDynamicallyProvisioned, KubeAnnMigratedTo, driver.Name)
@@ -353,4 +358,30 @@ func HasBackupLabel(o *metav1.ObjectMeta, backupName string) bool {
 		return false
 	}
 	return o.Labels[velerov1api.BackupNameLabel] == label.GetValidName(backupName)
+}
+
+func VerifyJSONConfigs(ctx context.Context, namespace string, crClient client.Client, configName string, configType any) error {
+	cm := new(corev1api.ConfigMap)
+	err := crClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: configName}, cm)
+	if err != nil {
+		return errors.Wrapf(err, "fail to find ConfigMap %s", configName)
+	}
+
+	if cm.Data == nil {
+		return errors.Errorf("data is not available in ConfigMap %s", configName)
+	}
+
+	// Verify all the keys in ConfigMap's data.
+	jsonString := ""
+	for _, v := range cm.Data {
+		jsonString = v
+
+		configs := configType
+		err = json.Unmarshal([]byte(jsonString), configs)
+		if err != nil {
+			return errors.Wrapf(err, "error to unmarshall data from ConfigMap %s", configName)
+		}
+	}
+
+	return nil
 }

@@ -41,19 +41,23 @@ func (n *NamespaceMapping) Init() error {
 	if n.UseVolumeSnapshots {
 		backupType = "snapshot"
 	}
-	var mappedNS string
+	var mappedNSSb strings.Builder
 	var mappedNSList []string
 	n.NSIncluded = &[]string{}
+
 	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
+		if nsNum > 0 {
+			mappedNSSb.WriteString(",")
+		}
 		createNSName := fmt.Sprintf("%s-%00000d", n.CaseBaseName, nsNum)
 		*n.NSIncluded = append(*n.NSIncluded, createNSName)
-		mappedNS = mappedNS + createNSName + ":" + createNSName + "-mapped"
+		mappedNSSb.WriteString(createNSName)
+		mappedNSSb.WriteString(":")
+		mappedNSSb.WriteString(createNSName)
+		mappedNSSb.WriteString("-mapped")
 		mappedNSList = append(mappedNSList, createNSName+"-mapped")
-		mappedNS = mappedNS + ","
 	}
-	mappedNS = strings.TrimRightFunc(mappedNS, func(r rune) bool {
-		return r == ','
-	})
+	mappedNS := mappedNSSb.String()
 
 	n.TestMsg = &TestMSG{
 		Desc:      fmt.Sprintf("Restore namespace %s with namespace mapping by %s test", *n.NSIncluded, backupType),
@@ -91,9 +95,18 @@ func (n *NamespaceMapping) CreateResources() error {
 			Expect(CreateNamespace(n.Ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
 		})
 		By("Deploy sample workload of Kibishii", func() {
-			Expect(KibishiiPrepareBeforeBackup(n.Ctx, n.Client, n.VeleroCfg.CloudProvider,
-				ns, n.VeleroCfg.RegistryCredentialFile, n.VeleroCfg.Features,
-				n.VeleroCfg.KibishiiDirectory, false, n.kibishiiData)).To(Succeed())
+			Expect(KibishiiPrepareBeforeBackup(
+				n.Ctx,
+				n.Client,
+				n.VeleroCfg.CloudProvider,
+				ns,
+				n.VeleroCfg.RegistryCredentialFile,
+				n.VeleroCfg.Features,
+				n.VeleroCfg.KibishiiDirectory,
+				n.kibishiiData,
+				n.VeleroCfg.ImageRegistryProxy,
+				n.VeleroCfg.WorkerOS,
+			)).To(Succeed())
 		})
 	}
 	return nil
@@ -103,8 +116,14 @@ func (n *NamespaceMapping) Verify() error {
 	for index, ns := range n.MappedNamespaceList {
 		n.kibishiiData.Levels = len(*n.NSIncluded) + index
 		By(fmt.Sprintf("Verify workload %s after restore ", ns), func() {
-			Expect(KibishiiVerifyAfterRestore(n.Client, ns,
-				n.Ctx, n.kibishiiData, "")).To(Succeed(), "Fail to verify workload after restore")
+			Expect(KibishiiVerifyAfterRestore(
+				n.Client,
+				ns,
+				n.Ctx,
+				n.kibishiiData,
+				"",
+				n.VeleroCfg.WorkerOS,
+			)).To(Succeed(), "Fail to verify workload after restore")
 		})
 	}
 	for _, ns := range *n.NSIncluded {

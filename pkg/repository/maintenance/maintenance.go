@@ -27,38 +27,36 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	batchv1 "k8s.io/api/batch/v1"
-	v1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	batchv1api "k8s.io/api/batch/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerolabel "github.com/vmware-tanzu/velero/pkg/label"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	appsv1 "k8s.io/api/apps/v1"
-
-	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
-
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 const (
 	RepositoryNameLabel              = "velero.io/repo-name"
 	GlobalKeyForRepoMaintenanceJobCM = "global"
 	TerminationLogIndicator          = "Repo maintenance error: "
+
+	DefaultKeepLatestMaintenanceJobs = 3
+	DefaultMaintenanceJobCPURequest  = "0"
+	DefaultMaintenanceJobCPULimit    = "0"
+	DefaultMaintenanceJobMemRequest  = "0"
+	DefaultMaintenanceJobMemLimit    = "0"
 )
-
-type JobConfigs struct {
-	// LoadAffinities is the config for repository maintenance job load affinity.
-	LoadAffinities []*kube.LoadAffinity `json:"loadAffinity,omitempty"`
-
-	// PodResources is the config for the CPU and memory resources setting.
-	PodResources *kube.PodResources `json:"podResources,omitempty"`
-}
 
 func GenerateJobName(repo string) string {
 	millisecond := time.Now().UTC().UnixMilli() // millisecond
@@ -72,10 +70,22 @@ func GenerateJobName(repo string) string {
 }
 
 // DeleteOldJobs deletes old maintenance jobs and keeps the latest N jobs
-func DeleteOldJobs(cli client.Client, repo string, keep int) error {
+func DeleteOldJobs(cli client.Client, repo velerov1api.BackupRepository, keep int, logger logrus.FieldLogger) error {
+	logger.Infof("Start to delete old maintenance jobs. %d jobs will be kept.", keep)
 	// Get the maintenance job list by label
-	jobList := &batchv1.JobList{}
-	err := cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
+	jobList := &batchv1api.JobList{}
+	err := cli.List(
+		context.TODO(),
+		jobList,
+		&client.ListOptions{
+			Namespace: repo.Namespace,
+			LabelSelector: labels.SelectorFromSet(
+				map[string]string{
+					RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name),
+				},
+			),
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -104,8 +114,8 @@ var waitCompletionBackOff = wait.Backoff{
 }
 
 // waitForJobComplete wait for completion of the specified job and update the latest job object
-func waitForJobComplete(ctx context.Context, client client.Client, ns string, job string, logger logrus.FieldLogger) (*batchv1.Job, error) {
-	var ret *batchv1.Job
+func waitForJobComplete(ctx context.Context, client client.Client, ns string, job string, logger logrus.FieldLogger) (*batchv1api.Job, error) {
+	var ret *batchv1api.Job
 
 	backOff := waitCompletionBackOff
 
@@ -113,7 +123,7 @@ func waitForJobComplete(ctx context.Context, client client.Client, ns string, jo
 	nextCheckpoint := startTime.Add(backOff.Step())
 
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
-		updated := &batchv1.Job{}
+		updated := &batchv1api.Job{}
 		err := client.Get(ctx, types.NamespacedName{Namespace: ns, Name: job}, updated)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -141,9 +151,9 @@ func waitForJobComplete(ctx context.Context, client client.Client, ns string, jo
 	return ret, err
 }
 
-func getResultFromJob(cli client.Client, job *batchv1.Job) (string, error) {
+func getResultFromJob(cli client.Client, job *batchv1api.Job) (string, error) {
 	// Get the maintenance job related pod by label selector
-	podList := &v1.PodList{}
+	podList := &corev1api.PodList{}
 	err := cli.List(context.TODO(), podList, client.InNamespace(job.Namespace), client.MatchingLabels(map[string]string{"job-name": job.Name}))
 	if err != nil {
 		return "", err
@@ -201,8 +211,8 @@ func getJobConfig(
 	veleroNamespace string,
 	repoMaintenanceJobConfig string,
 	repo *velerov1api.BackupRepository,
-) (*JobConfigs, error) {
-	var cm v1.ConfigMap
+) (*velerotypes.JobConfigs, error) {
+	var cm corev1api.ConfigMap
 	if err := client.Get(
 		ctx,
 		types.NamespacedName{
@@ -234,10 +244,10 @@ func getJobConfig(
 	repoJobConfigKey := repo.Spec.VolumeNamespace + "-" +
 		repo.Spec.BackupStorageLocation + "-" + repo.Spec.RepositoryType
 
-	var result *JobConfigs
+	var result *velerotypes.JobConfigs
 	if _, ok := cm.Data[repoJobConfigKey]; ok {
 		logger.Debugf("Find the repo maintenance config %s for repo %s", repoJobConfigKey, repo.Name)
-		result = new(JobConfigs)
+		result = new(velerotypes.JobConfigs)
 		if err := json.Unmarshal([]byte(cm.Data[repoJobConfigKey]), result); err != nil {
 			return nil, errors.Wrapf(
 				err,
@@ -251,10 +261,10 @@ func getJobConfig(
 		logger.Debugf("Find the global repo maintenance config for repo %s", repo.Name)
 
 		if result == nil {
-			result = new(JobConfigs)
+			result = new(velerotypes.JobConfigs)
 		}
 
-		globalResult := new(JobConfigs)
+		globalResult := new(velerotypes.JobConfigs)
 
 		if err := json.Unmarshal([]byte(cm.Data[GlobalKeyForRepoMaintenanceJobCM]), globalResult); err != nil {
 			return nil, errors.Wrapf(
@@ -271,9 +281,57 @@ func getJobConfig(
 		if len(result.LoadAffinities) == 0 {
 			result.LoadAffinities = globalResult.LoadAffinities
 		}
+
+		if result.KeepLatestMaintenanceJobs == nil && globalResult.KeepLatestMaintenanceJobs != nil {
+			result.KeepLatestMaintenanceJobs = globalResult.KeepLatestMaintenanceJobs
+		}
+
+		// Priority class is only read from global config, not per-repository
+		if globalResult.PriorityClassName != "" {
+			result.PriorityClassName = globalResult.PriorityClassName
+		}
+
+		// Pod's labels are only read from global config, not per-repository
+		if len(globalResult.PodLabels) > 0 {
+			result.PodLabels = globalResult.PodLabels
+		}
+
+		// Pod's annotations are only read from global config, not per-repository
+		if len(globalResult.PodAnnotations) > 0 {
+			result.PodAnnotations = globalResult.PodAnnotations
+		}
 	}
 
+	logger.Debugf("Configuration content for repository %s is %+v", repo.Name, result)
+
 	return result, nil
+}
+
+// GetKeepLatestMaintenanceJobs returns the configured number of maintenance jobs to keep from the JobConfigs.
+// Because the CLI configured Job kept number is deprecated,
+// if not configured in the ConfigMap, it returns default value to indicate using the fallback value.
+func GetKeepLatestMaintenanceJobs(
+	ctx context.Context,
+	client client.Client,
+	logger logrus.FieldLogger,
+	veleroNamespace string,
+	repoMaintenanceJobConfig string,
+	repo *velerov1api.BackupRepository,
+) (int, error) {
+	if repoMaintenanceJobConfig == "" {
+		return DefaultKeepLatestMaintenanceJobs, nil
+	}
+
+	config, err := getJobConfig(ctx, client, logger, veleroNamespace, repoMaintenanceJobConfig, repo)
+	if err != nil {
+		return DefaultKeepLatestMaintenanceJobs, err
+	}
+
+	if config != nil && config.KeepLatestMaintenanceJobs != nil {
+		return *config.KeepLatestMaintenanceJobs, nil
+	}
+
+	return DefaultKeepLatestMaintenanceJobs, nil
 }
 
 // WaitJobComplete waits the completion of the specified maintenance job and return the BackupRepositoryMaintenanceStatus
@@ -303,11 +361,18 @@ func WaitJobComplete(cli client.Client, ctx context.Context, jobName, ns string,
 // WaitAllJobsComplete checks all the incomplete maintenance jobs of the specified repo and wait for them to complete,
 // and then return the maintenance jobs' status in the range of limit
 func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1api.BackupRepository, limit int, log logrus.FieldLogger) ([]velerov1api.BackupRepositoryMaintenanceStatus, error) {
-	jobList := &batchv1.JobList{}
-	err := cli.List(context.TODO(), jobList, &client.ListOptions{
-		Namespace: repo.Namespace,
-	},
-		client.MatchingLabels(map[string]string{RepositoryNameLabel: repo.Name}),
+	jobList := &batchv1api.JobList{}
+	err := cli.List(
+		context.TODO(),
+		jobList,
+		&client.ListOptions{
+			Namespace: repo.Namespace,
+			LabelSelector: labels.SelectorFromSet(
+				map[string]string{
+					RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name),
+				},
+			),
+		},
 	)
 
 	if err != nil {
@@ -360,8 +425,15 @@ func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1a
 }
 
 // StartNewJob creates a new maintenance job
-func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, repoMaintenanceJobConfig string,
-	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag, logger logrus.FieldLogger) (string, error) {
+func StartNewJob(
+	cli client.Client,
+	ctx context.Context,
+	repo *velerov1api.BackupRepository,
+	repoMaintenanceJobConfig string,
+	logLevel logrus.Level,
+	logFormat *logging.FormatFlag,
+	logger logrus.FieldLogger,
+) (string, error) {
 	bsl := &velerov1api.BackupStorageLocation{}
 	if err := cli.Get(ctx, client.ObjectKey{Namespace: repo.Namespace, Name: repo.Spec.BackupStorageLocation}, bsl); err != nil {
 		return "", errors.WithStack(err)
@@ -391,14 +463,14 @@ func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.Backu
 
 	log.Info("Starting maintenance repo")
 
-	maintenanceJob, err := buildJob(cli, ctx, repo, bsl.Name, jobConfig, podResources, logLevel, logFormat)
+	maintenanceJob, err := buildJob(cli, ctx, repo, bsl.Name, jobConfig, logLevel, logFormat, log)
 	if err != nil {
 		return "", errors.Wrap(err, "error to build maintenance job")
 	}
 
 	log = log.WithField("job", fmt.Sprintf("%s/%s", maintenanceJob.Namespace, maintenanceJob.Name))
 
-	if err := cli.Create(context.TODO(), maintenanceJob); err != nil {
+	if err := cli.Create(ctx, maintenanceJob); err != nil {
 		return "", errors.Wrap(err, "error to create maintenance job")
 	}
 
@@ -407,10 +479,67 @@ func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.Backu
 	return maintenanceJob.Name, nil
 }
 
-func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, bslName string, config *JobConfigs,
-	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag) (*batchv1.Job, error) {
+// buildTolerationsForMaintenanceJob builds the tolerations for maintenance jobs.
+// It includes the required Windows toleration for backward compatibility and filters
+// tolerations from the Velero deployment to only include those with keys that are
+// in the ThirdPartyTolerations allowlist, following the same pattern as labels and annotations.
+func buildTolerationsForMaintenanceJob(deployment *appsv1api.Deployment) []corev1api.Toleration {
+	// Start with the Windows toleration for backward compatibility
+	windowsToleration := corev1api.Toleration{
+		Key:      "os",
+		Operator: "Equal",
+		Effect:   "NoSchedule",
+		Value:    "windows",
+	}
+	result := []corev1api.Toleration{windowsToleration}
+
+	// Filter tolerations from the Velero deployment to only include allowed ones
+	// Only tolerations that exist on the deployment AND have keys in the allowlist are inherited
+	deploymentTolerations := veleroutil.GetTolerationsFromVeleroServer(deployment)
+	for _, k := range util.ThirdPartyTolerations {
+		for _, toleration := range deploymentTolerations {
+			if toleration.Key == k {
+				result = append(result, toleration)
+				break // Only add the first matching toleration for each allowed key
+			}
+		}
+	}
+
+	return result
+}
+
+func getPriorityClassName(ctx context.Context, cli client.Client, config *velerotypes.JobConfigs, logger logrus.FieldLogger) string {
+	// Use the priority class name from the global job configuration if available
+	// Note: Priority class is only read from global config, not per-repository
+	if config != nil && config.PriorityClassName != "" {
+		// Validate that the priority class exists in the cluster
+		if err := kube.ValidatePriorityClassWithClient(ctx, cli, config.PriorityClassName); err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Warnf("Priority class %q not found in cluster. Job creation may fail if the priority class doesn't exist when jobs are scheduled.", config.PriorityClassName)
+			} else {
+				logger.WithError(err).Warnf("Failed to validate priority class %q", config.PriorityClassName)
+			}
+			// Still return the priority class name to let Kubernetes handle the error
+			return config.PriorityClassName
+		}
+		logger.Infof("Validated priority class %q exists in cluster", config.PriorityClassName)
+		return config.PriorityClassName
+	}
+	return ""
+}
+
+func buildJob(
+	cli client.Client,
+	ctx context.Context,
+	repo *velerov1api.BackupRepository,
+	bslName string,
+	config *velerotypes.JobConfigs,
+	logLevel logrus.Level,
+	logFormat *logging.FormatFlag,
+	logger logrus.FieldLogger,
+) (*batchv1api.Job, error) {
 	// Get the Velero server deployment
-	deployment := &appsv1.Deployment{}
+	deployment := &appsv1api.Deployment{}
 	err := cli.Get(ctx, types.NamespacedName{Name: "velero", Namespace: repo.Namespace}, deployment)
 	if err != nil {
 		return nil, err
@@ -431,14 +560,22 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 	// Get the service account from the Velero server deployment
 	serviceAccount := veleroutil.GetServiceAccountFromVeleroServer(deployment)
 
+	// Get the security context from the Velero server deployment
+	securityContext := veleroutil.GetContainerSecurityContextsFromVeleroServer(deployment)
+
+	// Get the pod security context from the Velero server deployment
+	podSecurityContext := veleroutil.GetPodSecurityContextsFromVeleroServer(deployment)
+
+	imagePullSecrets := veleroutil.GetImagePullSecretsFromVeleroServer(deployment)
+
 	// Get image
 	image := veleroutil.GetVeleroServerImage(deployment)
 
 	// Set resource limits and requests
-	cpuRequest := podResources.CPURequest
-	memRequest := podResources.MemoryRequest
-	cpuLimit := podResources.CPULimit
-	memLimit := podResources.MemoryLimit
+	cpuRequest := DefaultMaintenanceJobCPURequest
+	memRequest := DefaultMaintenanceJobMemRequest
+	cpuLimit := DefaultMaintenanceJobCPULimit
+	memLimit := DefaultMaintenanceJobMemLimit
 	if config != nil && config.PodResources != nil {
 		cpuRequest = config.PodResources.CPURequest
 		memRequest = config.PodResources.MemoryRequest
@@ -451,19 +588,30 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 	}
 
 	podLabels := map[string]string{
-		RepositoryNameLabel: repo.Name,
+		RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name),
 	}
-
-	for _, k := range util.ThirdPartyLabels {
-		if v := veleroutil.GetVeleroServerLabelValue(deployment, k); v != "" {
+	if config != nil && len(config.PodLabels) > 0 {
+		for k, v := range config.PodLabels {
 			podLabels[k] = v
+		}
+	} else {
+		for _, k := range util.ThirdPartyLabels {
+			if v := veleroutil.GetVeleroServerLabelValue(deployment, k); v != "" {
+				podLabels[k] = v
+			}
 		}
 	}
 
 	podAnnotations := map[string]string{}
-	for _, k := range util.ThirdPartyAnnotations {
-		if v := veleroutil.GetVeleroServerAnnotationValue(deployment, k); v != "" {
+	if config != nil && len(config.PodAnnotations) > 0 {
+		for k, v := range config.PodAnnotations {
 			podAnnotations[k] = v
+		}
+	} else {
+		for _, k := range util.ThirdPartyAnnotations {
+			if v := veleroutil.GetVeleroServerAnnotationValue(deployment, k); v != "" {
+				podAnnotations[k] = v
+			}
 		}
 	}
 
@@ -476,24 +624,24 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 	args = append(args, fmt.Sprintf("--log-format=%s", logFormat.String()))
 
 	// build the maintenance job
-	job := &batchv1.Job{
+	job := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      GenerateJobName(repo.Name),
 			Namespace: repo.Namespace,
 			Labels: map[string]string{
-				RepositoryNameLabel: repo.Name,
+				RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name),
 			},
 		},
-		Spec: batchv1.JobSpec{
+		Spec: batchv1api.JobSpec{
 			BackoffLimit: new(int32), // Never retry
-			Template: v1.PodTemplateSpec{
+			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "velero-repo-maintenance-pod",
 					Labels:      podLabels,
 					Annotations: podAnnotations,
 				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
 						{
 							Name:  "velero-repo-maintenance-container",
 							Image: image,
@@ -501,39 +649,36 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 								"/velero",
 							},
 							Args:                     args,
-							ImagePullPolicy:          v1.PullIfNotPresent,
+							ImagePullPolicy:          corev1api.PullIfNotPresent,
 							Env:                      envVars,
 							EnvFrom:                  envFromSources,
 							VolumeMounts:             volumeMounts,
 							Resources:                resources,
-							TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
+							SecurityContext:          securityContext,
+							TerminationMessagePolicy: corev1api.TerminationMessageFallbackToLogsOnError,
 						},
 					},
-					RestartPolicy:      v1.RestartPolicyNever,
+					PriorityClassName:  getPriorityClassName(ctx, cli, config, logger),
+					RestartPolicy:      corev1api.RestartPolicyNever,
+					SecurityContext:    podSecurityContext,
 					Volumes:            volumes,
 					ServiceAccountName: serviceAccount,
-					Tolerations: []v1.Toleration{
-						{
-							Key:      "os",
-							Operator: "Equal",
-							Effect:   "NoSchedule",
-							Value:    "windows",
-						},
-					},
+					Tolerations:        buildTolerationsForMaintenanceJob(deployment),
+					ImagePullSecrets:   imagePullSecrets,
 				},
 			},
 		},
 	}
 
 	if config != nil && len(config.LoadAffinities) > 0 {
-		affinity := kube.ToSystemAffinity(config.LoadAffinities)
+		affinity := kube.ToSystemAffinity(config.LoadAffinities[0], nil)
 		job.Spec.Template.Spec.Affinity = affinity
 	}
 
 	return job, nil
 }
 
-func composeStatusFromJob(job *batchv1.Job, message string) velerov1api.BackupRepositoryMaintenanceStatus {
+func composeStatusFromJob(job *batchv1api.Job, message string) velerov1api.BackupRepositoryMaintenanceStatus {
 	result := velerov1api.BackupRepositoryMaintenanceSucceeded
 	if job.Status.Failed > 0 {
 		result = velerov1api.BackupRepositoryMaintenanceFailed

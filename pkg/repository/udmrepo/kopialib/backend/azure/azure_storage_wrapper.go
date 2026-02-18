@@ -22,9 +22,9 @@ import (
 	"github.com/kopia/kopia/repo/blob"
 	"github.com/kopia/kopia/repo/blob/azure"
 	"github.com/kopia/kopia/repo/blob/throttling"
-	"github.com/sirupsen/logrus"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/logging"
 	azureutil "github.com/vmware-tanzu/velero/pkg/util/azure"
 )
 
@@ -56,7 +56,10 @@ func (s *Storage) ConnectionInfo() blob.ConnectionInfo {
 func NewStorage(ctx context.Context, option *Option, isCreate bool) (blob.Storage, error) {
 	cfg := option.Config
 
-	client, _, err := azureutil.NewStorageClient(logrus.New(), cfg)
+	// Get logger from context
+	logger := logging.LoggerFromContext(ctx)
+
+	client, _, err := azureutil.NewStorageClient(logger, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -70,6 +73,8 @@ func NewStorage(ctx context.Context, option *Option, isCreate bool) (blob.Storag
 	if err != nil {
 		return nil, err
 	}
+
+	logger.Info("Successfully created Azure storage backend")
 
 	return &Storage{
 		Option:  option,

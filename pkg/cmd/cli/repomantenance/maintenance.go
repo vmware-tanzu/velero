@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -90,7 +90,7 @@ func (o *Options) initClient(f velerocli.Factory) (client.Client, error) {
 		return nil, errors.Wrap(err, "failed to add velero scheme")
 	}
 
-	err = v1.AddToScheme(scheme)
+	err = corev1api.AddToScheme(scheme)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to add api core scheme")
 	}
@@ -121,7 +121,7 @@ func initRepoManager(namespace string, cli client.Client, kubeClient kubernetes.
 	credentialFileStore, err := credentials.NewNamespacedFileStore(
 		cli,
 		namespace,
-		"/tmp/credentials",
+		credentials.DefaultStoreDirectory(),
 		filesystem.NewFileSystem(),
 	)
 	if err != nil {

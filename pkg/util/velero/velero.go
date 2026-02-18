@@ -17,27 +17,29 @@ limitations under the License.
 package velero
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 // GetNodeSelectorFromVeleroServer get the node selector from the Velero server deployment
-func GetNodeSelectorFromVeleroServer(deployment *appsv1.Deployment) map[string]string {
+func GetNodeSelectorFromVeleroServer(deployment *appsv1api.Deployment) map[string]string {
 	return deployment.Spec.Template.Spec.NodeSelector
 }
 
 // GetTolerationsFromVeleroServer get the tolerations from the Velero server deployment
-func GetTolerationsFromVeleroServer(deployment *appsv1.Deployment) []v1.Toleration {
+func GetTolerationsFromVeleroServer(deployment *appsv1api.Deployment) []corev1api.Toleration {
 	return deployment.Spec.Template.Spec.Tolerations
 }
 
 // GetAffinityFromVeleroServer get the affinity from the Velero server deployment
-func GetAffinityFromVeleroServer(deployment *appsv1.Deployment) *v1.Affinity {
+func GetAffinityFromVeleroServer(deployment *appsv1api.Deployment) *corev1api.Affinity {
 	return deployment.Spec.Template.Spec.Affinity
 }
 
 // GetEnvVarsFromVeleroServer get the environment variables from the Velero server deployment
-func GetEnvVarsFromVeleroServer(deployment *appsv1.Deployment) []v1.EnvVar {
+func GetEnvVarsFromVeleroServer(deployment *appsv1api.Deployment) []corev1api.EnvVar {
 	for _, container := range deployment.Spec.Template.Spec.Containers {
 		// We only have one container in the Velero server deployment
 		return container.Env
@@ -46,7 +48,7 @@ func GetEnvVarsFromVeleroServer(deployment *appsv1.Deployment) []v1.EnvVar {
 }
 
 // GetEnvFromSourcesFromVeleroServer get the environment sources from the Velero server deployment
-func GetEnvFromSourcesFromVeleroServer(deployment *appsv1.Deployment) []v1.EnvFromSource {
+func GetEnvFromSourcesFromVeleroServer(deployment *appsv1api.Deployment) []corev1api.EnvFromSource {
 	for _, container := range deployment.Spec.Template.Spec.Containers {
 		// We only have one container in the Velero server deployment
 		return container.EnvFrom
@@ -55,7 +57,7 @@ func GetEnvFromSourcesFromVeleroServer(deployment *appsv1.Deployment) []v1.EnvFr
 }
 
 // GetVolumeMountsFromVeleroServer get the volume mounts from the Velero server deployment
-func GetVolumeMountsFromVeleroServer(deployment *appsv1.Deployment) []v1.VolumeMount {
+func GetVolumeMountsFromVeleroServer(deployment *appsv1api.Deployment) []corev1api.VolumeMount {
 	for _, container := range deployment.Spec.Template.Spec.Containers {
 		// We only have one container in the Velero server deployment
 		return container.VolumeMounts
@@ -63,33 +65,52 @@ func GetVolumeMountsFromVeleroServer(deployment *appsv1.Deployment) []v1.VolumeM
 	return nil
 }
 
+// GetPodSecurityContextsFromVeleroServer get the pod security context from the Velero server deployment
+func GetPodSecurityContextsFromVeleroServer(deployment *appsv1api.Deployment) *corev1api.PodSecurityContext {
+	return deployment.Spec.Template.Spec.SecurityContext
+}
+
+// GetContainerSecurityContextsFromVeleroServer get the security context from the Velero server deployment
+func GetContainerSecurityContextsFromVeleroServer(deployment *appsv1api.Deployment) *corev1api.SecurityContext {
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		// We only have one container in the Velero server deployment
+		return container.SecurityContext
+	}
+	return nil
+}
+
 // GetVolumesFromVeleroServer get the volumes from the Velero server deployment
-func GetVolumesFromVeleroServer(deployment *appsv1.Deployment) []v1.Volume {
+func GetVolumesFromVeleroServer(deployment *appsv1api.Deployment) []corev1api.Volume {
 	return deployment.Spec.Template.Spec.Volumes
 }
 
 // GetServiceAccountFromVeleroServer get the service account from the Velero server deployment
-func GetServiceAccountFromVeleroServer(deployment *appsv1.Deployment) string {
+func GetServiceAccountFromVeleroServer(deployment *appsv1api.Deployment) string {
 	return deployment.Spec.Template.Spec.ServiceAccountName
 }
 
+// GetImagePullSecretsFromVeleroServer get the image pull secrets from the Velero server deployment
+func GetImagePullSecretsFromVeleroServer(deployment *appsv1api.Deployment) []corev1api.LocalObjectReference {
+	return deployment.Spec.Template.Spec.ImagePullSecrets
+}
+
 // getVeleroServerImage get the image of the Velero server deployment
-func GetVeleroServerImage(deployment *appsv1.Deployment) string {
+func GetVeleroServerImage(deployment *appsv1api.Deployment) string {
 	return deployment.Spec.Template.Spec.Containers[0].Image
 }
 
 // GetVeleroServerLables get the labels of the Velero server deployment
-func GetVeleroServerLables(deployment *appsv1.Deployment) map[string]string {
+func GetVeleroServerLables(deployment *appsv1api.Deployment) map[string]string {
 	return deployment.Spec.Template.Labels
 }
 
 // GetVeleroServerAnnotations get the annotations of the Velero server deployment
-func GetVeleroServerAnnotations(deployment *appsv1.Deployment) map[string]string {
+func GetVeleroServerAnnotations(deployment *appsv1api.Deployment) map[string]string {
 	return deployment.Spec.Template.Annotations
 }
 
 // GetVeleroServerLabelValue returns the value of specified label of Velero server deployment
-func GetVeleroServerLabelValue(deployment *appsv1.Deployment, key string) string {
+func GetVeleroServerLabelValue(deployment *appsv1api.Deployment, key string) string {
 	if deployment.Spec.Template.Labels == nil {
 		return ""
 	}
@@ -98,10 +119,14 @@ func GetVeleroServerLabelValue(deployment *appsv1.Deployment, key string) string
 }
 
 // GetVeleroServerAnnotationValue returns the value of specified annotation of Velero server deployment
-func GetVeleroServerAnnotationValue(deployment *appsv1.Deployment, key string) string {
+func GetVeleroServerAnnotationValue(deployment *appsv1api.Deployment, key string) string {
 	if deployment.Spec.Template.Annotations == nil {
 		return ""
 	}
 
 	return deployment.Spec.Template.Annotations[key]
+}
+
+func BSLIsAvailable(bsl velerov1api.BackupStorageLocation) bool {
+	return bsl.Status.Phase == velerov1api.BackupStorageLocationPhaseAvailable
 }

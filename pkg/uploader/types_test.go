@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateUploaderType(t *testing.T) {
@@ -14,12 +15,6 @@ func TestValidateUploaderType(t *testing.T) {
 		wantMsg string
 	}{
 		{
-			"'restic' is a valid type",
-			"restic",
-			"",
-			"Uploader 'restic' is deprecated, don't use it for new backups, otherwise the backups won't be available for restore when this functionality is removed in a future version of Velero",
-		},
-		{
 			"'   kopia  ' is a valid type (space will be trimmed)",
 			"   kopia  ",
 			"",
@@ -28,7 +23,7 @@ func TestValidateUploaderType(t *testing.T) {
 		{
 			"'anything_else' is invalid",
 			"anything_else",
-			"invalid uploader type 'anything_else', valid upload types are: 'restic', 'kopia'",
+			"invalid uploader type 'anything_else', valid type: 'kopia'",
 			"",
 		},
 	}
@@ -36,9 +31,9 @@ func TestValidateUploaderType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			msg, err := ValidateUploaderType(tt.input)
 			if tt.wantErr != "" {
-				assert.EqualError(t, err, tt.wantErr)
+				require.EqualError(t, err, tt.wantErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, tt.wantMsg, msg)

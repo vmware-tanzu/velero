@@ -17,7 +17,6 @@ limitations under the License.
 package repository
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/stretchr/testify/assert"
@@ -150,7 +149,7 @@ func TestGetBackupRepository(t *testing.T) {
 			})
 			fakeClient := clientBuilder.Build()
 
-			backupRepo, err := GetBackupRepository(context.Background(), fakeClient, velerov1api.DefaultNamespace, tc.backupRepositoryKey, tc.ensureReady)
+			backupRepo, err := GetBackupRepository(t.Context(), fakeClient, velerov1api.DefaultNamespace, tc.backupRepositoryKey, tc.ensureReady)
 
 			if backupRepo != nil && tc.expected != nil {
 				backupRepo.ResourceVersion = tc.expected.ResourceVersion

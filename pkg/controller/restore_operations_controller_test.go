@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -303,12 +302,12 @@ func TestRestoreOperationsReconcile(t *testing.T) {
 				restorePluginManager.On("GetRestoreItemActionV2", operation.Spec.RestoreItemAction).Return(ria, nil)
 			}
 
-			_, err := reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.restore.Namespace, Name: test.restore.Name}})
+			_, err := reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.restore.Namespace, Name: test.restore.Name}})
 			gotErr := err != nil
 			assert.Equal(t, test.expectError, gotErr)
 
 			restoreAfter := velerov1api.Restore{}
-			err = fakeClient.Get(context.TODO(), types.NamespacedName{
+			err = fakeClient.Get(t.Context(), types.NamespacedName{
 				Namespace: test.restore.Namespace,
 				Name:      test.restore.Name,
 			}, &restoreAfter)

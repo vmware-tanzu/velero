@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,7 +73,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			sa := corev1.ServiceAccount{
+			sa := corev1api.ServiceAccount{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "bar",
@@ -81,7 +81,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 			}
 
 			for _, secret := range tc.secrets {
-				sa.Secrets = append(sa.Secrets, corev1.ObjectReference{
+				sa.Secrets = append(sa.Secrets, corev1api.ObjectReference{
 					Name: secret,
 				})
 			}
@@ -97,7 +97,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			var resSA *corev1.ServiceAccount
+			var resSA *corev1api.ServiceAccount
 			err = runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), &resSA)
 			require.NoError(t, err)
 

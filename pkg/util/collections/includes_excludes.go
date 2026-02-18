@@ -19,6 +19,8 @@ package collections
 import (
 	"strings"
 
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
+
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -30,6 +32,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/wildcard"
 )
 
 type globStringSet struct {
@@ -51,6 +54,143 @@ func (gss globStringSet) match(match string) bool {
 		}
 	}
 	return false
+}
+
+// NamespaceIncludesExcludes adds some features to IncludesExcludes
+// to handle namespace-specific functionality. In particular, it
+// provides a way to list all namespaces included in order to determine
+// overlap between backups, and it will be expanded in the future to
+// handle namespace wildcard values
+type NamespaceIncludesExcludes struct {
+	activeNamespaces []string
+	includesExcludes *IncludesExcludes
+	wildcardExpanded bool
+	wildcardResult   []string
+}
+
+func NewNamespaceIncludesExcludes() *NamespaceIncludesExcludes {
+	return &NamespaceIncludesExcludes{
+		activeNamespaces: []string{},
+		includesExcludes: NewIncludesExcludes(),
+	}
+}
+
+func (nie *NamespaceIncludesExcludes) ActiveNamespaces(activeNamespaces []string) *NamespaceIncludesExcludes {
+	nie.activeNamespaces = activeNamespaces
+	return nie
+}
+
+func (nie *NamespaceIncludesExcludes) IsWildcardExpanded() bool {
+	return nie.wildcardExpanded
+}
+
+// Includes adds items to the includes list. '*' is a wildcard
+// value meaning "include everything".
+func (nie *NamespaceIncludesExcludes) Includes(includes ...string) *NamespaceIncludesExcludes {
+	nie.includesExcludes.Includes(includes...)
+	return nie
+}
+
+// GetIncludes returns the items in the includes list
+func (nie *NamespaceIncludesExcludes) GetIncludes() []string {
+	return nie.includesExcludes.GetIncludes()
+}
+
+func (nie *NamespaceIncludesExcludes) GetExcludes() []string {
+	return nie.includesExcludes.GetExcludes()
+}
+
+// SetIncludes sets the includes list to the given list
+func (nie *NamespaceIncludesExcludes) SetIncludes(includes []string) *NamespaceIncludesExcludes {
+	nie.includesExcludes.includes = newGlobStringSet()
+	nie.includesExcludes.includes.Insert(includes...)
+	return nie
+}
+
+// SetExcludes sets the excludes list to the given list
+func (nie *NamespaceIncludesExcludes) SetExcludes(excludes []string) *NamespaceIncludesExcludes {
+	nie.includesExcludes.excludes = newGlobStringSet()
+	nie.includesExcludes.excludes.Insert(excludes...)
+	return nie
+}
+
+// IncludesString returns a string containing all of the includes, separated by commas, or * if the
+// list is empty.
+func (nie *NamespaceIncludesExcludes) IncludesString() string {
+	return nie.includesExcludes.IncludesString()
+}
+
+// Excludes adds items to the includes list. '*' is a wildcard
+// value meaning "include everything".
+func (nie *NamespaceIncludesExcludes) Excludes(excludes ...string) *NamespaceIncludesExcludes {
+	nie.includesExcludes.Excludes(excludes...)
+	return nie
+}
+
+// IncludesString returns a string containing all of the excludes, separated by commas, or * if the
+// list is empty.
+func (nie *NamespaceIncludesExcludes) ExcludesString() string {
+	return nie.includesExcludes.ExcludesString()
+}
+
+// ShouldInclude returns whether the specified item should be
+// included or not. Everything in the includes list except those
+// items in the excludes list should be included.
+func (nie *NamespaceIncludesExcludes) ShouldInclude(s string) bool {
+	// Special case: if wildcard expansion occurred and resulted in an empty includes list,
+	// it means the wildcard pattern matched nothing, so we should include nothing.
+	// This differs from the default behavior where an empty includes list means "include everything".
+	if nie.wildcardExpanded && nie.includesExcludes.includes.Len() == 0 {
+		return false
+	}
+	return nie.includesExcludes.ShouldInclude(s)
+}
+
+// IncludeEverything returns true if the includes list is empty or '*'
+// and the excludes list is empty, or false otherwise.
+func (nie *NamespaceIncludesExcludes) IncludeEverything() bool {
+	return nie.includesExcludes.IncludeEverything()
+}
+
+// Attempts to expand wildcard patterns, if any, in the includes and excludes lists.
+func (nie *NamespaceIncludesExcludes) ExpandIncludesExcludes() error {
+	includes := nie.GetIncludes()
+	excludes := nie.GetExcludes()
+
+	if wildcard.ShouldExpandWildcards(includes, excludes) {
+		expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(
+			nie.activeNamespaces, includes, excludes)
+		if err != nil {
+			return err
+		}
+
+		nie.SetIncludes(expandedIncludes)
+		nie.SetExcludes(expandedExcludes)
+		nie.wildcardExpanded = true
+	}
+
+	return nil
+}
+
+// ResolveNamespaceList returns a list of all namespaces which will be backed up.
+// The second return value indicates whether wildcard expansion was performed.
+func (nie *NamespaceIncludesExcludes) ResolveNamespaceList() ([]string, error) {
+	// Check if this is being called by non-backup processing e.g. backup queue controller
+	if !nie.wildcardExpanded {
+		err := nie.ExpandIncludesExcludes()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	outNamespaces := []string{}
+	for _, ns := range nie.activeNamespaces {
+		if nie.ShouldInclude(ns) {
+			outNamespaces = append(outNamespaces, ns)
+		}
+	}
+	nie.wildcardResult = outNamespaces
+	return nie.wildcardResult, nil
 }
 
 // IncludesExcludes is a type that manages lists of included
@@ -105,14 +245,63 @@ func (ie *IncludesExcludes) ShouldInclude(s string) bool {
 	return ie.includes.Len() == 0 || ie.includes.Has("*") || ie.includes.match(s)
 }
 
+// IncludesString returns a string containing all of the includes, separated by commas, or * if the
+// list is empty.
+func (ie *IncludesExcludes) IncludesString() string {
+	return asString(ie.GetIncludes(), "*")
+}
+
+// ExcludesString returns a string containing all of the excludes, separated by commas, or <none> if the
+// list is empty.
+func (ie *IncludesExcludes) ExcludesString() string {
+	return asString(ie.GetExcludes(), "<none>")
+}
+
+// IncludeEverything returns true if the includes list is empty or '*'
+// and the excludes list is empty, or false otherwise.
+func (ie *IncludesExcludes) IncludeEverything() bool {
+	return ie.excludes.Len() == 0 && (ie.includes.Len() == 0 || (ie.includes.Len() == 1 && ie.includes.Has("*")))
+}
+
+// GetResourceIncludesExcludes takes the lists of resources to include and exclude, uses the
+// discovery helper to resolve them to fully-qualified group-resource names, and returns an
+// IncludesExcludes list.
+func GetResourceIncludesExcludes(helper discovery.Helper, includes, excludes []string) *IncludesExcludes {
+	resources := generateIncludesExcludes(
+		includes,
+		excludes,
+		func(item string) string {
+			gvr, _, err := helper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
+			if err != nil {
+				// If we can't resolve it, return it as-is. This prevents the generated
+				// includes-excludes list from including *everything*, if none of the includes
+				// can be resolved. ref. https://github.com/vmware-tanzu/velero/issues/2461
+				return item
+			}
+
+			gr := gvr.GroupResource()
+			return gr.String()
+		},
+	)
+
+	return resources
+}
+
+func asString(in []string, empty string) string {
+	if len(in) == 0 {
+		return empty
+	}
+	return strings.Join(in, ", ")
+}
+
 // IncludesExcludesInterface is used as polymorphic IncludesExcludes for Global and scope
 // resources Include/Exclude.
 type IncludesExcludesInterface interface {
-	// Check whether the type name passed in by parameter should be included.
+	// ShouldInclude checks whether the type name passed in by parameter should be included.
 	// typeName should be k8s.io/apimachinery/pkg/runtime/schema GroupResource's String() result.
 	ShouldInclude(typeName string) bool
 
-	// Check whether the type name passed in by parameter should be excluded.
+	// ShouldExclude checks whether the type name passed in by parameter should be excluded.
 	// typeName should be k8s.io/apimachinery/pkg/runtime/schema GroupResource's String() result.
 	ShouldExclude(typeName string) bool
 }
@@ -120,7 +309,7 @@ type IncludesExcludesInterface interface {
 type GlobalIncludesExcludes struct {
 	resourceFilter          IncludesExcludes
 	includeClusterResources *bool
-	namespaceFilter         IncludesExcludes
+	namespaceFilter         NamespaceIncludesExcludes
 
 	helper discovery.Helper
 	logger logrus.FieldLogger
@@ -188,10 +377,24 @@ func (ie *GlobalIncludesExcludes) ShouldExclude(typeName string) bool {
 	return false
 }
 
+func GetGlobalResourceIncludesExcludes(helper discovery.Helper, logger logrus.FieldLogger, includes, excludes []string, includeClusterResources *bool, nsIncludesExcludes NamespaceIncludesExcludes) *GlobalIncludesExcludes {
+	ret := &GlobalIncludesExcludes{
+		resourceFilter:          *GetResourceIncludesExcludes(helper, includes, excludes),
+		includeClusterResources: includeClusterResources,
+		namespaceFilter:         nsIncludesExcludes,
+		helper:                  helper,
+		logger:                  logger,
+	}
+
+	logger.Infof("Including resources: %s", ret.resourceFilter.IncludesString())
+	logger.Infof("Excluding resources: %s", ret.resourceFilter.ExcludesString())
+	return ret
+}
+
 type ScopeIncludesExcludes struct {
-	namespaceScopedResourceFilter IncludesExcludes // namespace-scoped resource filter
-	clusterScopedResourceFilter   IncludesExcludes // cluster-scoped resource filter
-	namespaceFilter               IncludesExcludes // namespace filter
+	namespaceScopedResourceFilter IncludesExcludes          // namespace-scoped resource filter
+	clusterScopedResourceFilter   IncludesExcludes          // cluster-scoped resource filter
+	namespaceFilter               NamespaceIncludesExcludes // namespace filter
 
 	helper discovery.Helper
 	logger logrus.FieldLogger
@@ -259,32 +462,67 @@ func (ie *ScopeIncludesExcludes) ShouldExclude(typeName string) bool {
 	return false
 }
 
-// IncludesString returns a string containing all of the includes, separated by commas, or * if the
-// list is empty.
-func (ie *IncludesExcludes) IncludesString() string {
-	return asString(ie.GetIncludes(), "*")
-}
-
-// ExcludesString returns a string containing all of the excludes, separated by commas, or <none> if the
-// list is empty.
-func (ie *IncludesExcludes) ExcludesString() string {
-	return asString(ie.GetExcludes(), "<none>")
-}
-
-func asString(in []string, empty string) string {
-	if len(in) == 0 {
-		return empty
+func (ie *ScopeIncludesExcludes) CombineWithPolicy(policy *resourcepolicies.IncludeExcludePolicy) {
+	if policy == nil {
+		return
 	}
-	return strings.Join(in, ", ")
+	mapFunc := scopeResourceMapFunc(ie.helper)
+	for _, item := range policy.ExcludedNamespaceScopedResources {
+		resolvedItem := mapFunc(item, true)
+		if resolvedItem == "" {
+			continue
+		}
+		// The existing includeExcludes in the struct has higher priority, therefore, we should only add the item to the filter
+		// when the struct does not include this item and this item is not yet in the excludes filter.
+		if !ie.namespaceScopedResourceFilter.includes.match(resolvedItem) &&
+			!ie.namespaceScopedResourceFilter.excludes.match(resolvedItem) {
+			ie.namespaceScopedResourceFilter.Excludes(resolvedItem)
+		}
+	}
+	for _, item := range policy.IncludedNamespaceScopedResources {
+		resolvedItem := mapFunc(item, true)
+		if resolvedItem == "" {
+			continue
+		}
+		// The existing includeExcludes in the struct has higher priority, therefore, we should only add the item to the filter
+		// when the struct does not exclude this item and this item is not yet in the includes filter.
+		if !ie.namespaceScopedResourceFilter.includes.match(resolvedItem) &&
+			!ie.namespaceScopedResourceFilter.excludes.match(resolvedItem) {
+			ie.namespaceScopedResourceFilter.Includes(resolvedItem)
+		}
+	}
+	for _, item := range policy.ExcludedClusterScopedResources {
+		resolvedItem := mapFunc(item, false)
+		if resolvedItem == "" {
+			continue
+		}
+		if !ie.clusterScopedResourceFilter.includes.match(resolvedItem) &&
+			!ie.clusterScopedResourceFilter.excludes.match(resolvedItem) {
+			// The existing includeExcludes in the struct has higher priority, therefore, we should only add the item to the filter
+			// when the struct does not exclude this item and this item is not yet in the includes filter.
+			ie.clusterScopedResourceFilter.Excludes(resolvedItem)
+		}
+	}
+	for _, item := range policy.IncludedClusterScopedResources {
+		resolvedItem := mapFunc(item, false)
+		if resolvedItem == "" {
+			continue
+		}
+		if !ie.clusterScopedResourceFilter.includes.match(resolvedItem) &&
+			!ie.clusterScopedResourceFilter.excludes.match(resolvedItem) {
+			// The existing includeExcludes in the struct has higher priority, therefore, we should only add the item to the filter
+			// when the struct does not exclude this item and this item is not yet in the includes filter.
+			ie.clusterScopedResourceFilter.Includes(resolvedItem)
+		}
+	}
+	ie.logger.Infof("Scoped resource includes/excludes after combining with resource policy")
+	ie.logger.Infof("Including namespace-scoped resources: %s", ie.namespaceScopedResourceFilter.IncludesString())
+	ie.logger.Infof("Excluding namespace-scoped resources: %s", ie.namespaceScopedResourceFilter.ExcludesString())
+	ie.logger.Infof("Including cluster-scoped resources: %s", ie.clusterScopedResourceFilter.GetIncludes())
+	ie.logger.Infof("Excluding cluster-scoped resources: %s", ie.clusterScopedResourceFilter.ExcludesString())
 }
 
-// IncludeEverything returns true if the includes list is empty or '*'
-// and the excludes list is empty, or false otherwise.
-func (ie *IncludesExcludes) IncludeEverything() bool {
-	return ie.excludes.Len() == 0 && (ie.includes.Len() == 0 || (ie.includes.Len() == 1 && ie.includes.Has("*")))
-}
-
-func newScopeIncludesExcludes(nsIncludesExcludes IncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
+func newScopeIncludesExcludes(nsIncludesExcludes NamespaceIncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
 	ret := &ScopeIncludesExcludes{
 		namespaceScopedResourceFilter: IncludesExcludes{
 			includes: newGlobStringSet(),
@@ -300,6 +538,43 @@ func newScopeIncludesExcludes(nsIncludesExcludes IncludesExcludes, helper discov
 	}
 
 	return ret
+}
+
+// GetScopeResourceIncludesExcludes function is similar with GetResourceIncludesExcludes,
+// but it's used for scoped Includes/Excludes, and can handle both cluster-scoped and namespace-scoped resources.
+func GetScopeResourceIncludesExcludes(helper discovery.Helper, logger logrus.FieldLogger, namespaceIncludes, namespaceExcludes, clusterIncludes, clusterExcludes []string, nsIncludesExcludes NamespaceIncludesExcludes) *ScopeIncludesExcludes {
+	ret := generateScopedIncludesExcludes(
+		namespaceIncludes,
+		namespaceExcludes,
+		clusterIncludes,
+		clusterExcludes,
+		scopeResourceMapFunc(helper),
+		nsIncludesExcludes,
+		helper,
+		logger,
+	)
+	logger.Infof("Scoped resource includes/excludes after initialization")
+	logger.Infof("Including namespace-scoped resources: %s", ret.namespaceScopedResourceFilter.IncludesString())
+	logger.Infof("Excluding namespace-scoped resources: %s", ret.namespaceScopedResourceFilter.ExcludesString())
+	logger.Infof("Including cluster-scoped resources: %s", ret.clusterScopedResourceFilter.GetIncludes())
+	logger.Infof("Excluding cluster-scoped resources: %s", ret.clusterScopedResourceFilter.ExcludesString())
+
+	return ret
+}
+
+func scopeResourceMapFunc(helper discovery.Helper) func(string, bool) string {
+	return func(item string, namespaced bool) string {
+		gvr, resource, err := helper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
+		if err != nil {
+			return item
+		}
+		if resource.Namespaced != namespaced {
+			return ""
+		}
+
+		gr := gvr.GroupResource()
+		return gr.String()
+	}
 }
 
 // ValidateIncludesExcludes checks provided lists of included and excluded
@@ -391,10 +666,22 @@ func validateNamespaceName(ns string) []error {
 		return nil
 	}
 
-	// Kubernetes does not allow asterisks in namespaces but Velero uses them as
-	// wildcards. Replace asterisks with an arbitrary letter to pass Kubernetes
-	// validation.
-	tmpNamespace := strings.ReplaceAll(ns, "*", "x")
+	// Validate the namespace name to ensure it is a valid wildcard pattern
+	if err := wildcard.ValidateNamespaceName(ns); err != nil {
+		return []error{err}
+	}
+
+	// Kubernetes does not allow wildcard characters in namespaces but Velero uses them
+	// for glob patterns. Replace wildcard characters with valid characters to pass
+	// Kubernetes validation.
+	tmpNamespace := ns
+
+	// Replace glob wildcard characters with valid alphanumeric characters
+	// Note: Validation of wildcard patterns is handled by the wildcard package.
+	tmpNamespace = strings.ReplaceAll(tmpNamespace, "*", "x") // matches any sequence
+	tmpNamespace = strings.ReplaceAll(tmpNamespace, "?", "x") // matches single character
+	tmpNamespace = strings.ReplaceAll(tmpNamespace, "[", "x") // character class start
+	tmpNamespace = strings.ReplaceAll(tmpNamespace, "]", "x") // character class end
 
 	if errMsgs := validation.ValidateNamespaceName(tmpNamespace, false); errMsgs != nil {
 		for _, msg := range errMsgs {
@@ -444,7 +731,7 @@ func generateIncludesExcludes(includes, excludes []string, mapFunc func(string) 
 
 // generateScopedIncludesExcludes function is similar with generateIncludesExcludes,
 // but it's used for scoped Includes/Excludes.
-func generateScopedIncludesExcludes(namespacedIncludes, namespacedExcludes, clusterIncludes, clusterExcludes []string, mapFunc func(string, bool) string, nsIncludesExcludes IncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
+func generateScopedIncludesExcludes(namespacedIncludes, namespacedExcludes, clusterIncludes, clusterExcludes []string, mapFunc func(string, bool) string, nsIncludesExcludes NamespaceIncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
 	res := newScopeIncludesExcludes(nsIncludesExcludes, helper, logger)
 
 	generateFilter(res.namespaceScopedResourceFilter.includes, namespacedIncludes, mapFunc, true)
@@ -470,97 +757,16 @@ func generateFilter(filter globStringSet, resources []string, mapFunc func(strin
 	}
 }
 
-// GetResourceIncludesExcludes takes the lists of resources to include and exclude, uses the
-// discovery helper to resolve them to fully-qualified group-resource names, and returns an
-// IncludesExcludes list.
-func GetResourceIncludesExcludes(helper discovery.Helper, includes, excludes []string) *IncludesExcludes {
-	resources := generateIncludesExcludes(
-		includes,
-		excludes,
-		func(item string) string {
-			gvr, _, err := helper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
-			if err != nil {
-				// If we can't resolve it, return it as-is. This prevents the generated
-				// includes-excludes list from including *everything*, if none of the includes
-				// can be resolved. ref. https://github.com/vmware-tanzu/velero/issues/2461
-				return item
-			}
-
-			gr := gvr.GroupResource()
-			return gr.String()
-		},
-	)
-
-	return resources
-}
-
-func GetGlobalResourceIncludesExcludes(helper discovery.Helper, logger logrus.FieldLogger, includes, excludes []string, includeClusterResources *bool, nsIncludesExcludes IncludesExcludes) *GlobalIncludesExcludes {
-	ret := &GlobalIncludesExcludes{
-		resourceFilter:          *GetResourceIncludesExcludes(helper, includes, excludes),
-		includeClusterResources: includeClusterResources,
-		namespaceFilter:         nsIncludesExcludes,
-		helper:                  helper,
-		logger:                  logger,
-	}
-
-	logger.Infof("Including resources: %s", ret.resourceFilter.IncludesString())
-	logger.Infof("Excluding resources: %s", ret.resourceFilter.ExcludesString())
-	return ret
-}
-
-// GetScopeResourceIncludesExcludes function is similar with GetResourceIncludesExcludes,
-// but it's used for scoped Includes/Excludes, and can handle both cluster-scoped and namespace-scoped resources.
-func GetScopeResourceIncludesExcludes(helper discovery.Helper, logger logrus.FieldLogger, namespaceIncludes, namespaceExcludes, clusterIncludes, clusterExcludes []string, nsIncludesExcludes IncludesExcludes) *ScopeIncludesExcludes {
-	ret := generateScopedIncludesExcludes(
-		namespaceIncludes,
-		namespaceExcludes,
-		clusterIncludes,
-		clusterExcludes,
-		func(item string, namespaced bool) string {
-			gvr, resource, err := helper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
-			if err != nil {
-				return item
-			}
-			if resource.Namespaced != namespaced {
-				return ""
-			}
-
-			gr := gvr.GroupResource()
-			return gr.String()
-		},
-		nsIncludesExcludes,
-		helper,
-		logger,
-	)
-	logger.Infof("Including namespace-scoped resources: %s", ret.namespaceScopedResourceFilter.IncludesString())
-	logger.Infof("Excluding namespace-scoped resources: %s", ret.namespaceScopedResourceFilter.ExcludesString())
-	logger.Infof("Including cluster-scoped resources: %s", ret.clusterScopedResourceFilter.GetIncludes())
-	logger.Infof("Excluding cluster-scoped resources: %s", ret.clusterScopedResourceFilter.ExcludesString())
-
-	return ret
-}
-
 // UseOldResourceFilters checks whether to use old resource filters (IncludeClusterResources,
 // IncludedResources and ExcludedResources), depending the backup's filters setting.
 // New filters are IncludedClusterScopedResources, ExcludedClusterScopedResources,
 // IncludedNamespaceScopedResources and ExcludedNamespaceScopedResources.
+// If all resource filters are none, it is treated as using new parameter filters.
 func UseOldResourceFilters(backupSpec velerov1api.BackupSpec) bool {
-	// If all resource filters are none, it is treated as using old parameter filters.
-	if backupSpec.IncludeClusterResources == nil &&
-		len(backupSpec.IncludedResources) == 0 &&
-		len(backupSpec.ExcludedResources) == 0 &&
-		len(backupSpec.IncludedClusterScopedResources) == 0 &&
-		len(backupSpec.ExcludedClusterScopedResources) == 0 &&
-		len(backupSpec.IncludedNamespaceScopedResources) == 0 &&
-		len(backupSpec.ExcludedNamespaceScopedResources) == 0 {
-		return true
-	}
-
 	if backupSpec.IncludeClusterResources != nil ||
 		len(backupSpec.IncludedResources) > 0 ||
 		len(backupSpec.ExcludedResources) > 0 {
 		return true
 	}
-
 	return false
 }

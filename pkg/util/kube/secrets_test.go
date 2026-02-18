@@ -17,7 +17,6 @@ limitations under the License.
 package kube
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -81,7 +80,7 @@ func TestGetSecretKey(t *testing.T) {
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t)
 
 			for _, secret := range tc.secrets {
-				require.NoError(t, fakeClient.Create(context.Background(), secret))
+				require.NoError(t, fakeClient.Create(t.Context(), secret))
 			}
 
 			data, err := GetSecretKey(fakeClient, tc.namespace, tc.selector)

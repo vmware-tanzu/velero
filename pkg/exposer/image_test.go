@@ -17,24 +17,24 @@ limitations under the License.
 package exposer
 
 import (
-	"context"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestGetInheritedPodInfo(t *testing.T) {
-	daemonSet := &appsv1.DaemonSet{
+	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -44,7 +44,7 @@ func TestGetInheritedPodInfo(t *testing.T) {
 		},
 	}
 
-	daemonSetWithNoLog := &appsv1.DaemonSet{
+	daemonSetWithNoLog := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -52,14 +52,14 @@ func TestGetInheritedPodInfo(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: v1.PodTemplateSpec{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
 						{
 							Name:  "container-1",
 							Image: "image-1",
-							Env: []v1.EnvVar{
+							Env: []corev1api.EnvVar{
 								{
 									Name:  "env-1",
 									Value: "value-1",
@@ -69,23 +69,23 @@ func TestGetInheritedPodInfo(t *testing.T) {
 									Value: "value-2",
 								},
 							},
-							EnvFrom: []v1.EnvFromSource{
+							EnvFrom: []corev1api.EnvFromSource{
 								{
-									ConfigMapRef: &v1.ConfigMapEnvSource{
-										LocalObjectReference: v1.LocalObjectReference{
+									ConfigMapRef: &corev1api.ConfigMapEnvSource{
+										LocalObjectReference: corev1api.LocalObjectReference{
 											Name: "test-configmap",
 										},
 									},
 								},
 								{
-									SecretRef: &v1.SecretEnvSource{
-										LocalObjectReference: v1.LocalObjectReference{
+									SecretRef: &corev1api.SecretEnvSource{
+										LocalObjectReference: corev1api.LocalObjectReference{
 											Name: "test-secret",
 										},
 									},
 								},
 							},
-							VolumeMounts: []v1.VolumeMount{
+							VolumeMounts: []corev1api.VolumeMount{
 								{
 									Name: "volume-1",
 								},
@@ -95,7 +95,7 @@ func TestGetInheritedPodInfo(t *testing.T) {
 							},
 						},
 					},
-					Volumes: []v1.Volume{
+					Volumes: []corev1api.Volume{
 						{
 							Name: "volume-1",
 						},
@@ -109,7 +109,7 @@ func TestGetInheritedPodInfo(t *testing.T) {
 		},
 	}
 
-	daemonSetWithLog := &appsv1.DaemonSet{
+	daemonSetWithLog := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -117,14 +117,14 @@ func TestGetInheritedPodInfo(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: v1.PodTemplateSpec{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
 						{
 							Name:  "container-1",
 							Image: "image-1",
-							Env: []v1.EnvVar{
+							Env: []corev1api.EnvVar{
 								{
 									Name:  "env-1",
 									Value: "value-1",
@@ -134,23 +134,23 @@ func TestGetInheritedPodInfo(t *testing.T) {
 									Value: "value-2",
 								},
 							},
-							EnvFrom: []v1.EnvFromSource{
+							EnvFrom: []corev1api.EnvFromSource{
 								{
-									ConfigMapRef: &v1.ConfigMapEnvSource{
-										LocalObjectReference: v1.LocalObjectReference{
+									ConfigMapRef: &corev1api.ConfigMapEnvSource{
+										LocalObjectReference: corev1api.LocalObjectReference{
 											Name: "test-configmap",
 										},
 									},
 								},
 								{
-									SecretRef: &v1.SecretEnvSource{
-										LocalObjectReference: v1.LocalObjectReference{
+									SecretRef: &corev1api.SecretEnvSource{
+										LocalObjectReference: corev1api.LocalObjectReference{
 											Name: "test-secret",
 										},
 									},
 								},
 							},
-							VolumeMounts: []v1.VolumeMount{
+							VolumeMounts: []corev1api.VolumeMount{
 								{
 									Name: "volume-1",
 								},
@@ -168,7 +168,7 @@ func TestGetInheritedPodInfo(t *testing.T) {
 							},
 						},
 					},
-					Volumes: []v1.Volume{
+					Volumes: []corev1api.Volume{
 						{
 							Name: "volume-1",
 						},
@@ -177,13 +177,18 @@ func TestGetInheritedPodInfo(t *testing.T) {
 						},
 					},
 					ServiceAccountName: "sa-1",
+					ImagePullSecrets: []corev1api.LocalObjectReference{
+						{
+							Name: "imagePullSecret1",
+						},
+					},
 				},
 			},
 		},
 	}
 
 	scheme := runtime.NewScheme()
-	appsv1.AddToScheme(scheme)
+	appsv1api.AddToScheme(scheme)
 
 	tests := []struct {
 		name          string
@@ -215,7 +220,7 @@ func TestGetInheritedPodInfo(t *testing.T) {
 			result: inheritedPodInfo{
 				image:          "image-1",
 				serviceAccount: "sa-1",
-				env: []v1.EnvVar{
+				env: []corev1api.EnvVar{
 					{
 						Name:  "env-1",
 						Value: "value-1",
@@ -225,23 +230,23 @@ func TestGetInheritedPodInfo(t *testing.T) {
 						Value: "value-2",
 					},
 				},
-				envFrom: []v1.EnvFromSource{
+				envFrom: []corev1api.EnvFromSource{
 					{
-						ConfigMapRef: &v1.ConfigMapEnvSource{
-							LocalObjectReference: v1.LocalObjectReference{
+						ConfigMapRef: &corev1api.ConfigMapEnvSource{
+							LocalObjectReference: corev1api.LocalObjectReference{
 								Name: "test-configmap",
 							},
 						},
 					},
 					{
-						SecretRef: &v1.SecretEnvSource{
-							LocalObjectReference: v1.LocalObjectReference{
+						SecretRef: &corev1api.SecretEnvSource{
+							LocalObjectReference: corev1api.LocalObjectReference{
 								Name: "test-secret",
 							},
 						},
 					},
 				},
-				volumeMounts: []v1.VolumeMount{
+				volumeMounts: []corev1api.VolumeMount{
 					{
 						Name: "volume-1",
 					},
@@ -249,7 +254,7 @@ func TestGetInheritedPodInfo(t *testing.T) {
 						Name: "volume-2",
 					},
 				},
-				volumes: []v1.Volume{
+				volumes: []corev1api.Volume{
 					{
 						Name: "volume-1",
 					},
@@ -268,7 +273,7 @@ func TestGetInheritedPodInfo(t *testing.T) {
 			result: inheritedPodInfo{
 				image:          "image-1",
 				serviceAccount: "sa-1",
-				env: []v1.EnvVar{
+				env: []corev1api.EnvVar{
 					{
 						Name:  "env-1",
 						Value: "value-1",
@@ -278,23 +283,23 @@ func TestGetInheritedPodInfo(t *testing.T) {
 						Value: "value-2",
 					},
 				},
-				envFrom: []v1.EnvFromSource{
+				envFrom: []corev1api.EnvFromSource{
 					{
-						ConfigMapRef: &v1.ConfigMapEnvSource{
-							LocalObjectReference: v1.LocalObjectReference{
+						ConfigMapRef: &corev1api.ConfigMapEnvSource{
+							LocalObjectReference: corev1api.LocalObjectReference{
 								Name: "test-configmap",
 							},
 						},
 					},
 					{
-						SecretRef: &v1.SecretEnvSource{
-							LocalObjectReference: v1.LocalObjectReference{
+						SecretRef: &corev1api.SecretEnvSource{
+							LocalObjectReference: corev1api.LocalObjectReference{
 								Name: "test-secret",
 							},
 						},
 					},
 				},
-				volumeMounts: []v1.VolumeMount{
+				volumeMounts: []corev1api.VolumeMount{
 					{
 						Name: "volume-1",
 					},
@@ -302,7 +307,7 @@ func TestGetInheritedPodInfo(t *testing.T) {
 						Name: "volume-2",
 					},
 				},
-				volumes: []v1.Volume{
+				volumes: []corev1api.Volume{
 					{
 						Name: "volume-1",
 					},
@@ -317,6 +322,11 @@ func TestGetInheritedPodInfo(t *testing.T) {
 					"--log-level",
 					"debug",
 				},
+				imagePullSecrets: []corev1api.LocalObjectReference{
+					{
+						Name: "imagePullSecret1",
+					},
+				},
 			},
 		},
 	}
@@ -324,10 +334,10 @@ func TestGetInheritedPodInfo(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
-			info, err := getInheritedPodInfo(context.Background(), fakeKubeClient, test.namespace, kube.NodeOSLinux)
+			info, err := getInheritedPodInfo(t.Context(), fakeKubeClient, test.namespace, kube.NodeOSLinux)
 
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.True(t, reflect.DeepEqual(info, test.result))
 			} else {
 				assert.EqualError(t, err, test.expectErr)

@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -113,6 +113,10 @@ type BackupSpec struct {
 	// +optional
 	TTL metav1.Duration `json:"ttl,omitempty"`
 
+	// VolumeGroupSnapshotLabelKey specifies the label key to group PVCs under a VGS.
+	// +optional
+	VolumeGroupSnapshotLabelKey string `json:"volumeGroupSnapshotLabelKey,omitempty"`
+
 	// IncludeClusterResources specifies whether cluster-scoped resources
 	// should be included for consideration in the backup.
 	// +optional
@@ -164,7 +168,7 @@ type BackupSpec struct {
 	ItemOperationTimeout metav1.Duration `json:"itemOperationTimeout,omitempty"`
 	// ResourcePolicy specifies the referenced resource policies that backup should follow
 	// +optional
-	ResourcePolicy *v1.TypedLocalObjectReference `json:"resourcePolicy,omitempty"`
+	ResourcePolicy *corev1api.TypedLocalObjectReference `json:"resourcePolicy,omitempty"`
 
 	// SnapshotMoveData specifies whether snapshot data should be moved
 	// +optional
@@ -284,13 +288,19 @@ const (
 
 // BackupPhase is a string representation of the lifecycle phase
 // of a Velero backup.
-// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Finalizing;FinalizingPartiallyFailed;Completed;PartiallyFailed;Failed;Deleting
+// +kubebuilder:validation:Enum=New;Queued;ReadyToStart;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Finalizing;FinalizingPartiallyFailed;Completed;PartiallyFailed;Failed;Deleting
 type BackupPhase string
 
 const (
 	// BackupPhaseNew means the backup has been created but not
 	// yet processed by the BackupController.
 	BackupPhaseNew BackupPhase = "New"
+
+	// BackupPhaseQueued means the backup has been added to the queue and is waiting for the Queue to move it out of the queue.
+	BackupPhaseQueued BackupPhase = "Queued"
+
+	// BackupPhaseReadyToStart means the backup has been pulled from the queue and is ready to start.
+	BackupPhaseReadyToStart BackupPhase = "ReadyToStart"
 
 	// BackupPhaseFailedValidation means the backup has failed
 	// the controller's validations and therefore will not run.
@@ -366,6 +376,11 @@ type BackupStatus struct {
 	// Phase is the current state of the Backup.
 	// +optional
 	Phase BackupPhase `json:"phase,omitempty"`
+
+	// QueuePosition is the position of the backup in the queue.
+	// Only relevant when Phase is "Queued"
+	// +optional
+	QueuePosition int `json:"queuePosition,omitempty"`
 
 	// ValidationErrors is a slice of all validation errors (if
 	// applicable).

@@ -26,7 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -70,8 +70,8 @@ type microServiceBRWatcher struct {
 	thisPod             string
 	thisContainer       string
 	associatedObject    string
-	eventCh             chan *v1.Event
-	podCh               chan *v1.Pod
+	eventCh             chan *corev1api.Event
+	podCh               chan *corev1api.Pod
 	startedFromEvent    bool
 	terminatedFromEvent bool
 	wgWatcher           sync.WaitGroup
@@ -95,8 +95,8 @@ func newMicroServiceBRWatcher(client client.Client, kubeClient kubernetes.Interf
 		thisPod:          podName,
 		thisContainer:    containerName,
 		associatedObject: associatedObject,
-		eventCh:          make(chan *v1.Event, 10),
-		podCh:            make(chan *v1.Pod, 2),
+		eventCh:          make(chan *corev1api.Event, 10),
+		podCh:            make(chan *corev1api.Pod, 2),
 		wgWatcher:        sync.WaitGroup{},
 		log:              log,
 	}
@@ -105,12 +105,12 @@ func newMicroServiceBRWatcher(client client.Client, kubeClient kubernetes.Interf
 }
 
 func (ms *microServiceBRWatcher) Init(ctx context.Context, param any) error {
-	eventInformer, err := ms.mgr.GetCache().GetInformer(ctx, &v1.Event{})
+	eventInformer, err := ms.mgr.GetCache().GetInformer(ctx, &corev1api.Event{})
 	if err != nil {
 		return errors.Wrap(err, "error getting event informer")
 	}
 
-	podInformer, err := ms.mgr.GetCache().GetInformer(ctx, &v1.Pod{})
+	podInformer, err := ms.mgr.GetCache().GetInformer(ctx, &corev1api.Pod{})
 	if err != nil {
 		return errors.Wrap(err, "error getting pod informer")
 	}
@@ -118,7 +118,7 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param any) error {
 	eventHandler, err := eventInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj any) {
-				evt := obj.(*v1.Event)
+				evt := obj.(*corev1api.Event)
 				if evt.InvolvedObject.Namespace != ms.namespace || evt.InvolvedObject.Name != ms.associatedObject {
 					return
 				}
@@ -126,7 +126,7 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param any) error {
 				ms.eventCh <- evt
 			},
 			UpdateFunc: func(_, obj any) {
-				evt := obj.(*v1.Event)
+				evt := obj.(*corev1api.Event)
 				if evt.InvolvedObject.Namespace != ms.namespace || evt.InvolvedObject.Name != ms.associatedObject {
 					return
 				}
@@ -142,12 +142,12 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param any) error {
 	podHandler, err := podInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(_, obj any) {
-				pod := obj.(*v1.Pod)
+				pod := obj.(*corev1api.Pod)
 				if pod.Namespace != ms.namespace || pod.Name != ms.thisPod {
 					return
 				}
 
-				if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+				if pod.Status.Phase == corev1api.PodSucceeded || pod.Status.Phase == corev1api.PodFailed {
 					ms.podCh <- pod
 				}
 			},
@@ -230,7 +230,7 @@ func (ms *microServiceBRWatcher) StartRestore(snapshotID string, target AccessPo
 }
 
 func (ms *microServiceBRWatcher) reEnsureThisPod(ctx context.Context) error {
-	thisPod := &v1.Pod{}
+	thisPod := &corev1api.Pod{}
 	if err := ms.client.Get(ctx, types.NamespacedName{
 		Namespace: ms.namespace,
 		Name:      ms.thisPod,
@@ -238,7 +238,7 @@ func (ms *microServiceBRWatcher) reEnsureThisPod(ctx context.Context) error {
 		return errors.Wrapf(err, "error getting this pod %s", ms.thisPod)
 	}
 
-	if thisPod.Status.Phase == v1.PodSucceeded || thisPod.Status.Phase == v1.PodFailed {
+	if thisPod.Status.Phase == corev1api.PodSucceeded || thisPod.Status.Phase == corev1api.PodFailed {
 		ms.podCh <- thisPod
 		ms.log.WithField("this pod", ms.thisPod).Infof("This pod comes to terminital status %s before watch start", thisPod.Status.Phase)
 	}
@@ -264,7 +264,7 @@ func (ms *microServiceBRWatcher) startWatch() {
 			ms.wgWatcher.Done()
 		}()
 
-		var lastPod *v1.Pod
+		var lastPod *corev1api.Pod
 
 	watchLoop:
 		for {
@@ -319,7 +319,7 @@ func (ms *microServiceBRWatcher) startWatch() {
 
 		logger.Info("Calling callback on data path pod termination")
 
-		if lastPod.Status.Phase == v1.PodSucceeded {
+		if lastPod.Status.Phase == corev1api.PodSucceeded {
 			result := funcGetResultFromMessage(ms.taskType, terminateMessage, ms.log)
 			ms.callbacks.OnProgress(ms.ctx, ms.namespace, ms.taskName, getCompletionProgressFromResult(ms.taskType, result))
 			ms.callbacks.OnCompleted(ms.ctx, ms.namespace, ms.taskName, result)
@@ -335,7 +335,7 @@ func (ms *microServiceBRWatcher) startWatch() {
 	}()
 }
 
-func (ms *microServiceBRWatcher) onEvent(evt *v1.Event) {
+func (ms *microServiceBRWatcher) onEvent(evt *corev1api.Event) {
 	switch evt.Reason {
 	case EventReasonStarted:
 		ms.startedFromEvent = true

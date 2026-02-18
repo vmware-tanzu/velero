@@ -113,10 +113,38 @@ spec:
                     description: Bucket is the bucket to use for object storage.
                     type: string
                   caCert:
-                    description: CACert defines a CA bundle to use when verifying
-                      TLS connections to the provider.
+                    description: |-
+                      CACert defines a CA bundle to use when verifying TLS connections to the provider.
+                      Deprecated: Use CACertRef instead.
                     format: byte
                     type: string
+                  caCertRef:
+                    description: |-
+                      CACertRef is a reference to a Secret containing the CA certificate bundle to use
+                      when verifying TLS connections to the provider. The Secret must be in the same
+                      namespace as the BackupStorageLocation.
+                    properties:
+                      key:
+                        description: The key of the secret to select from.  Must be
+                          a valid secret key.
+                        type: string
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      optional:
+                        description: Specify whether the Secret or its key must be
+                          defined
+                        type: boolean
+                    required:
+                    - key
+                    type: object
+                    x-kubernetes-map-type: atomic
                   prefix:
                     description: Prefix is the path inside a bucket to use for Velero
                       storage. Optional.

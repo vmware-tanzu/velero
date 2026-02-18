@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -400,8 +400,8 @@ func TestDescribeResourceModifier(t *testing.T) {
 
 	d.out.Init(d.buf, 0, 8, 2, ' ', 0)
 
-	DescribeResourceModifier(d, &v1.TypedLocalObjectReference{
-		APIGroup: &v1.SchemeGroupVersion.Group,
+	DescribeResourceModifier(d, &corev1api.TypedLocalObjectReference{
+		APIGroup: &corev1api.SchemeGroupVersion.Group,
 		Kind:     "ConfigMap",
 		Name:     "resourceModifier",
 	})

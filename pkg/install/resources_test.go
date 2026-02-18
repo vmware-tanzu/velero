@@ -54,13 +54,13 @@ func TestResources(t *testing.T) {
 
 	crb := ClusterRoleBinding(DefaultVeleroNamespace)
 	// The CRB is a cluster-scoped resource
-	assert.Equal(t, "", crb.ObjectMeta.Namespace)
+	assert.Empty(t, crb.ObjectMeta.Namespace)
 	assert.Equal(t, "velero", crb.ObjectMeta.Name)
 	assert.Equal(t, "velero", crb.Subjects[0].Namespace)
 
 	customNamespaceCRB := ClusterRoleBinding("foo")
 	// The CRB is a cluster-scoped resource
-	assert.Equal(t, "", customNamespaceCRB.ObjectMeta.Namespace)
+	assert.Empty(t, customNamespaceCRB.ObjectMeta.Namespace)
 	assert.Equal(t, "velero-foo", customNamespaceCRB.ObjectMeta.Name)
 	assert.Equal(t, "foo", customNamespaceCRB.Subjects[0].Namespace)
 
@@ -116,4 +116,133 @@ func TestAllResources(t *testing.T) {
 	assert.True(t, exist)
 
 	assert.Len(t, ds, 2)
+}
+
+func TestAllResourcesWithPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		name                       string
+		serverPriorityClassName    string
+		nodeAgentPriorityClassName string
+		useNodeAgent               bool
+	}{
+		{
+			name:                       "with same priority class for server and node agent",
+			serverPriorityClassName:    "high-priority",
+			nodeAgentPriorityClassName: "high-priority",
+			useNodeAgent:               true,
+		},
+		{
+			name:                       "with different priority classes for server and node agent",
+			serverPriorityClassName:    "high-priority",
+			nodeAgentPriorityClassName: "medium-priority",
+			useNodeAgent:               true,
+		},
+		{
+			name:                       "with only server priority class",
+			serverPriorityClassName:    "high-priority",
+			nodeAgentPriorityClassName: "",
+			useNodeAgent:               true,
+		},
+		{
+			name:                       "with only node agent priority class",
+			serverPriorityClassName:    "",
+			nodeAgentPriorityClassName: "medium-priority",
+			useNodeAgent:               true,
+		},
+		{
+			name:                       "with priority class name without node agent",
+			serverPriorityClassName:    "high-priority",
+			nodeAgentPriorityClassName: "medium-priority",
+			useNodeAgent:               false,
+		},
+		{
+			name:                       "without priority class name with node agent",
+			serverPriorityClassName:    "",
+			nodeAgentPriorityClassName: "",
+			useNodeAgent:               true,
+		},
+		{
+			name:                       "without priority class name without node agent",
+			serverPriorityClassName:    "",
+			nodeAgentPriorityClassName: "",
+			useNodeAgent:               false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create VeleroOptions with the priority class names
+			options := &VeleroOptions{
+				Namespace:                  "velero",
+				UseNodeAgent:               tc.useNodeAgent,
+				ServerPriorityClassName:    tc.serverPriorityClassName,
+				NodeAgentPriorityClassName: tc.nodeAgentPriorityClassName,
+			}
+
+			// Generate all resources
+			resources := AllResources(options)
+
+			// Find the deployment and verify priority class name
+			deploymentFound := false
+			daemonsetFound := false
+
+			for i := range resources.Items {
+				item := resources.Items[i]
+
+				// Check deployment
+				if item.GetKind() == "Deployment" && item.GetName() == "velero" {
+					deploymentFound = true
+
+					// Extract priority class name from the unstructured object
+					priorityClassName, found, err := unstructured.NestedString(
+						item.Object,
+						"spec", "template", "spec", "priorityClassName",
+					)
+
+					require.NoError(t, err)
+					if tc.serverPriorityClassName != "" {
+						assert.True(t, found, "Server priorityClassName should be set")
+						assert.Equal(t, tc.serverPriorityClassName, priorityClassName,
+							"Server deployment should have the correct priority class")
+					} else {
+						// If no priority class name was provided, it might not be set at all
+						if found {
+							assert.Empty(t, priorityClassName)
+						}
+					}
+				}
+
+				// Check daemonset if node agent is enabled
+				if tc.useNodeAgent && item.GetKind() == "DaemonSet" && item.GetName() == "node-agent" {
+					daemonsetFound = true
+
+					// Extract priority class name from the unstructured object
+					priorityClassName, found, err := unstructured.NestedString(
+						item.Object,
+						"spec", "template", "spec", "priorityClassName",
+					)
+
+					require.NoError(t, err)
+					if tc.nodeAgentPriorityClassName != "" {
+						assert.True(t, found, "Node agent priorityClassName should be set")
+						assert.Equal(t, tc.nodeAgentPriorityClassName, priorityClassName,
+							"Node agent daemonset should have the correct priority class")
+					} else {
+						// If no priority class name was provided, it might not be set at all
+						if found {
+							assert.Empty(t, priorityClassName)
+						}
+					}
+				}
+			}
+
+			// Verify we found the deployment
+			assert.True(t, deploymentFound, "Deployment should be present in resources")
+
+			// Verify we found the daemonset if node agent is enabled
+			if tc.useNodeAgent {
+				assert.True(t, daemonsetFound, "DaemonSet should be present when UseNodeAgent is true")
+			}
+		})
+	}
 }

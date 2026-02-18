@@ -20,7 +20,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
@@ -36,13 +37,13 @@ func TestParseSecurityContext(t *testing.T) {
 		name     string
 		args     args
 		wantErr  bool
-		expected *corev1.SecurityContext
+		expected *corev1api.SecurityContext
 	}{
 		{
 			"valid security context",
 			args{"1001", "999", "true", ``},
 			false,
-			&corev1.SecurityContext{
+			&corev1api.SecurityContext{
 				RunAsUser:                pointInt64(1001),
 				RunAsGroup:               pointInt64(999),
 				AllowPrivilegeEscalation: boolptr.True(),
@@ -52,7 +53,7 @@ func TestParseSecurityContext(t *testing.T) {
 			"valid security context with override runAsUser",
 			args{"1001", "999", "true", `runAsUser: 2000`},
 			false,
-			&corev1.SecurityContext{
+			&corev1api.SecurityContext{
 				RunAsUser:                pointInt64(2000),
 				RunAsGroup:               pointInt64(999),
 				AllowPrivilegeEscalation: boolptr.True(),
@@ -80,14 +81,14 @@ runAsNonRoot: true
 readOnlyRootFilesystem: true
 allowPrivilegeEscalation: false`},
 			false,
-			&corev1.SecurityContext{
+			&corev1api.SecurityContext{
 				RunAsUser:  pointInt64(3333),
 				RunAsGroup: pointInt64(3333),
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-					Add:  []corev1.Capability{"cap1", "cap2"},
+				Capabilities: &corev1api.Capabilities{
+					Drop: []corev1api.Capability{"ALL"},
+					Add:  []corev1api.Capability{"cap1", "cap2"},
 				},
-				SELinuxOptions: &corev1.SELinuxOptions{
+				SELinuxOptions: &corev1api.SELinuxOptions{
 					User:  "userLabel",
 					Role:  "roleLabel",
 					Type:  "typeLabel",
@@ -120,14 +121,14 @@ runAsNonRoot: true
 readOnlyRootFilesystem: true
 allowPrivilegeEscalation: false`},
 			true,
-			&corev1.SecurityContext{
+			&corev1api.SecurityContext{
 				RunAsUser:  pointInt64(3333),
 				RunAsGroup: pointInt64(3333),
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-					Add:  []corev1.Capability{"cap1", "cap2"},
+				Capabilities: &corev1api.Capabilities{
+					Drop: []corev1api.Capability{"ALL"},
+					Add:  []corev1api.Capability{"cap1", "cap2"},
 				},
-				SELinuxOptions: &corev1.SELinuxOptions{
+				SELinuxOptions: &corev1api.SELinuxOptions{
 					User:  "userLabel",
 					Role:  "roleLabel",
 					Type:  "typeLabel",
@@ -160,14 +161,14 @@ runAsNonRoot: true
 readOnlyRootFilesystem: true
 allowPrivilegeEscalation: false`},
 			false,
-			&corev1.SecurityContext{
+			&corev1api.SecurityContext{
 				RunAsUser:  pointInt64(3333),
 				RunAsGroup: pointInt64(3333),
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-					Add:  []corev1.Capability{"cap1", "cap2"},
+				Capabilities: &corev1api.Capabilities{
+					Drop: []corev1api.Capability{"ALL"},
+					Add:  []corev1api.Capability{"cap1", "cap2"},
 				},
-				SELinuxOptions: &corev1.SELinuxOptions{
+				SELinuxOptions: &corev1api.SELinuxOptions{
 					User:  "userLabel",
 					Role:  "roleLabel",
 					Type:  "typeLabel",
@@ -182,19 +183,19 @@ allowPrivilegeEscalation: false`},
 			"another valid security context",
 			args{"1001", "999", "false", ""},
 			false,
-			&corev1.SecurityContext{
+			&corev1api.SecurityContext{
 				RunAsUser:                pointInt64(1001),
 				RunAsGroup:               pointInt64(999),
 				AllowPrivilegeEscalation: boolptr.False(),
 			},
 		},
-		{"security context without runAsGroup", args{"1001", "", "", ""}, false, &corev1.SecurityContext{
+		{"security context without runAsGroup", args{"1001", "", "", ""}, false, &corev1api.SecurityContext{
 			RunAsUser: pointInt64(1001),
 		}},
-		{"security context without runAsUser", args{"", "999", "", ""}, false, &corev1.SecurityContext{
+		{"security context without runAsUser", args{"", "999", "", ""}, false, &corev1api.SecurityContext{
 			RunAsGroup: pointInt64(999),
 		}},
-		{"empty context without runAsUser", args{"", "", "", ""}, false, &corev1.SecurityContext{}},
+		{"empty context without runAsUser", args{"", "", "", ""}, false, &corev1api.SecurityContext{}},
 		{
 			"invalid securityContext secCtx unknown key",
 			args{"", "", "", `
@@ -260,10 +261,10 @@ allowPrivilegeEscalation: false`},
 				assert.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if tt.expected == nil {
-				tt.expected = &corev1.SecurityContext{}
+				tt.expected = &corev1api.SecurityContext{}
 			}
 
 			if tt.wantErr {

@@ -25,7 +25,7 @@ import (
 	"reflect"
 	"time"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 
 	"context"
 
@@ -126,6 +126,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 					},
 				},
 			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
+			},
 		}
 		dbr := defaultTestDbr()
 		td := setupBackupDeletionControllerTest(t, dbr, location, backup)
@@ -174,7 +177,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 				BackupName: input.Spec.BackupName,
 			},
 		}
-		err := td.fakeClient.Create(context.TODO(), existing)
+		err := td.fakeClient.Create(t.Context(), existing)
 		require.NoError(t, err)
 		existing2 :=
 			&velerov1api.DeleteBackupRequest{
@@ -189,12 +192,12 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 					BackupName: "some-other-backup",
 				},
 			}
-		err = td.fakeClient.Create(context.TODO(), existing2)
+		err = td.fakeClient.Create(t.Context(), existing2)
 		require.NoError(t, err)
-		_, err = td.controller.Reconcile(context.TODO(), td.req)
-		assert.NoError(t, err)
+		_, err = td.controller.Reconcile(t.Context(), td.req)
+		require.NoError(t, err)
 		// verify "existing" is deleted
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: existing.Namespace,
 			Name:      existing.Name,
 		}, &velerov1api.DeleteBackupRequest{})
@@ -202,7 +205,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
 		// verify "existing2" remains
-		assert.NoError(t, td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		assert.NoError(t, td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: existing2.Namespace,
 			Name:      existing2.Name,
 		}, &velerov1api.DeleteBackupRequest{}))
@@ -212,7 +215,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td := setupBackupDeletionControllerTest(t, dbr)
 
 		td.controller.backupTracker.Add(td.req.Namespace, dbr.Spec.BackupName)
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -226,7 +229,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 	t.Run("unable to find backup", func(t *testing.T) {
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr())
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -241,7 +244,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), backup)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -254,11 +257,11 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 	t.Run("backup storage location is in read-only mode", func(t *testing.T) {
 		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").StorageLocation("default").Result()
-		location := builder.ForBackupStorageLocation("velero", "default").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result()
+		location := builder.ForBackupStorageLocation("velero", "default").Phase(velerov1api.BackupStorageLocationPhaseAvailable).AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result()
 
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -268,6 +271,24 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "cannot delete backup because backup storage location default is currently in read-only mode", res.Status.Errors[0])
 	})
+
+	t.Run("backup storage location is in unavailable state", func(t *testing.T) {
+		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").StorageLocation("default").Result()
+		location := builder.ForBackupStorageLocation("velero", "default").Phase(velerov1api.BackupStorageLocationPhaseUnavailable).Result()
+
+		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
+
+		_, err := td.controller.Reconcile(t.Context(), td.req)
+		require.NoError(t, err)
+
+		res := &velerov1api.DeleteBackupRequest{}
+		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
+		require.NoError(t, err)
+		assert.Equal(t, "Processed", string(res.Status.Phase))
+		assert.Len(t, res.Status.Errors, 1)
+		assert.Equal(t, "cannot delete backup because backup storage location default is currently in Unavailable state", res.Status.Errors[0])
+	})
+
 	t.Run("full delete, no errors", func(t *testing.T) {
 		input := defaultTestDbr()
 
@@ -296,6 +317,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 						Bucket: "bucket",
 					},
 				},
+			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 		}
 
@@ -333,7 +357,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td.backupStore.On("GetBackupContents", input.Spec.BackupName).Return(io.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 		td.backupStore.On("DeleteBackup", input.Spec.BackupName).Return(nil)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		// the dbr should be deleted
@@ -345,30 +369,30 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		}
 
 		// backup CR, restore CR restore-1 and restore-2 should be deleted
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      backup.Name,
 		}, &velerov1api.Backup{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-1",
 		}, &velerov1api.Restore{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-2",
 		}, &velerov1api.Restore{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
 		// restore-3 should remain
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		td.backupStore.AssertCalled(t, "DeleteBackup", input.Spec.BackupName)
 
@@ -416,6 +440,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 					},
 				},
 			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
+			},
 		}
 
 		snapshotLocation := &velerov1api.VolumeSnapshotLocation{
@@ -454,7 +481,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 		td.volumeSnapshotter.SnapshotsTaken.Insert("snap-1")
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		// the dbr should be deleted
@@ -466,30 +493,30 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		}
 
 		// backup CR, restore CR restore-1 and restore-2 should be deleted
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      backup.Name,
 		}, &velerov1api.Backup{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-1",
 		}, &velerov1api.Restore{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-2",
 		}, &velerov1api.Restore{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
 		// restore-3 should remain
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())
@@ -517,6 +544,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 						Bucket: "bucket",
 					},
 				},
+			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 		}
 
@@ -552,7 +582,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td.backupStore.On("GetBackupVolumeSnapshots", input.Spec.BackupName).Return(snapshots, nil)
 		td.backupStore.On("DeleteBackup", input.Spec.BackupName).Return(nil)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		td.backupStore.AssertNotCalled(t, "GetBackupContents", mock.Anything)
@@ -567,7 +597,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		}
 
 		// backup CR should be deleted
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      backup.Name,
 		}, &velerov1api.Backup{})
@@ -599,6 +629,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 						Bucket: "bucket",
 					},
 				},
+			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 		}
 
@@ -641,7 +674,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td.backupStore.On("GetBackupContents", input.Spec.BackupName).Return(nil, fmt.Errorf("error downloading tarball"))
 		td.backupStore.On("DeleteBackup", input.Spec.BackupName).Return(nil)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		td.backupStore.AssertCalled(t, "GetBackupContents", input.Spec.BackupName)
@@ -656,14 +689,14 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		}
 
 		// backup CR should be deleted
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      backup.Name,
 		}, &velerov1api.Backup{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
 		// leaked CSI snapshot should be deleted
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: "user-ns",
 			Name:      "vs-1",
 		}, &snapshotv1api.VolumeSnapshot{})
@@ -681,7 +714,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		input.Status.Phase = velerov1api.DeleteBackupRequestPhaseProcessed
 		td := setupBackupDeletionControllerTest(t, input)
 		td.backupStore.On("DeleteBackup", mock.Anything).Return(nil)
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -700,7 +733,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td := setupBackupDeletionControllerTest(t, input)
 		td.backupStore.On("DeleteBackup", mock.Anything).Return(nil)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -866,8 +899,8 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 				Items: test.podVolumeBackups,
 			})
 
-			res, err := getSnapshotsInBackup(context.TODO(), veleroBackup, clientBuilder.Build())
-			assert.NoError(t, err)
+			res, err := getSnapshotsInBackup(t.Context(), veleroBackup, clientBuilder.Build())
+			require.NoError(t, err)
 
 			assert.True(t, reflect.DeepEqual(res, test.expected))
 		})
@@ -1033,11 +1066,11 @@ func TestDeleteMovedSnapshots(t *testing.T) {
 				batchDeleteSnapshotFunc = batchDeleteFail
 			}
 
-			errs := controller.deleteMovedSnapshots(context.Background(), veleroBackup)
+			errs := controller.deleteMovedSnapshots(t.Context(), veleroBackup)
 			if test.expected == nil {
 				assert.Nil(t, errs)
 			} else {
-				assert.Equal(t, len(test.expected), len(errs))
+				assert.Len(t, errs, len(test.expected))
 				for i := range test.expected {
 					assert.EqualError(t, errs[i], test.expected[i])
 				}

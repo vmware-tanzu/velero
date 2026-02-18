@@ -24,7 +24,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 
-	"github.com/kopia/kopia/snapshot/snapshotfs"
+	"github.com/kopia/kopia/snapshot/upload"
 )
 
 // Throttle throttles controlle the interval of output result
@@ -63,7 +63,7 @@ type Progress struct {
 	outputThrottle  Throttle                 // which control the frequency of update progress
 	updater         uploader.ProgressUpdater //which kopia progress will call the UpdateProgress interface, the third party will implement the interface to do the progress update
 	log             logrus.FieldLogger       // output info into log when backup
-	estimationParam snapshotfs.EstimationParameters
+	estimationParam upload.EstimationParameters
 }
 
 func NewProgress(updater uploader.ProgressUpdater, interval time.Duration, log logrus.FieldLogger) *Progress {
@@ -73,8 +73,8 @@ func NewProgress(updater uploader.ProgressUpdater, interval time.Duration, log l
 			interval: interval,
 		},
 		updater: updater,
-		estimationParam: snapshotfs.EstimationParameters{
-			Type:              snapshotfs.EstimationTypeClassic,
+		estimationParam: upload.EstimationParameters{
+			Type:              upload.EstimationTypeClassic,
 			AdaptiveThreshold: 300000,
 		},
 		log: log,
@@ -121,6 +121,7 @@ func (p *Progress) UploadStarted() {}
 // CachedFile statistic the total bytes been cached currently
 func (p *Progress) CachedFile(fname string, numBytes int64) {
 	atomic.AddInt64(&p.cachedBytes, numBytes)
+	atomic.AddInt64(&p.processedBytes, numBytes)
 	p.UpdateProgress()
 }
 
@@ -169,10 +170,14 @@ func (p *Progress) ProgressBytes(processedBytes int64, totalBytes int64) {
 
 func (p *Progress) FinishedFile(fname string, err error) {}
 
-func (p *Progress) EstimationParameters() snapshotfs.EstimationParameters {
+func (p *Progress) EstimationParameters() upload.EstimationParameters {
 	return p.estimationParam
 }
 
 func (p *Progress) Enabled() bool {
 	return true
+}
+
+func (p *Progress) GetIncrementalSize() int64 {
+	return p.estimatedTotalBytes - p.cachedBytes
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package backup
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -41,9 +40,9 @@ func TestNewDownloadCommand(t *testing.T) {
 
 	backupName := "backup-1"
 	kbclient := velerotest.NewFakeControllerRuntimeClient(t)
-	err := kbclient.Create(context.Background(), builder.ForBackup(cmdtest.VeleroNameSpace, backupName).Result())
+	err := kbclient.Create(t.Context(), builder.ForBackup(cmdtest.VeleroNameSpace, backupName).Result())
 	require.NoError(t, err)
-	err = kbclient.Create(context.Background(), builder.ForBackup(cmdtest.VeleroNameSpace, "bk-to-be-download").Result())
+	err = kbclient.Create(t.Context(), builder.ForBackup(cmdtest.VeleroNameSpace, "bk-to-be-download").Result())
 	require.NoError(t, err)
 
 	f.On("Namespace").Return(cmdtest.VeleroNameSpace)
@@ -74,10 +73,10 @@ func TestNewDownloadCommand(t *testing.T) {
 	args := []string{backupName, "arg2"}
 
 	e := o.Complete(args)
-	assert.NoError(t, e)
+	require.NoError(t, e)
 
 	e = o.Validate(c, args, f)
-	assert.NoError(t, e)
+	require.NoError(t, e)
 
 	// verify all options are set as expected
 	assert.Equal(t, output, o.Output)
@@ -92,7 +91,7 @@ func TestNewDownloadCommand(t *testing.T) {
 		assert.NoError(t, e)
 		return
 	}
-	cmd := exec.Command(os.Args[0], []string{"-test.run=TestNewDownloadCommand"}...)
+	cmd := exec.CommandContext(t.Context(), os.Args[0], []string{"-test.run=TestNewDownloadCommand"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
 	_, stderr, err := veleroexec.RunCommand(cmd)
 

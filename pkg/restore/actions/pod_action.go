@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -44,7 +44,7 @@ func (a *PodAction) AppliesTo() (velero.ResourceSelector, error) {
 }
 
 func (a *PodAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
-	pod := new(v1.Pod)
+	pod := new(corev1api.Pod)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), pod); err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -54,7 +54,7 @@ func (a *PodAction) Execute(input *velero.RestoreItemActionExecuteInput) (*veler
 
 	serviceAccountTokenPrefix := pod.Spec.ServiceAccountName + "-token-"
 
-	var preservedVolumes []v1.Volume
+	var preservedVolumes []corev1api.Volume
 	for _, vol := range pod.Spec.Volumes {
 		if !strings.HasPrefix(vol.Name, serviceAccountTokenPrefix) {
 			preservedVolumes = append(preservedVolumes, vol)
@@ -63,7 +63,7 @@ func (a *PodAction) Execute(input *velero.RestoreItemActionExecuteInput) (*veler
 	pod.Spec.Volumes = preservedVolumes
 
 	for i, container := range pod.Spec.Containers {
-		var preservedVolumeMounts []v1.VolumeMount
+		var preservedVolumeMounts []corev1api.VolumeMount
 		for _, mount := range container.VolumeMounts {
 			if !strings.HasPrefix(mount.Name, serviceAccountTokenPrefix) {
 				preservedVolumeMounts = append(preservedVolumeMounts, mount)
@@ -73,7 +73,7 @@ func (a *PodAction) Execute(input *velero.RestoreItemActionExecuteInput) (*veler
 	}
 
 	for i, container := range pod.Spec.InitContainers {
-		var preservedVolumeMounts []v1.VolumeMount
+		var preservedVolumeMounts []corev1api.VolumeMount
 		for _, mount := range container.VolumeMounts {
 			if !strings.HasPrefix(mount.Name, serviceAccountTokenPrefix) {
 				preservedVolumeMounts = append(preservedVolumeMounts, mount)

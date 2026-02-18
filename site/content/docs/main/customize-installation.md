@@ -23,6 +23,8 @@ By default, `velero install` does not install Velero's [File System Backup][3]. 
 
 If you've already run `velero install` without the `--use-node-agent` flag, you can run the same command again, including the `--use-node-agent` flag, to add the file system backup to your existing install.
 
+Note that for some use cases (including installation on OpenShift clusters) the fs-backup pods must run in a Privileged security context. This is configured through the node-agent configmap (see below) by setting `privilegedFsBackup` to `true` in the configmap.
+
 ## CSI Snapshot Data Movement
 
 Velero node-agent is required by [CSI Snapshot Data Movement][12] when Velero built-in data mover is used. By default, `velero install` does not install Velero's node-agent. To enable it, specify the `--use-node-agent` flag.
@@ -31,11 +33,24 @@ For some use cases, Velero node-agent requires to run under privileged mode. For
 
 If you've already run `velero install` without the `--use-node-agent` or `--privileged-node-agent` flag, you can run the same command again, including the `--use-node-agent` or `--privileged-node-agent` flag, to add CSI snapshot data movement to your existing install.
 
+## Customize the kubelet root path of the node-agent
+When installing with the `--use-node-agent` flag, the node-agent will mount the default kubelet paths `/var/lib/kubelet/pods` and `/var/lib/kubelet/plugins` (hostPath). To customize these kubelet mount paths, use the `--kubelet-root-dir` flag.
+
 ## Default Pod Volume backup to file system backup
 
 By default, `velero install` does not enable the use of File System Backup (FSB) to take backups of all pod volumes. You must apply an [annotation](file-system-backup.md/#using-opt-in-pod-volume-backup) to every pod which contains volumes for Velero to use FSB for the backup.
 
 If you are planning to only use FSB for volume backups, you can run the `velero install` command with the `--default-volumes-to-fs-backup` flag. This will default all pod volumes backups to use FSB without having to apply annotations to pods. Note that when this flag is set during install, Velero will always try to use FSB to perform the backup, even want an individual backup to use volume snapshots, by setting the `--snapshot-volumes` flag in the `backup create` command. Alternatively, you can set the  `--default-volumes-to-fs-backup` on an individual backup to to make sure Velero uses FSB for each volume being backed up.
+
+## Update an existing installation
+
+By default, the `velero install` command creates new resources in your cluster. If you're updating an existing Velero installation, you can use the `--apply` flag to apply changes to existing resources instead of attempting to create new ones:
+
+```bash
+velero install --apply
+```
+
+When the `--apply` flag is specified, Velero uses server-side apply to update existing resources. This is particularly useful when updating Velero to a new version or when modifying your installation configuration. While this can be used as part of an upgrade process, please note that for version upgrades, additional steps may be required depending on the specific changes between versions. Also ensure when using this flag that you are setting any additional flags previously used for your existing configuration so that you don't introduce unexpected changes.
 
 ## Enable features
 
@@ -93,6 +108,53 @@ Note that if you specify `--colorized=true` as a CLI option it will override
 the config file setting.
 
 
+## Set priority class names for Velero components
+
+You can set priority class names for different Velero components during installation. This allows you to influence the scheduling and eviction behavior of Velero pods, which can be useful in clusters where resource contention is high.
+
+### Priority class configuration options:
+
+1. **Velero server deployment**: Use the `--server-priority-class-name` flag
+2. **Node agent daemonset**: Use the `--node-agent-priority-class-name` flag
+3. **Data mover pods**: Configure through the node-agent configmap (see below)
+4. **Maintenance jobs**: Configure through the repository maintenance job configmap (see below)
+
+```bash
+velero install \
+    --server-priority-class-name=<SERVER_PRIORITY_CLASS> \
+    --node-agent-priority-class-name=<NODE_AGENT_PRIORITY_CLASS>
+```
+
+### Configuring priority classes for data mover pods and maintenance jobs
+
+For data mover pods and maintenance jobs, priority classes are configured through ConfigMaps that must be created before installation:
+
+**Data mover pods** (via node-agent configmap):
+```bash
+kubectl create configmap node-agent-config -n velero --from-file=config.json=/dev/stdin <<EOF
+{
+    "priorityClassName": "low-priority"
+}
+EOF
+
+velero install --node-agent-configmap node-agent-config # ... other flags
+```
+
+**Maintenance jobs** (via repository maintenance job configmap):
+```bash
+kubectl create configmap repo-maintenance-job-config -n velero --from-file=config.json=/dev/stdin <<EOF
+{
+    "global": {
+        "priorityClassName": "low-priority"
+    }
+}
+EOF
+
+velero install --repo-maintenance-job-configmap repo-maintenance-job-config # ... other flags
+```
+
+Note that you need to create the priority classes before installing Velero. For more information on priority classes, see the [Kubernetes documentation on Pod Priority and Preemption](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/).
+
 ## Customize resource requests and limits
 
 At installation, You could set resource requests and limits for the Velero pod, the node-agent pod and the [repository maintenance job][14], if you are using the [File System Backup][3] or [CSI Snapshot Data Movement][12].  
@@ -106,7 +168,7 @@ At installation, You could set resource requests and limits for the Velero pod, 
 |Memory limit|512Mi|N/A|
 {{< /table >}}
   
-For Velero pod, through testing, the Velero maintainers have found these defaults work well when backing up and restoring 1000 or less resources.  
+For Velero pod, through testing, the Velero maintainers have found these defaults work well when backing up and restoring 1000 or less resources. If you are enabling concurrent backups and your backups tend to be large, you may need to increase these limits.
 For node-agent pod, by default it doesn't have CPU/memory request/limit, so that the backups/restores won't break due to resource throttling. The Velero maintainers have also done some [Performance Tests][13] to show the relationship of CPU/memory usage and the scale of data being backed up/restored.
 
 For repository maintenance job, it's no limit on resources by default. You could configure the job resource limitation based on target data to be backed up, some further settings please refer to [repository maintenance job][14].
@@ -177,6 +239,12 @@ Additionally, you may want to update the the default File System Backup operatio
           - args:
             - --fs-backup-timeout=240m
     ```
+
+### Ephemeral-storage Requests and Limits
+
+Velero does not set ephemeral-storage limits during installation. Limits and requests can be edited after install for clusters that monitor and restrict ephemeral-storage usage. 
+
+Plugins will use ephemeral-storage. There needs to be a sufficient requests and limit set to account for plugins and the additional ephemeral-storage used to maintain credentials and cache space for datamovers. Object storage plugins will fit comfortably into an allocation of 100MB of ephemeral-storage.
 
 ## Configure more than one storage location for backups or volume snapshots
 
@@ -418,6 +486,37 @@ If you get an error like `complete:13: command not found: compdef`, then add the
   compinit
   ```
 
+## Advanced configuration through external ConfigMaps
+
+Velero supports to configure its some advanced behaviors by external ConfigMaps.
+Velero itself isn't responsible for creating and maintaining these ConfigMaps, instead the users should do that.
+
+By far, `velero install` supports the following parameters to specify the external ConfigMap names:
+* --backup-repository-configmap: [backup repository configuration document][15]
+* --node-agent-configmap: [node-agent concurrency configuration document][16], and there are some other documents specify other parts of node-agent-config.
+* --repo-maintenance-job-configmap: [repository maintenance configuration document][17]
+
+From v1.17, Velero adds verification for the ConfigMaps in CLI and server side, which means `velero install` CLI will fail and velero server and node-agent pod will exit if the specified ConfigMaps don't exist or are invalid.
+
+The change's aim is validating the ConfigMaps and fail early instead of finding the ConfigMaps are not valid during running data mover pod or repository maintenance job.
+
+However, there means the user cannot just running `velero install` CLI then get a working environment, when the external ConfigMaps are involved.
+
+The new workflow is:
+* Create the needed namespace: `kubectl create ns velero`
+* Add PSA labels to the namespace: `kubectl label ns velero pod-security.velero.io/enforce=privileged`
+* Create the needed ConfigMaps.
+* Run the `velero install` CLI:
+  ``` bash
+  velero install \
+    --provider aws \
+    ......
+    --backup-repository-configmap=... \
+    --node-agent-configmap=... \
+    --repo-maintenance-job-configmap=...
+  ```
+
+
 [1]: https://github.com/vmware-tanzu/velero/releases/latest
 [2]: namespace.md
 [3]: file-system-backup.md
@@ -431,3 +530,6 @@ If you get an error like `complete:13: command not found: compdef`, then add the
 [12]: csi-snapshot-data-movement.md
 [13]: performance-guidance.md
 [14]: repository-maintenance.md
+[15]: backup-repository-configuration.md
+[16]: node-agent-concurrency.md
+[17]: repository-maintenance.md

@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,18 +52,18 @@ func TestWaitExecHandleHooks(t *testing.T) {
 	type change struct {
 		// delta to wait since last change applied or pod added
 		wait    time.Duration
-		updated *v1.Pod
+		updated *corev1api.Pod
 	}
 	type expectedExecution struct {
 		hook  *velerov1api.ExecHook
 		name  string
 		error error
-		pod   *v1.Pod
+		pod   *corev1api.Pod
 	}
 	tests := []struct {
 		name string
 		// Used as argument to HandleHooks and first state added to ListerWatcher
-		initialPod         *v1.Pod
+		initialPod         *corev1api.Pod
 		groupResource      string
 		byContainer        map[string][]PodExecRestoreHook
 		expectedExecutions []expectedExecution
@@ -83,13 +83,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					podRestoreHookTimeoutAnnotationKey, "1s",
 					podRestoreHookWaitTimeoutAnnotationKey, "1m",
 				)).
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{},
+					State: corev1api.ContainerState{
+						Running: &corev1api.ContainerStateRunning{},
 					},
 				}).
 				Result(),
@@ -128,13 +128,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 							podRestoreHookTimeoutAnnotationKey, "1s",
 							podRestoreHookWaitTimeoutAnnotationKey, "1m",
 						)).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container1",
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container1",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
 						Result(),
@@ -152,13 +152,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					podRestoreHookTimeoutAnnotationKey, "1s",
 					podRestoreHookWaitTimeoutAnnotationKey, "1m",
 				)).
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{},
+					State: corev1api.ContainerState{
+						Running: &corev1api.ContainerStateRunning{},
 					},
 				}).
 				Result(),
@@ -197,13 +197,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 							podRestoreHookTimeoutAnnotationKey, "1s",
 							podRestoreHookWaitTimeoutAnnotationKey, "1m",
 						)).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container1",
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container1",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
 						Result(),
@@ -221,13 +221,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					podRestoreHookTimeoutAnnotationKey, "1s",
 					podRestoreHookWaitTimeoutAnnotationKey, "1m",
 				)).
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{},
+					State: corev1api.ContainerState{
+						Running: &corev1api.ContainerStateRunning{},
 					},
 				}).
 				Result(),
@@ -266,13 +266,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 							podRestoreHookTimeoutAnnotationKey, "1s",
 							podRestoreHookWaitTimeoutAnnotationKey, "1m",
 						)).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container1",
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container1",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
 						Result(),
@@ -290,13 +290,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					podRestoreHookTimeoutAnnotationKey, "1s",
 					podRestoreHookWaitTimeoutAnnotationKey, "1m",
 				)).
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
 				Result(),
@@ -335,13 +335,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 							podRestoreHookTimeoutAnnotationKey, "1s",
 							podRestoreHookWaitTimeoutAnnotationKey, "1m",
 						)).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container1",
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container1",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
 						Result(),
@@ -359,13 +359,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 							podRestoreHookTimeoutAnnotationKey, "1s",
 							podRestoreHookWaitTimeoutAnnotationKey, "1m",
 						)).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container1",
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container1",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
 						Result(),
@@ -376,13 +376,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			name:          "should return no error when hook from spec executes successfully",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{},
+					State: corev1api.ContainerState{
+						Running: &corev1api.ContainerStateRunning{},
 					},
 				}).
 				Result(),
@@ -408,13 +408,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 					pod: builder.ForPod("default", "my-pod").
 						ObjectMeta(builder.WithResourceVersion("1")).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container1",
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container1",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
 						Result(),
@@ -425,13 +425,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			name:          "should return error when spec hook with wait timeout expires with OnError mode Continue",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
 				Result(),
@@ -456,13 +456,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			name:          "should return an error when spec hook with wait timeout expires with OnError mode Fail",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
 				Result(),
@@ -487,13 +487,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			name:          "should return an error when shared hooks context is canceled before spec hook with OnError mode Fail executes",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
 				Result(),
@@ -519,13 +519,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			expectedErrors: []error{errors.New("hook my-hook-1 in container container1 in pod default/my-pod not executed: context deadline exceeded")},
 			groupResource:  "pods",
 			initialPod: builder.ForPod("default", "my-pod").
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
 				Result(),
@@ -549,23 +549,23 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			name:          "should return no error with 2 spec hooks in 2 different containers, 1st container starts running after 10ms, 2nd container after 20ms, both succeed",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container2",
 				}).
 				// initially both are waiting
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container2",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
 				Result(),
@@ -602,23 +602,23 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					error: nil,
 					pod: builder.ForPod("default", "my-pod").
 						ObjectMeta(builder.WithResourceVersion("2")).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container1",
 						}).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container2",
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container1",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
 						// container 2 is still waiting when the first hook executes in container1
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container2",
-							State: v1.ContainerState{
-								Waiting: &v1.ContainerStateWaiting{},
+							State: corev1api.ContainerState{
+								Waiting: &corev1api.ContainerStateWaiting{},
 							},
 						}).
 						Result(),
@@ -632,22 +632,22 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					error: nil,
 					pod: builder.ForPod("default", "my-pod").
 						ObjectMeta(builder.WithResourceVersion("3")).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container1",
 						}).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container2",
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container1",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container2",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
 						Result(),
@@ -659,22 +659,22 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					wait: 10 * time.Millisecond,
 					updated: builder.ForPod("default", "my-pod").
 						ObjectMeta(builder.WithResourceVersion("2")).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container1",
 						}).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container2",
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container1",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container2",
-							State: v1.ContainerState{
-								Waiting: &v1.ContainerStateWaiting{},
+							State: corev1api.ContainerState{
+								Waiting: &corev1api.ContainerStateWaiting{},
 							},
 						}).
 						Result(),
@@ -684,27 +684,151 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					wait: 10 * time.Millisecond,
 					updated: builder.ForPod("default", "my-pod").
 						ObjectMeta(builder.WithResourceVersion("3")).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container1",
 						}).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container2",
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container1",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container2",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
 						Result(),
 				},
 			},
+		},
+		{
+			name: "Multiple hooks with non-sequential indices (bug #9359)",
+			initialPod: builder.ForPod("default", "my-pod").
+				Containers(&corev1api.Container{
+					Name: "container1",
+				}).
+				ContainerStatuses(&corev1api.ContainerStatus{
+					Name: "container1",
+					State: corev1api.ContainerState{
+						Running: &corev1api.ContainerStateRunning{},
+					},
+				}).
+				Result(),
+			groupResource: "pods",
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": {
+					{
+						HookName:   "first-hook",
+						HookSource: HookSourceAnnotation,
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/foo"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							ExecTimeout: metav1.Duration{Duration: time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Minute},
+						},
+						hookIndex: 0,
+					},
+					{
+						HookName:   "second-hook",
+						HookSource: HookSourceAnnotation,
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/bar"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							ExecTimeout: metav1.Duration{Duration: time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Minute},
+						},
+						hookIndex: 2,
+					},
+					{
+						HookName:   "third-hook",
+						HookSource: HookSourceAnnotation,
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/third"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							ExecTimeout: metav1.Duration{Duration: time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Minute},
+						},
+						hookIndex: 4,
+					},
+				},
+			},
+			expectedExecutions: []expectedExecution{
+				{
+					name: "first-hook",
+					hook: &velerov1api.ExecHook{
+						Container: "container1",
+						Command:   []string{"/usr/bin/foo"},
+						OnError:   velerov1api.HookErrorModeContinue,
+						Timeout:   metav1.Duration{Duration: time.Second},
+					},
+					error: nil,
+					pod: builder.ForPod("default", "my-pod").
+						ObjectMeta(builder.WithResourceVersion("1")).
+						Containers(&corev1api.Container{
+							Name: "container1",
+						}).
+						ContainerStatuses(&corev1api.ContainerStatus{
+							Name: "container1",
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
+							},
+						}).
+						Result(),
+				},
+				{
+					name: "second-hook",
+					hook: &velerov1api.ExecHook{
+						Container: "container1",
+						Command:   []string{"/usr/bin/bar"},
+						OnError:   velerov1api.HookErrorModeContinue,
+						Timeout:   metav1.Duration{Duration: time.Second},
+					},
+					error: nil,
+					pod: builder.ForPod("default", "my-pod").
+						ObjectMeta(builder.WithResourceVersion("1")).
+						Containers(&corev1api.Container{
+							Name: "container1",
+						}).
+						ContainerStatuses(&corev1api.ContainerStatus{
+							Name: "container1",
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
+							},
+						}).
+						Result(),
+				},
+				{
+					name: "third-hook",
+					hook: &velerov1api.ExecHook{
+						Container: "container1",
+						Command:   []string{"/usr/bin/third"},
+						OnError:   velerov1api.HookErrorModeContinue,
+						Timeout:   metav1.Duration{Duration: time.Second},
+					},
+					error: nil,
+					pod: builder.ForPod("default", "my-pod").
+						ObjectMeta(builder.WithResourceVersion("1")).
+						Containers(&corev1api.Container{
+							Name: "container1",
+						}).
+						ContainerStatuses(&corev1api.ContainerStatus{
+							Name: "container1",
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
+							},
+						}).
+						Result(),
+				},
+			},
+			expectedErrors: nil,
 		},
 	}
 
@@ -732,11 +856,11 @@ func TestWaitExecHandleHooks(t *testing.T) {
 
 			for _, e := range test.expectedExecutions {
 				obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(e.pod)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				podCommandExecutor.On("ExecutePodCommand", mock.Anything, obj, e.pod.Namespace, e.pod.Name, e.name, e.hook).Return(e.error)
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 			if test.sharedHooksContextTimeout > 0 {
 				var ctxCancel context.CancelFunc
 				ctx, ctxCancel = context.WithTimeout(ctx, test.sharedHooksContextTimeout)
@@ -758,7 +882,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 func TestPodHasContainer(t *testing.T) {
 	tests := []struct {
 		name      string
-		pod       *v1.Pod
+		pod       *corev1api.Pod
 		container string
 		expect    bool
 	}{
@@ -767,7 +891,7 @@ func TestPodHasContainer(t *testing.T) {
 			expect:    true,
 			container: "container1",
 			pod: builder.ForPod("default", "my-pod").
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
 				Result(),
@@ -777,7 +901,7 @@ func TestPodHasContainer(t *testing.T) {
 			expect:    false,
 			container: "container1",
 			pod: builder.ForPod("default", "my-pod").
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container2",
 				}).
 				Result(),
@@ -794,7 +918,7 @@ func TestPodHasContainer(t *testing.T) {
 func TestIsContainerUp(t *testing.T) {
 	tests := []struct {
 		name      string
-		pod       *v1.Pod
+		pod       *corev1api.Pod
 		container string
 		expect    bool
 		hooks     []PodExecRestoreHook
@@ -804,10 +928,10 @@ func TestIsContainerUp(t *testing.T) {
 			container: "container1",
 			expect:    true,
 			pod: builder.ForPod("default", "my-pod").
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{},
+					State: corev1api.ContainerState{
+						Running: &corev1api.ContainerStateRunning{},
 					},
 				}).
 				Result(),
@@ -818,10 +942,10 @@ func TestIsContainerUp(t *testing.T) {
 			container: "container1",
 			expect:    false,
 			pod: builder.ForPod("default", "my-pod").
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{},
+					State: corev1api.ContainerState{
+						Running: &corev1api.ContainerStateRunning{},
 					},
 					Ready: false,
 				}).
@@ -839,10 +963,10 @@ func TestIsContainerUp(t *testing.T) {
 			container: "container1",
 			expect:    true,
 			pod: builder.ForPod("default", "my-pod").
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{},
+					State: corev1api.ContainerState{
+						Running: &corev1api.ContainerStateRunning{},
 					},
 					Ready: true,
 				}).
@@ -860,9 +984,9 @@ func TestIsContainerUp(t *testing.T) {
 			container: "container1",
 			expect:    false,
 			pod: builder.ForPod("default", "my-pod").
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name:  "container1",
-					State: v1.ContainerState{},
+					State: corev1api.ContainerState{},
 				}).
 				Result(),
 			hooks: []PodExecRestoreHook{},
@@ -872,10 +996,10 @@ func TestIsContainerUp(t *testing.T) {
 			container: "container1",
 			expect:    false,
 			pod: builder.ForPod("default", "my-pod").
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
 				Result(),
@@ -886,16 +1010,16 @@ func TestIsContainerUp(t *testing.T) {
 			container: "container1",
 			expect:    true,
 			pod: builder.ForPod("default", "my-pod").
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container0",
-					State: v1.ContainerState{
-						Terminated: &v1.ContainerStateTerminated{},
+					State: corev1api.ContainerState{
+						Terminated: &corev1api.ContainerStateTerminated{},
 					},
 				},
-					&v1.ContainerStatus{
+					&corev1api.ContainerStatus{
 						Name: "container1",
-						State: v1.ContainerState{
-							Running: &v1.ContainerStateRunning{},
+						State: corev1api.ContainerState{
+							Running: &corev1api.ContainerStateRunning{},
 						},
 					}).
 				Result(),
@@ -1003,25 +1127,25 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 		hook  *velerov1api.ExecHook
 		name  string
 		error error
-		pod   *v1.Pod
+		pod   *corev1api.Pod
 	}
 
 	hookTracker1 := NewMultiHookTracker()
-	hookTracker1.Add("restore1", "default", "my-pod", "container1", HookSourceAnnotation, "<from-annotation>", HookPhase(""))
+	hookTracker1.Add("restore1", "default", "my-pod", "container1", HookSourceAnnotation, "<from-annotation>", HookPhase(""), 0)
 
 	hookTracker2 := NewMultiHookTracker()
-	hookTracker2.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""))
+	hookTracker2.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""), 0)
 
 	hookTracker3 := NewMultiHookTracker()
-	hookTracker3.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""))
-	hookTracker3.Add("restore1", "default", "my-pod", "container2", HookSourceSpec, "my-hook-2", HookPhase(""))
+	hookTracker3.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""), 0)
+	hookTracker3.Add("restore1", "default", "my-pod", "container2", HookSourceSpec, "my-hook-2", HookPhase(""), 0)
 
 	hookTracker4 := NewMultiHookTracker()
-	hookTracker4.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""))
+	hookTracker4.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""), 0)
 
 	tests1 := []struct {
 		name               string
-		initialPod         *v1.Pod
+		initialPod         *corev1api.Pod
 		groupResource      string
 		byContainer        map[string][]PodExecRestoreHook
 		expectedExecutions []expectedExecution
@@ -1038,13 +1162,13 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 					podRestoreHookTimeoutAnnotationKey, "1s",
 					podRestoreHookWaitTimeoutAnnotationKey, "1m",
 				)).
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{},
+					State: corev1api.ContainerState{
+						Running: &corev1api.ContainerStateRunning{},
 					},
 				}).
 				Result(),
@@ -1083,13 +1207,13 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 							podRestoreHookTimeoutAnnotationKey, "1s",
 							podRestoreHookWaitTimeoutAnnotationKey, "1m",
 						)).
-						Containers(&v1.Container{
+						Containers(&corev1api.Container{
 							Name: "container1",
 						}).
-						ContainerStatuses(&v1.ContainerStatus{
+						ContainerStatuses(&corev1api.ContainerStatus{
 							Name: "container1",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{},
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
 							},
 						}).
 						Result(),
@@ -1102,13 +1226,13 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 			name:          "a hook with OnError mode Fail failed to execute",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
 				Result(),
@@ -1133,13 +1257,13 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 			name:          "a hook with OnError mode Continue failed to execute",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
 				Result(),
@@ -1164,23 +1288,23 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 			name:          "two hooks with OnError mode Continue failed to execute",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container2",
 				}).
 				// initially both are waiting
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container2",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
 				Result(),
@@ -1217,13 +1341,13 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 			name:          "a hook was recorded before added to tracker",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
-				Containers(&v1.Container{
+				Containers(&corev1api.Container{
 					Name: "container1",
 				}).
-				ContainerStatuses(&v1.ContainerStatus{
+				ContainerStatuses(&corev1api.ContainerStatus{
 					Name: "container1",
-					State: v1.ContainerState{
-						Waiting: &v1.ContainerStateWaiting{},
+					State: corev1api.ContainerState{
+						Waiting: &corev1api.ContainerStateWaiting{},
 					},
 				}).
 				Result(),
@@ -1264,11 +1388,11 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 
 			for _, e := range test.expectedExecutions {
 				obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(e.pod)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				podCommandExecutor.On("ExecutePodCommand", mock.Anything, obj, e.pod.Namespace, e.pod.Name, e.name, e.hook).Return(e.error)
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 			_ = h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer, test.hookTracker, "restore1")
 			_, actualFailed := test.hookTracker.Stat("restore1")
 			assert.Equal(t, test.expectedFailed, actualFailed)

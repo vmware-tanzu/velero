@@ -96,7 +96,7 @@ func TestAsyncBackup(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fs := newFileSystemBR("job-1", "test", nil, "velero", Callbacks{}, velerotest.NewLogger()).(*fileSystemBR)
 			mockProvider := providerMock.NewProvider(t)
-			mockProvider.On("RunBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.result.Backup.SnapshotID, test.result.Backup.EmptySnapshot, test.result.Backup.TotalBytes, test.err)
+			mockProvider.On("RunBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.result.Backup.SnapshotID, test.result.Backup.EmptySnapshot, test.result.Backup.TotalBytes, test.result.Backup.IncrementalBytes, test.err)
 			mockProvider.On("Close", mock.Anything).Return(nil)
 			fs.uploaderProv = mockProvider
 			fs.initialized = true
@@ -106,6 +106,9 @@ func TestAsyncBackup(t *testing.T) {
 			require.NoError(t, err)
 
 			<-finish
+
+			// Ensure the goroutine finishes so deferred fs.close executes, satisfying mock expectations.
+			fs.wgDataPath.Wait()
 
 			assert.Equal(t, test.err, asyncErr)
 			assert.Equal(t, test.result, asyncResult)
@@ -191,6 +194,9 @@ func TestAsyncRestore(t *testing.T) {
 			require.NoError(t, err)
 
 			<-finish
+
+			// Ensure the goroutine finishes so deferred fs.close executes, satisfying mock expectations.
+			fs.wgDataPath.Wait()
 
 			assert.Equal(t, asyncErr, test.err)
 			assert.Equal(t, asyncResult, test.result)

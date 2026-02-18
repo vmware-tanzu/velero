@@ -83,14 +83,14 @@ func TestSortResources(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Logf("before")
+			t.Log("before")
 			for _, r := range test.resources {
-				t.Logf(r.GroupVersion)
+				t.Log(r.GroupVersion)
 			}
 			sortResources(test.resources)
 			t.Logf("after")
 			for _, r := range test.resources {
-				t.Logf(r.GroupVersion)
+				t.Log(r.GroupVersion)
 			}
 			assert.Equal(t, test.expected, test.resources)
 		})
@@ -195,9 +195,9 @@ func TestRefreshServerPreferredResources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			resources, err := refreshServerPreferredResources(fakeServer, logging.DefaultLogger(logrus.DebugLevel, formatFlag))
 			if test.returnError != nil {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, test.returnError, err)
 			}
 
@@ -311,7 +311,7 @@ func TestHelper_ResourceFor(t *testing.T) {
 			}
 			gvr, apiResource, err := h.ResourceFor(*tc.input)
 			if tc.err == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
 				require.ErrorContains(t, err, tc.err)
 			}
@@ -418,7 +418,7 @@ func TestHelper_KindFor(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			gvr, apiResource, err := h.KindFor(*tc.input)
 			if tc.err == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
 				require.ErrorContains(t, err, tc.err)
 			}
@@ -575,7 +575,7 @@ func TestHelper_refreshServerPreferredResources(t *testing.T) {
 			if tc.expectedErr != nil {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, resources)
 			}
 		})
@@ -630,7 +630,7 @@ func TestHelper_refreshServerGroupsAndResources(t *testing.T) {
 			if tc.expectedErr != nil {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, serverGroups)
 				assert.NotNil(t, serverResources)
 			}
@@ -645,7 +645,7 @@ func TestHelper(t *testing.T) {
 	h, err := NewHelper(&velerotest.DiscoveryClient{
 		FakeDiscovery: fakeDiscoveryClient,
 	}, logrus.New())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// All below calls put together for the implementation are empty or just very simple, and just want to cover testing
 	// If wanting to write unit tests for some functions could remove it and with writing new function alone
 	h.Resources()

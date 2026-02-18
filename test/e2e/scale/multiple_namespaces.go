@@ -21,4 +21,4 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 )
 
-var MultiNSBackupRestore func() = TestFunc(&basic.MultiNSBackup{IsScalTest: true})
+var MultiNSBackupRestore func() = TestFunc(&basic.MultiNSBackup{IsScaleTest: true})

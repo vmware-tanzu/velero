@@ -305,8 +305,14 @@ func SetPVReclaimPolicy(ctx context.Context, pvGetter corev1client.CoreV1Interfa
 // WaitPVCConsumed waits for a PVC to be consumed by a pod so that the selected node is set by the pod scheduling; or does
 // nothing if the consuming doesn't affect the PV provision.
 // The latest PVC and the selected node will be returned.
-func WaitPVCConsumed(ctx context.Context, pvcGetter corev1client.CoreV1Interface, pvc string, namespace string,
-	storageClient storagev1.StorageV1Interface, timeout time.Duration, ignoreConsume bool) (string, *corev1api.PersistentVolumeClaim, error) {
+func WaitPVCConsumed(
+	ctx context.Context,
+	pvcGetter corev1client.CoreV1Interface,
+	pvc string, namespace string,
+	storageClient storagev1.StorageV1Interface,
+	timeout time.Duration,
+	ignoreConsume bool,
+) (string, *corev1api.PersistentVolumeClaim, error) {
 	selectedNode := ""
 	var updated *corev1api.PersistentVolumeClaim
 	var storageClass *storagev1api.StorageClass
@@ -411,19 +417,19 @@ func MakePodPVCAttachment(volumeName string, volumeMode *corev1api.PersistentVol
 	return volumeMounts, volumeDevices, volumePath
 }
 
+// GetPVForPVC returns the PersistentVolume backing a PVC
+// returns PV, error.
+// PV will be nil on error
 func GetPVForPVC(
 	pvc *corev1api.PersistentVolumeClaim,
 	crClient crclient.Client,
 ) (*corev1api.PersistentVolume, error) {
 	if pvc.Spec.VolumeName == "" {
-		return nil, errors.Errorf("PVC %s/%s has no volume backing this claim",
-			pvc.Namespace, pvc.Name)
+		return nil, errors.Errorf("PVC %s/%s has no volume backing this claim", pvc.Namespace, pvc.Name)
 	}
 	if pvc.Status.Phase != corev1api.ClaimBound {
-		// TODO: confirm if this PVC should be snapshotted if it has no PV bound
-		return nil,
-			errors.Errorf("PVC %s/%s is in phase %v and is not bound to a volume",
-				pvc.Namespace, pvc.Name, pvc.Status.Phase)
+		return nil, errors.Errorf("PVC %s/%s is in phase %v and is not bound to a volume",
+			pvc.Namespace, pvc.Name, pvc.Status.Phase)
 	}
 
 	pv := &corev1api.PersistentVolume{}
@@ -457,8 +463,18 @@ func GetPVCForPodVolume(vol *corev1api.Volume, pod *corev1api.Pod, crClient crcl
 	return pvc, nil
 }
 
-func DiagnosePVC(pvc *corev1api.PersistentVolumeClaim) string {
-	return fmt.Sprintf("PVC %s/%s, phase %s, binding to %s\n", pvc.Namespace, pvc.Name, pvc.Status.Phase, pvc.Spec.VolumeName)
+func DiagnosePVC(pvc *corev1api.PersistentVolumeClaim, events *corev1api.EventList) string {
+	diag := fmt.Sprintf("PVC %s/%s, phase %s, binding to %s\n", pvc.Namespace, pvc.Name, pvc.Status.Phase, pvc.Spec.VolumeName)
+
+	if events != nil {
+		for _, e := range events.Items {
+			if e.InvolvedObject.UID == pvc.UID && e.Type == corev1api.EventTypeWarning {
+				diag += fmt.Sprintf("PVC event reason %s, message %s\n", e.Reason, e.Message)
+			}
+		}
+	}
+
+	return diag
 }
 
 func DiagnosePV(pv *corev1api.PersistentVolume) string {
@@ -467,13 +483,13 @@ func DiagnosePV(pv *corev1api.PersistentVolume) string {
 }
 
 func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, nodeClient corev1client.CoreV1Interface,
-	storageClient storagev1.StorageV1Interface, log logrus.FieldLogger) (string, error) {
+	storageClient storagev1.StorageV1Interface, log logrus.FieldLogger) string {
 	var nodeOS string
 	var scFsType string
 
 	if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == corev1api.PersistentVolumeBlock {
 		log.Infof("Use linux node for block mode PVC %s/%s", pvc.Namespace, pvc.Name)
-		return NodeOSLinux, nil
+		return NodeOSLinux
 	}
 
 	if pvc.Spec.VolumeName == "" {
@@ -485,53 +501,53 @@ func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, nodeClient core
 	}
 
 	nodeName := ""
-	if value := pvc.Annotations[KubeAnnSelectedNode]; value != "" {
-		nodeName = value
-	}
-
-	if nodeName == "" {
-		if pvc.Spec.VolumeName != "" {
-			n, err := GetPVAttachedNode(context.Background(), pvc.Spec.VolumeName, storageClient)
-			if err != nil {
-				return "", errors.Wrapf(err, "error to get attached node for PVC %s/%s", pvc.Namespace, pvc.Name)
-			}
-
+	if pvc.Spec.VolumeName != "" {
+		if n, err := GetPVAttachedNode(context.Background(), pvc.Spec.VolumeName, storageClient); err != nil {
+			log.WithError(err).Warnf("Failed to get attached node for PVC %s/%s", pvc.Namespace, pvc.Name)
+		} else {
 			nodeName = n
 		}
 	}
 
-	if nodeName != "" {
-		os, err := GetNodeOS(context.Background(), nodeName, nodeClient)
-		if err != nil {
-			return "", errors.Wrapf(err, "error to get os from node %s for PVC %s/%s", nodeName, pvc.Namespace, pvc.Name)
+	if nodeName == "" {
+		if value := pvc.Annotations[KubeAnnSelectedNode]; value != "" {
+			nodeName = value
 		}
+	}
 
-		nodeOS = os
+	if nodeName != "" {
+		if os, err := GetNodeOS(context.Background(), nodeName, nodeClient); err != nil {
+			log.WithError(err).Warnf("Failed to get os from node %s for PVC %s/%s", nodeName, pvc.Namespace, pvc.Name)
+		} else {
+			nodeOS = os
+		}
 	}
 
 	if pvc.Spec.StorageClassName != nil {
-		sc, err := storageClient.StorageClasses().Get(context.Background(), *pvc.Spec.StorageClassName, metav1.GetOptions{})
-		if err != nil {
-			return "", errors.Wrapf(err, "error to get storage class %s", *pvc.Spec.StorageClassName)
-		}
-
-		if sc.Parameters != nil {
+		if sc, err := storageClient.StorageClasses().Get(context.Background(), *pvc.Spec.StorageClassName, metav1.GetOptions{}); err != nil {
+			log.WithError(err).Warnf("Failed to get storage class %s for PVC %s/%s", *pvc.Spec.StorageClassName, pvc.Namespace, pvc.Name)
+		} else if sc.Parameters != nil {
 			scFsType = strings.ToLower(sc.Parameters["csi.storage.k8s.io/fstype"])
 		}
 	}
 
 	if nodeOS != "" {
-		log.Infof("Deduced node os %s from selected node for PVC %s/%s (fsType %s)", nodeOS, pvc.Namespace, pvc.Name, scFsType)
-		return nodeOS, nil
+		log.Infof("Deduced node os %s from selected/attached node for PVC %s/%s (fsType %s)", nodeOS, pvc.Namespace, pvc.Name, scFsType)
+		return nodeOS
 	}
 
 	if scFsType == "ntfs" {
-		log.Infof("Deduced Windows node os from fsType for PVC %s/%s", pvc.Namespace, pvc.Name)
-		return NodeOSWindows, nil
+		log.Infof("Deduced Windows node os from fsType %s for PVC %s/%s", scFsType, pvc.Namespace, pvc.Name)
+		return NodeOSWindows
+	}
+
+	if scFsType != "" {
+		log.Infof("Deduced linux node os from fsType %s for PVC %s/%s", scFsType, pvc.Namespace, pvc.Name)
+		return NodeOSLinux
 	}
 
 	log.Warnf("Cannot deduce node os for PVC %s/%s, default to linux", pvc.Namespace, pvc.Name)
-	return NodeOSLinux, nil
+	return NodeOSLinux
 }
 
 func GetPVAttachedNode(ctx context.Context, pv string, storageClient storagev1.StorageV1Interface) (string, error) {
@@ -547,4 +563,46 @@ func GetPVAttachedNode(ctx context.Context, pv string, storageClient storagev1.S
 	}
 
 	return "", nil
+}
+
+func GetPVAttachedNodes(ctx context.Context, pv string, storageClient storagev1.StorageV1Interface) ([]string, error) {
+	vaList, err := storageClient.VolumeAttachments().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error listing volumeattachment")
+	}
+
+	nodes := []string{}
+	for _, va := range vaList.Items {
+		if va.Spec.Source.PersistentVolumeName != nil && *va.Spec.Source.PersistentVolumeName == pv {
+			nodes = append(nodes, va.Spec.NodeName)
+		}
+	}
+
+	return nodes, nil
+}
+
+func GetVolumeTopology(ctx context.Context, volumeClient corev1client.CoreV1Interface, storageClient storagev1.StorageV1Interface, pvName string, scName string) (*corev1api.NodeSelector, error) {
+	if pvName == "" || scName == "" {
+		return nil, errors.Errorf("invalid parameter, pv %s, sc %s", pvName, scName)
+	}
+
+	sc, err := storageClient.StorageClasses().Get(ctx, scName, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting storage class %s", scName)
+	}
+
+	if sc.VolumeBindingMode == nil || *sc.VolumeBindingMode != storagev1api.VolumeBindingWaitForFirstConsumer {
+		return nil, nil
+	}
+
+	pv, err := volumeClient.PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting PV %s", pvName)
+	}
+
+	if pv.Spec.NodeAffinity == nil {
+		return nil, nil
+	}
+
+	return pv.Spec.NodeAffinity.Required, nil
 }

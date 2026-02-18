@@ -38,7 +38,7 @@ func TestValidateOfSelectOption(t *testing.T) {
 		Selector: flag.LabelSelector{},
 		All:      false,
 	}
-	assert.Error(t, option.Validate())
+	require.Error(t, option.Validate())
 
 	option.All = true
 	assert.NoError(t, option.Validate())
