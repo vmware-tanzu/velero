@@ -51,13 +51,14 @@ jobs:
           files: coverage.out
           verbose: true
       # Only try to publish the container image from the root repo; forks don't have permission to do so and will always get failures.
+      - name: Free up disk space
+        if: github.repository == 'vmware-tanzu/velero'
+        uses: palmsoftware/quick-cleanup@v0
+        with:
+          cleanup-mode: aggressive
       - name: Publish container image
         if: github.repository == 'vmware-tanzu/velero'
         run: |
-          sudo swapoff -a
-          sudo rm -f /mnt/swapfile
-          docker system prune -a --force
-              
           # Build and push Velero image to docker registry
           docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
           ./hack/docker-push.sh
