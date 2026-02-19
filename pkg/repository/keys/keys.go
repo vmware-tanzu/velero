@@ -36,7 +36,17 @@ const (
 	encryptionKey = "static-passw0rd"
 )
 
-func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespace string) error {
+import (
+	"os"
+)
+
+// EnsureCommonRepositoryKey ensures the repo credentials secret exists, unless disabled by flag or env var.
+func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespace string, disable bool) error {
+       // Check env var as well as flag
+	if disable || os.Getenv("DISABLE_REPO_CREDENTIALS_SECRET") == "true" {
+		return nil
+	}
+
 	_, err := secretClient.Secrets(namespace).Get(context.TODO(), credentialsSecretName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.WithStack(err)

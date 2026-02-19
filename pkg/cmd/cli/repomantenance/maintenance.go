@@ -52,14 +52,17 @@ func NewCommand(f velerocli.Factory) *cobra.Command {
 		LogLevelFlag: logging.LogLevelFlag(logrus.InfoLevel),
 		FormatFlag:   logging.NewFormatFlag(),
 	}
+	var disableRepoCredentialsSecret bool
 	cmd := &cobra.Command{
 		Use:    "repo-maintenance",
 		Hidden: true,
 		Short:  "VELERO INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
-			o.Run(f)
+			o.RunWithDisableFlag(f, disableRepoCredentialsSecret)
 		},
 	}
+
+	cmd.Flags().BoolVar(&disableRepoCredentialsSecret, "disable-repo-credentials-secret", false, "If set, do not create the velero-repo-credentials secret (can also be set with DISABLE_REPO_CREDENTIALS_SECRET env var)")
 
 	o.BindFlags(cmd.Flags())
 	return cmd
@@ -110,9 +113,9 @@ func (o *Options) initClient(f velerocli.Factory) (client.Client, error) {
 	return cli, nil
 }
 
-func initRepoManager(namespace string, cli client.Client, kubeClient kubernetes.Interface, logger logrus.FieldLogger) (repomanager.Manager, error) {
+func initRepoManager(namespace string, cli client.Client, kubeClient kubernetes.Interface, logger logrus.FieldLogger, disableRepoCredentialsSecret bool) (repomanager.Manager, error) {
 	// ensure the repo key secret is set up
-	if err := repokey.EnsureCommonRepositoryKey(kubeClient.CoreV1(), namespace); err != nil {
+	if err := repokey.EnsureCommonRepositoryKey(kubeClient.CoreV1(), namespace, disableRepoCredentialsSecret); err != nil {
 		return nil, errors.Wrap(err, "failed to ensure repository key")
 	}
 
@@ -143,7 +146,7 @@ func initRepoManager(namespace string, cli client.Client, kubeClient kubernetes.
 	), nil
 }
 
-func (o *Options) runRepoPrune(f velerocli.Factory, namespace string, logger logrus.FieldLogger) error {
+func (o *Options) runRepoPruneWithDisableFlag(f velerocli.Factory, namespace string, logger logrus.FieldLogger, disableRepoCredentialsSecret bool) error {
 	cli, err := o.initClient(f)
 	if err != nil {
 		return err
@@ -181,7 +184,7 @@ func (o *Options) runRepoPrune(f velerocli.Factory, namespace string, logger log
 		return errors.Wrap(err, "failed to get backup repository")
 	}
 
-	manager, err := initRepoManager(namespace, cli, kubeClient, logger)
+	manager, err := initRepoManager(namespace, cli, kubeClient, logger, disableRepoCredentialsSecret)
 	if err != nil {
 		return err
 	}
@@ -192,4 +195,22 @@ func (o *Options) runRepoPrune(f velerocli.Factory, namespace string, logger log
 	}
 
 	return nil
+}
+
+func (o *Options) RunWithDisableFlag(f velerocli.Factory, disableRepoCredentialsSecret bool) {
+	logger := logging.DefaultLogger(o.LogLevelFlag.Parse(), o.FormatFlag.Parse())
+	logger.SetOutput(os.Stdout)
+
+	ctrl.SetLogger(logrusr.New(logger))
+
+	pruneError := o.runRepoPruneWithDisableFlag(f, f.Namespace(), logger, disableRepoCredentialsSecret)
+	defer func() {
+		if pruneError != nil {
+			os.Exit(1)
+		}
+	}()
+
+	if pruneError != nil {
+		os.Stdout.WriteString(fmt.Sprintf("%s%v", maintenance.TerminationLogIndicator, pruneError))
+	}
 }

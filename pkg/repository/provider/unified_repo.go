@@ -463,7 +463,7 @@ func getRepoPassword(secretStore credentials.SecretStore) (string, error) {
 
 	rawPass, err := secretStore.Get(repokey.RepoKeySelector())
 	if err != nil {
-		return "", errors.Wrap(err, "error to get password")
+		return "", errors.Wrap(err, "Could not fetch repository credentials secret; filesystem-level backups will not work. If you intentionally disabled secret creation, this is expected.")
 	}
 
 	return strings.TrimSpace(rawPass), nil
