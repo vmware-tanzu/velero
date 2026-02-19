@@ -151,6 +151,12 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 				annotations[velerov1api.VolumeSnapshotRestoreSize] = resource.NewQuantity(
 					*vsc.Status.RestoreSize, resource.BinarySI).String()
 			}
+
+			// Capture VolumeGroupSnapshotHandle to create stub VGSC during restore
+			// for CSI drivers that populate this field (e.g., Ceph RBD).
+			if vsc.Status.VolumeGroupSnapshotHandle != nil {
+				annotations[velerov1api.VolumeGroupSnapshotHandleAnnotation] = *vsc.Status.VolumeGroupSnapshotHandle
+			}
 		}
 
 		p.log.Infof("Patching VolumeSnapshotContent %s with velero BackupNameLabel",
