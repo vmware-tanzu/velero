@@ -62,7 +62,7 @@ func TestNewGetCommand(t *testing.T) {
 		return
 	}
 
-	cmd := exec.Command(os.Args[0], []string{"-test.run=TestNewGetCommand"}...)
+	cmd := exec.CommandContext(t.Context(), os.Args[0], []string{"-test.run=TestNewGetCommand"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
 	stdout, _, err := veleroexec.RunCommand(cmd)
 	require.NoError(t, err)

@@ -248,7 +248,9 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		time.Minute*5,
 		velerotest.NewLogger(),
 		metrics.NewServerMetrics(),
-		"", // dataMovePriorityClass
+		"",  // dataMovePriorityClass
+		nil, // podLabels
+		nil, // podAnnotations
 	), nil
 }
 
@@ -1381,6 +1383,152 @@ func TestResumeCancellableBackup(t *testing.T) {
 			if test.expectedError != "" {
 				assert.EqualError(t, err, test.expectedError)
 			}
+		})
+	}
+}
+
+func TestDataUploadSetupExposeParam(t *testing.T) {
+	// Common objects for all cases
+	fileMode := corev1api.PersistentVolumeFilesystem
+	node := builder.ForNode("worker-1").Labels(map[string]string{kube.NodeOSLabel: kube.NodeOSLinux}).Result()
+
+	pvc := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "app-ns",
+			Name:      "test-pvc",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeName: "test-pv",
+			VolumeMode: &fileMode,
+			Resources: corev1api.VolumeResourceRequirements{
+				Requests: corev1api.ResourceList{
+					corev1api.ResourceStorage: resource.MustParse("10Gi"),
+				},
+			},
+		},
+	}
+
+	pv := &corev1api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pv",
+		},
+	}
+
+	baseDataUpload := dataUploadBuilder().Result()
+	baseDataUpload.Spec.SourceNamespace = "app-ns"
+	baseDataUpload.Spec.SourcePVC = "test-pvc"
+	baseDataUpload.Namespace = velerov1api.DefaultNamespace
+	baseDataUpload.Spec.OperationTimeout = metav1.Duration{Duration: time.Minute * 10}
+
+	type args struct {
+		customLabels      map[string]string
+		customAnnotations map[string]string
+	}
+	type want struct {
+		labels      map[string]string
+		annotations map[string]string
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "label has customize values",
+			args: args{
+				customLabels:      map[string]string{"custom-label": "label-value"},
+				customAnnotations: nil,
+			},
+			want: want{
+				labels: map[string]string{
+					velerov1api.DataUploadLabel: baseDataUpload.Name,
+					"custom-label":              "label-value",
+				},
+				annotations: map[string]string{},
+			},
+		},
+		{
+			name: "label has no customize values",
+			args: args{
+				customLabels:      nil,
+				customAnnotations: nil,
+			},
+			want: want{
+				labels:      map[string]string{velerov1api.DataUploadLabel: baseDataUpload.Name},
+				annotations: map[string]string{},
+			},
+		},
+		{
+			name: "annotation has customize values",
+			args: args{
+				customLabels:      nil,
+				customAnnotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+			want: want{
+				labels:      map[string]string{velerov1api.DataUploadLabel: baseDataUpload.Name},
+				annotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+		},
+		{
+			name: "both label and annotation have customize values",
+			args: args{
+				customLabels:      map[string]string{"custom-label": "label-value"},
+				customAnnotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+			want: want{
+				labels: map[string]string{
+					velerov1api.DataUploadLabel: baseDataUpload.Name,
+					"custom-label":              "label-value",
+				},
+				annotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Fake clients per case
+			fakeCRClient := velerotest.NewFakeControllerRuntimeClient(t, pvc, pv, node, baseDataUpload.DeepCopy())
+			fakeKubeClient := clientgofake.NewSimpleClientset(node)
+
+			// Reconciler config per case
+			preparingTimeout := time.Minute * 3
+			podRes := corev1api.ResourceRequirements{}
+			r := NewDataUploadReconciler(
+				fakeCRClient,
+				nil,
+				fakeKubeClient,
+				nil, // snapshotClient (unused in setupExposeParam)
+				datapath.NewManager(1),
+				nil, // dataPathMgr
+				nil, // exposer (unused in setupExposeParam)
+				map[string]velerotypes.BackupPVC{},
+				podRes,
+				testclocks.NewFakeClock(time.Now()),
+				"test-node",
+				preparingTimeout,
+				velerotest.NewLogger(),
+				metrics.NewServerMetrics(),
+				"upload-priority",
+				tt.args.customLabels,
+				tt.args.customAnnotations,
+			)
+
+			// Act
+			got, err := r.setupExposeParam(baseDataUpload)
+
+			// Assert no error
+			require.NoError(t, err)
+			require.NotNil(t, got)
+
+			// Type assertion to CSISnapshotExposeParam
+			csiParam, ok := got.(*exposer.CSISnapshotExposeParam)
+			require.True(t, ok, "expected CSISnapshotExposeParam type")
+
+			// Labels and Annotations
+			assert.Equal(t, tt.want.labels, csiParam.HostingPodLabels)
+			assert.Equal(t, tt.want.annotations, csiParam.HostingPodAnnotations)
 		})
 	}
 }

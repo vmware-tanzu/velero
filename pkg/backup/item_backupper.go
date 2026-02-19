@@ -69,6 +69,7 @@ type itemBackupper struct {
 	kbClient                 kbClient.Client
 	discoveryHelper          discovery.Helper
 	podVolumeBackupper       podvolume.Backupper
+	podVolumeContext         context.Context
 	podVolumeSnapshotTracker *podvolume.Tracker
 	kubernetesBackupper      *kubernetesBackupper
 	volumeSnapshotterCache   *VolumeSnapshotterCache
@@ -686,15 +687,14 @@ func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource 
 			return nil, errors.WithStack(err)
 		}
 
-		pvName := pvc.Spec.VolumeName
-		if pvName == "" {
-			return nil, errors.Errorf("PVC has no volume backing this claim")
+		var pv *corev1api.PersistentVolume
+		if pvName := pvc.Spec.VolumeName; pvName != "" {
+			pv = &corev1api.PersistentVolume{}
+			if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
+				return nil, errors.WithStack(err)
+			}
 		}
-
-		pv := &corev1api.PersistentVolume{}
-		if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
-			return nil, errors.WithStack(err)
-		}
+		// If pv is nil for unbound PVCs - policy matching will use PVC-only conditions
 		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
 		return ib.backupRequest.ResPolicies.GetMatchAction(vfd)
 	}
@@ -708,7 +708,10 @@ func (ib *itemBackupper) trackSkippedPV(obj runtime.Unstructured, groupResource 
 	if name, err := getPVName(obj, groupResource); len(name) > 0 && err == nil {
 		ib.backupRequest.SkippedPVTracker.Track(name, approach, reason)
 	} else if err != nil {
-		log.WithError(err).Warnf("unable to get PV name, skip tracking.")
+		// Log at info level for tracking purposes. This is not an error because
+		// it's expected for some resources (e.g., PVCs in Pending or Lost phase)
+		// to not have a PV name. This occurs when volume policy skips unbound PVCs.
+		log.WithError(err).Infof("unable to get PV name, skip tracking.")
 	}
 }
 
@@ -718,6 +721,17 @@ func (ib *itemBackupper) unTrackSkippedPV(obj runtime.Unstructured, groupResourc
 	if name, err := getPVName(obj, groupResource); len(name) > 0 && err == nil {
 		ib.backupRequest.SkippedPVTracker.Untrack(name)
 	} else if err != nil {
+		// For PVCs in Pending or Lost phase, it's expected that there's no PV name.
+		// Log at debug level instead of warning to reduce noise.
+		if groupResource == kuberesource.PersistentVolumeClaims {
+			pvc := new(corev1api.PersistentVolumeClaim)
+			if convErr := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pvc); convErr == nil {
+				if pvc.Status.Phase == corev1api.ClaimPending || pvc.Status.Phase == corev1api.ClaimLost {
+					log.WithError(err).Debugf("unable to get PV name for %s PVC, skip untracking.", pvc.Status.Phase)
+					return
+				}
+			}
+		}
 		log.WithError(err).Warnf("unable to get PV name, skip untracking.")
 	}
 }

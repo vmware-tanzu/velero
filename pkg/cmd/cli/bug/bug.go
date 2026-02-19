@@ -18,6 +18,7 @@ package bug
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -147,7 +148,7 @@ func getKubectlVersion() (string, error) {
 		return "", errors.New("kubectl not found on PATH")
 	}
 
-	kubectlCmd := exec.Command("kubectl", "version")
+	kubectlCmd := exec.CommandContext(context.Background(), "kubectl", "version")
 	var outbuf bytes.Buffer
 	kubectlCmd.Stdout = &outbuf
 	if err := kubectlCmd.Start(); err != nil {
@@ -207,16 +208,17 @@ func renderToString(bugInfo *VeleroBugInfo) (string, error) {
 // a platform specific binary.
 func showIssueInBrowser(body string) error {
 	url := issueURL + "?body=" + url.QueryEscape(body)
+	ctx := context.Background()
 	switch runtime.GOOS {
 	case "darwin":
-		return exec.Command("open", url).Start()
+		return exec.CommandContext(ctx, "open", url).Start()
 	case "linux":
 		if cmdExistsOnPath("xdg-open") {
-			return exec.Command("xdg-open", url).Start()
+			return exec.CommandContext(ctx, "xdg-open", url).Start()
 		}
 		return fmt.Errorf("velero can't open a browser window using the command '%s'", "xdg-open")
 	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		return exec.CommandContext(ctx, "rundll32", "url.dll,FileProtocolHandler", url).Start()
 	default:
 		return fmt.Errorf("velero can't open a browser window on platform %s", runtime.GOOS)
 	}

@@ -107,6 +107,9 @@ func TestAsyncBackup(t *testing.T) {
 
 			<-finish
 
+			// Ensure the goroutine finishes so deferred fs.close executes, satisfying mock expectations.
+			fs.wgDataPath.Wait()
+
 			assert.Equal(t, test.err, asyncErr)
 			assert.Equal(t, test.result, asyncResult)
 		})
@@ -191,6 +194,9 @@ func TestAsyncRestore(t *testing.T) {
 			require.NoError(t, err)
 
 			<-finish
+
+			// Ensure the goroutine finishes so deferred fs.close executes, satisfying mock expectations.
+			fs.wgDataPath.Wait()
 
 			assert.Equal(t, asyncErr, test.err)
 			assert.Equal(t, asyncResult, test.result)

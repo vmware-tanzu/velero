@@ -25,6 +25,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -77,6 +78,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
+	"github.com/vmware-tanzu/velero/pkg/util/wildcard"
 )
 
 const ObjectStatusRestoreAnnotationKey = "velero.io/restore-status"
@@ -474,6 +476,12 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 		return warnings, errs
 	}
 
+	// Expand wildcard patterns in namespace includes/excludes if needed
+	if err := ctx.expandNamespaceWildcards(backupResources); err != nil {
+		errs.AddVeleroError(err)
+		return warnings, errs
+	}
+
 	// TODO: Remove outer feature flag check to make this feature a default in Velero.
 	if features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag) {
 		if ctx.backup.Status.FormatVersion >= "1.1.0" {
@@ -741,7 +749,7 @@ func (ctx *restoreContext) processSelectedResource(
 						namespace: ns.Namespace,
 						name:      ns.Name,
 					}
-					ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: true}
+					ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: true, createdName: ns.Name}
 				}
 
 				// Keep track of namespaces that we know exist so we don't
@@ -1142,7 +1150,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				namespace: nsToEnsure.Namespace,
 				name:      nsToEnsure.Name,
 			}
-			ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: true}
+			ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: true, createdName: nsToEnsure.Name}
 		}
 	} else {
 		if boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
@@ -1514,7 +1522,11 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		createdObj, restoreErr = resourceClient.Create(obj)
 		if restoreErr == nil {
 			itemExists = true
-			ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: itemExists}
+			ctx.restoredItems[itemKey] = restoredItemStatus{
+				action:      ItemRestoreResultCreated,
+				itemExists:  itemExists,
+				createdName: createdObj.GetName(),
+			}
 		}
 	}
 
@@ -1699,21 +1711,21 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	createdObj.SetManagedFields(obj.GetManagedFields())
 	patchBytes, err := generatePatch(withoutManagedFields, createdObj)
 	if err != nil {
-		restoreLogger.Errorf("error generating patch for managed fields %s: %s", kube.NamespaceAndName(obj), err.Error())
+		restoreLogger.Errorf("error generating patch for managed fields %s: %s", kube.NamespaceAndName(createdObj), err.Error())
 		errs.Add(namespace, err)
 		return warnings, errs, itemExists
 	}
 	if patchBytes != nil {
-		if _, err = resourceClient.Patch(obj.GetName(), patchBytes); err != nil {
+		if _, err = resourceClient.Patch(createdObj.GetName(), patchBytes); err != nil {
 			if !apierrors.IsNotFound(err) {
-				restoreLogger.Errorf("error patch for managed fields %s: %s", kube.NamespaceAndName(obj), err.Error())
+				restoreLogger.Errorf("error patch for managed fields %s: %s", kube.NamespaceAndName(createdObj), err.Error())
 				errs.Add(namespace, err)
 				return warnings, errs, itemExists
 			}
-			restoreLogger.Warnf("item not found when patching managed fields %s: %s", kube.NamespaceAndName(obj), err.Error())
+			restoreLogger.Warnf("item not found when patching managed fields %s: %s", kube.NamespaceAndName(createdObj), err.Error())
 			warnings.Add(namespace, err)
 		} else {
-			restoreLogger.Infof("the managed fields for %s is patched", kube.NamespaceAndName(obj))
+			restoreLogger.Infof("the managed fields for %s is patched", kube.NamespaceAndName(createdObj))
 		}
 	}
 
@@ -2372,6 +2384,59 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource string, original
 		restorable.totalItems++
 	}
 	return restorable, warnings, errs
+}
+
+// extractNamespacesFromBackup extracts all available namespaces from backup resources
+func extractNamespacesFromBackup(backupResources map[string]*archive.ResourceItems) []string {
+	namespaceSet := make(map[string]struct{})
+	for _, resource := range backupResources {
+		for namespace := range resource.ItemsByNamespace {
+			if namespace != "" { // Skip cluster-scoped resources (empty namespace)
+				namespaceSet[namespace] = struct{}{}
+			}
+		}
+	}
+
+	namespaces := make([]string, 0, len(namespaceSet))
+	for ns := range namespaceSet {
+		namespaces = append(namespaces, ns)
+	}
+	return namespaces
+}
+
+// expandNamespaceWildcards expands wildcard patterns in namespace includes/excludes
+// and updates the restore context with the expanded patterns and status
+func (ctx *restoreContext) expandNamespaceWildcards(backupResources map[string]*archive.ResourceItems) error {
+	if !wildcard.ShouldExpandWildcards(ctx.restore.Spec.IncludedNamespaces, ctx.restore.Spec.ExcludedNamespaces) {
+		return nil
+	}
+
+	// If `*` is mentioned in restore excludes, something is wrong
+	if slices.Contains(ctx.restore.Spec.ExcludedNamespaces, "*") {
+		return errors.New("wildcard '*' is not allowed in restore excludes")
+	}
+
+	availableNamespaces := extractNamespacesFromBackup(backupResources)
+	expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(
+		availableNamespaces,
+		ctx.restore.Spec.IncludedNamespaces,
+		ctx.restore.Spec.ExcludedNamespaces,
+	)
+	if err != nil {
+		return errors.Wrap(err, "error expanding wildcard patterns in namespace includes/excludes")
+	}
+
+	// Update namespace includes/excludes with expanded patterns
+	ctx.namespaceIncludesExcludes = collections.NewIncludesExcludes().
+		Includes(expandedIncludes...).
+		Excludes(expandedExcludes...)
+
+	selectedNamespaces := wildcard.GetWildcardResult(expandedIncludes, expandedExcludes)
+
+	ctx.log.Infof("Expanded namespace wildcards - includes: %v, excludes: %v, final: %v",
+		expandedIncludes, expandedExcludes, selectedNamespaces)
+
+	return nil
 }
 
 // removeRestoreLabels removes the restore name and the

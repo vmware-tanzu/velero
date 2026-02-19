@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,7 +35,6 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/constant"
-	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
@@ -243,31 +241,6 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				log.Debug("Synced pod volume backup into cluster")
 			}
 		}
-
-		if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-			// we are syncing these objects only to ensure that the storage snapshots are cleaned up
-			// on backup deletion or expiry.
-			log.Info("Syncing CSI VolumeSnapshotClasses in backup")
-			vsClasses, err := backupStore.GetCSIVolumeSnapshotClasses(backupName)
-			if err != nil {
-				log.WithError(errors.WithStack(err)).Error("Error getting CSI VolumeSnapClasses for this backup from backup store")
-				continue
-			}
-			for _, vsClass := range vsClasses {
-				vsClass.ResourceVersion = ""
-				err := b.client.Create(ctx, vsClass, &client.CreateOptions{})
-				switch {
-				case err != nil && apierrors.IsAlreadyExists(err):
-					log.Debugf("VolumeSnapshotClass %s already exists in cluster", vsClass.Name)
-					continue
-				case err != nil && !apierrors.IsAlreadyExists(err):
-					log.WithError(errors.WithStack(err)).Errorf("Error syncing VolumeSnapshotClass %s into cluster", vsClass.Name)
-					continue
-				default:
-					log.Infof("Created CSI VolumeSnapshotClass %s", vsClass.Name)
-				}
-			}
-		}
 	}
 
 	b.deleteOrphanedBackups(ctx, location.Name, backupStoreBackups, log)
@@ -364,37 +337,7 @@ func (b *backupSyncReconciler) deleteOrphanedBackups(ctx context.Context, locati
 
 		if err := b.client.Delete(ctx, &backupList.Items[i], &client.DeleteOptions{}); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error deleting orphaned backup from cluster")
-		} else {
-			log.Debug("Deleted orphaned backup from cluster")
-			b.deleteCSISnapshotsByBackup(ctx, backup.Name, log)
 		}
-	}
-}
-
-func (b *backupSyncReconciler) deleteCSISnapshotsByBackup(ctx context.Context, backupName string, log logrus.FieldLogger) {
-	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		return
-	}
-	m := client.MatchingLabels{velerov1api.BackupNameLabel: label.GetValidName(backupName)}
-	var vsList snapshotv1api.VolumeSnapshotList
-	listOptions := &client.ListOptions{
-		LabelSelector: label.NewSelectorForBackup(label.GetValidName(backupName)),
-	}
-	if err := b.client.List(ctx, &vsList, listOptions); err != nil {
-		log.WithError(err).Warnf("Failed to list volumesnapshots for backup: %s, the deletion will be skipped", backupName)
-	} else {
-		for i, vs := range vsList.Items {
-			name := kube.NamespaceAndName(vs.GetObjectMeta())
-			log.Debugf("Deleting volumesnapshot %s", name)
-			if err := b.client.Delete(context.TODO(), &vsList.Items[i]); err != nil {
-				log.WithError(err).Warnf("Failed to delete volumesnapshot %s", name)
-			}
-		}
-	}
-	vsc := &snapshotv1api.VolumeSnapshotContent{}
-	log.Debugf("Deleting volumesnapshotcontents for backup: %s", backupName)
-	if err := b.client.DeleteAllOf(context.TODO(), vsc, m); err != nil {
-		log.WithError(err).Warnf("Failed to delete volumesnapshotcontents for backup: %s", backupName)
 	}
 }
 

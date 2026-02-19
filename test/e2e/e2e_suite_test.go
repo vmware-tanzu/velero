@@ -127,7 +127,7 @@ func init() {
 	flag.StringVar(
 		&test.VeleroCfg.UpgradeFromVeleroVersion,
 		"upgrade-from-velero-version",
-		"v1.7.1",
+		"v1.16.2",
 		"comma-separated list of Velero version to be tested with for the pre-upgrade velero server.",
 	)
 	flag.StringVar(
@@ -139,7 +139,7 @@ func init() {
 	flag.StringVar(
 		&test.VeleroCfg.MigrateFromVeleroVersion,
 		"migrate-from-velero-version",
-		"self",
+		"v1.17.1",
 		"comma-separated list of Velero version to be tested with on source cluster.",
 	)
 	flag.StringVar(
@@ -441,12 +441,6 @@ var _ = Describe(
 )
 
 var _ = Describe(
-	"Node selectors of persistent volume claims can be changed during restores",
-	Label("Basic", "SelectedNode", "SKIP_KIND"),
-	PVCSelectedNodeChangingTest,
-)
-
-var _ = Describe(
 	"Backup/restore of 2500 namespaces",
 	Label("Scale", "LongTime"),
 	MultiNSBackupRestore,
@@ -730,6 +724,36 @@ func TestE2e(t *testing.T) {
 	} else {
 		if test.VeleroCfg.ObjectStoreProvider == "" {
 			t.Error(errors.New("No object store provider specified - must be specified when using kind as the cloud provider")) // Must have an object store provider
+		}
+	}
+
+	// Validate the Velero version
+	if len(test.VeleroCfg.VeleroVersion) > 0 {
+		if err := veleroutil.ValidateVeleroVersion(test.VeleroCfg.VeleroVersion); err != nil {
+			fmt.Println("VeleroVersion is invalid: ", test.VeleroCfg.VeleroVersion)
+			t.Error(err)
+		}
+	}
+
+	// Validate the UpgradeFromVeleroVersion if provided
+	if len(test.VeleroCfg.UpgradeFromVeleroVersion) > 0 {
+		versions := strings.Split(test.VeleroCfg.UpgradeFromVeleroVersion, ",")
+		for _, version := range versions {
+			if err := veleroutil.ValidateVeleroVersion(version); err != nil {
+				fmt.Println("UpgradeFromVeleroVersion is invalid: ", version)
+				t.Error(err)
+			}
+		}
+	}
+
+	// Validate the MigrateFromVeleroVersion if provided
+	if len(test.VeleroCfg.MigrateFromVeleroVersion) > 0 {
+		versions := strings.Split(test.VeleroCfg.MigrateFromVeleroVersion, ",")
+		for _, version := range versions {
+			if err := veleroutil.ValidateVeleroVersion(version); err != nil {
+				fmt.Println("MigrateFromVeleroVersion is invalid: ", version)
+				t.Error(err)
+			}
 		}
 	}
 

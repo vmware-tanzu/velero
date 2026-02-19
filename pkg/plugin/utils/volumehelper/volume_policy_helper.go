@@ -33,6 +33,11 @@ import (
 // up on demand. On the other hand, the volumeHelperImpl assume there
 // is a VolumeHelper instance initialized before calling the
 // ShouldPerformXXX functions.
+//
+// Deprecated: Use ShouldPerformSnapshotWithVolumeHelper instead for better performance.
+// ShouldPerformSnapshotWithVolumeHelper allows passing a pre-created VolumeHelper with
+// an internal PVC-to-Pod cache, which avoids O(N*M) complexity when there are many PVCs and pods.
+// See issue #9179 for details.
 func ShouldPerformSnapshotWithBackup(
 	unstructured runtime.Unstructured,
 	groupResource schema.GroupResource,
@@ -40,6 +45,35 @@ func ShouldPerformSnapshotWithBackup(
 	crClient crclient.Client,
 	logger logrus.FieldLogger,
 ) (bool, error) {
+	return ShouldPerformSnapshotWithVolumeHelper(
+		unstructured,
+		groupResource,
+		backup,
+		crClient,
+		logger,
+		nil, // no cached VolumeHelper, will create one
+	)
+}
+
+// ShouldPerformSnapshotWithVolumeHelper is like ShouldPerformSnapshotWithBackup
+// but accepts an optional VolumeHelper. If vh is non-nil, it will be used directly,
+// avoiding the overhead of creating a new VolumeHelper on each call.
+// This is useful for BIA plugins that process multiple PVCs during a single backup
+// and want to reuse the same VolumeHelper (with its internal cache) across calls.
+func ShouldPerformSnapshotWithVolumeHelper(
+	unstructured runtime.Unstructured,
+	groupResource schema.GroupResource,
+	backup velerov1api.Backup,
+	crClient crclient.Client,
+	logger logrus.FieldLogger,
+	vh volumehelper.VolumeHelper,
+) (bool, error) {
+	// If a VolumeHelper is provided, use it directly
+	if vh != nil {
+		return vh.ShouldPerformSnapshot(unstructured, groupResource)
+	}
+
+	// Otherwise, create a new VolumeHelper (original behavior for third-party plugins)
 	resourcePolicies, err := resourcepolicies.GetResourcePoliciesFromBackup(
 		backup,
 		crClient,
@@ -49,6 +83,7 @@ func ShouldPerformSnapshotWithBackup(
 		return false, err
 	}
 
+	//nolint:staticcheck // Intentional use of deprecated function for backwards compatibility
 	volumeHelperImpl := volumehelper.NewVolumeHelperImpl(
 		resourcePolicies,
 		backup.Spec.SnapshotVolumes,

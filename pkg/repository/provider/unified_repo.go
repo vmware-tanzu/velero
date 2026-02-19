@@ -59,7 +59,7 @@ var getGCPCredentials = repoconfig.GetGCPCredentials
 var getS3BucketRegion = repoconfig.GetAWSBucketRegion
 
 type localFuncTable struct {
-	getStorageVariables   func(*velerov1api.BackupStorageLocation, string, string, map[string]string) (map[string]string, error)
+	getStorageVariables   func(*velerov1api.BackupStorageLocation, string, string, map[string]string, credentials.CredentialGetter) (map[string]string, error)
 	getStorageCredentials func(*velerov1api.BackupStorageLocation, credentials.FileStore) (map[string]string, error)
 }
 
@@ -189,7 +189,7 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 		"repo UID":  param.BackupRepo.UID,
 	})
 
-	log.Debug("Start to prepare repo")
+	log.Info("Start to prepare repo")
 
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
@@ -211,7 +211,7 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 	if created, err := urp.repoService.IsCreated(ctx, *repoOption); err != nil {
 		return errors.Wrap(err, "error to check backup repo")
 	} else if created {
-		log.Debug("Repo has already been initialized remotely")
+		log.Info("Repo has already been initialized")
 		return nil
 	}
 
@@ -224,7 +224,7 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 		return errors.Wrap(err, "error to create backup repo")
 	}
 
-	log.Debug("Prepare repo complete")
+	log.Info("Prepare repo complete")
 
 	return nil
 }
@@ -427,7 +427,7 @@ func (urp *unifiedRepoProvider) GetStoreOptions(param any) (map[string]string, e
 		return map[string]string{}, errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
 	}
 
-	storeVar, err := funcTable.getStorageVariables(repoParam.BackupLocation, urp.repoBackend, repoParam.BackupRepo.Spec.VolumeNamespace, repoParam.BackupRepo.Spec.RepositoryConfig)
+	storeVar, err := funcTable.getStorageVariables(repoParam.BackupLocation, urp.repoBackend, repoParam.BackupRepo.Spec.VolumeNamespace, repoParam.BackupRepo.Spec.RepositoryConfig, urp.credentialGetter)
 	if err != nil {
 		return map[string]string{}, errors.Wrap(err, "error to get storage variables")
 	}
@@ -539,7 +539,7 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 // so we would accept only the options that are well defined in the internal system.
 // Users' inputs should not be treated as safe any time.
 // We remove the unnecessary parameters and keep the modules/logics below safe
-func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoBackend string, repoName string, backupRepoConfig map[string]string) (map[string]string, error) {
+func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoBackend string, repoName string, backupRepoConfig map[string]string, credGetter credentials.CredentialGetter) (map[string]string, error) {
 	result := make(map[string]string)
 
 	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider, backupLocation.Spec.Config)
@@ -603,8 +603,23 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 
 	result[udmrepo.StoreOptionOssBucket] = bucket
 	result[udmrepo.StoreOptionPrefix] = prefix
-	if backupLocation.Spec.ObjectStorage != nil && backupLocation.Spec.ObjectStorage.CACert != nil {
-		result[udmrepo.StoreOptionCACert] = base64.StdEncoding.EncodeToString(backupLocation.Spec.ObjectStorage.CACert)
+	if backupLocation.Spec.ObjectStorage != nil {
+		var caCertData []byte
+
+		// Try CACertRef first (new method), then fall back to CACert (deprecated)
+		if backupLocation.Spec.ObjectStorage.CACertRef != nil {
+			caCertString, err := credGetter.FromSecret.Get(backupLocation.Spec.ObjectStorage.CACertRef)
+			if err != nil {
+				return nil, errors.Wrap(err, "error getting CA certificate from secret")
+			}
+			caCertData = []byte(caCertString)
+		} else if backupLocation.Spec.ObjectStorage.CACert != nil {
+			caCertData = backupLocation.Spec.ObjectStorage.CACert
+		}
+
+		if caCertData != nil {
+			result[udmrepo.StoreOptionCACert] = base64.StdEncoding.EncodeToString(caCertData)
+		}
 	}
 	result[udmrepo.StoreOptionOssRegion] = strings.Trim(region, "/")
 	result[udmrepo.StoreOptionFsPath] = config["fspath"]

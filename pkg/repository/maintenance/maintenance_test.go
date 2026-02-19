@@ -40,6 +40,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	velerolabel "github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/repository/provider"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
@@ -48,7 +49,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
-func TestGenerateJobName1(t *testing.T) {
+func TestGenerateJobName(t *testing.T) {
 	testCases := []struct {
 		repo          string
 		expectedStart string
@@ -82,59 +83,62 @@ func TestGenerateJobName1(t *testing.T) {
 }
 func TestDeleteOldJobs(t *testing.T) {
 	// Set up test repo and keep value
-	repo := "test-repo"
-	keep := 2
-
-	// Create some maintenance jobs for testing
-	var objs []client.Object
-	// Create a newer job
-	newerJob := &batchv1api.Job{
+	repo := &velerov1api.BackupRepository{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "job1",
-			Namespace: "default",
-			Labels:    map[string]string{RepositoryNameLabel: repo},
+			Name:      "label with more than 63 characters should be modified",
+			Namespace: velerov1api.DefaultNamespace,
+		},
+	}
+	keep := 1
+
+	jobArray := []client.Object{
+		&batchv1api.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job-0",
+				Namespace: velerov1api.DefaultNamespace,
+				Labels:    map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
+			},
+			Spec: batchv1api.JobSpec{},
+		},
+		&batchv1api.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job-1",
+				Namespace: velerov1api.DefaultNamespace,
+				Labels:    map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
+			},
+			Spec: batchv1api.JobSpec{},
+		},
+	}
+
+	newJob := &batchv1api.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "job-new",
+			Namespace: velerov1api.DefaultNamespace,
+			Labels:    map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
 		},
 		Spec: batchv1api.JobSpec{},
 	}
-	objs = append(objs, newerJob)
-	// Create older jobs
-	for i := 2; i <= 3; i++ {
-		olderJob := &batchv1api.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("job%d", i),
-				Namespace: "default",
-				Labels:    map[string]string{RepositoryNameLabel: repo},
-				CreationTimestamp: metav1.Time{
-					Time: metav1.Now().Add(time.Duration(-24*i) * time.Hour),
-				},
-			},
-			Spec: batchv1api.JobSpec{},
-		}
-		objs = append(objs, olderJob)
-	}
-	// Create a fake Kubernetes client
+
+	// Create a fake Kubernetes client with 2 jobs.
 	scheme := runtime.NewScheme()
 	_ = batchv1api.AddToScheme(scheme)
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(jobArray...).Build()
+
+	// Create a new job
+	require.NoError(t, cli.Create(t.Context(), newJob))
 
 	// Call the function
-	err := DeleteOldJobs(cli, repo, keep, velerotest.NewLogger())
-	require.NoError(t, err)
+	require.NoError(t, DeleteOldJobs(cli, *repo, keep, velerotest.NewLogger()))
 
 	// Get the remaining jobs
 	jobList := &batchv1api.JobList{}
-	err = cli.List(t.Context(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
-	require.NoError(t, err)
+	require.NoError(t, cli.List(t.Context(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo.Name})))
 
 	// We expect the number of jobs to be equal to 'keep'
 	assert.Len(t, jobList.Items, keep)
 
-	// We expect that the oldest jobs were deleted
-	// Job3 should not be present in the remaining list
-	assert.NotContains(t, jobList.Items, objs[2])
-
-	// Job2 should also not be present in the remaining list
-	assert.NotContains(t, jobList.Items, objs[1])
+	// Only the new created job should be left.
+	assert.Equal(t, jobList.Items[0].Name, newJob.Name)
 }
 
 func TestWaitForJobComplete(t *testing.T) {
@@ -534,6 +538,45 @@ func TestGetJobConfig(t *testing.T) {
 			},
 			expectedError: nil,
 		},
+		{
+			name: "Configs only exist in global section should supersede specific config",
+			repoJobConfig: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: veleroNamespace,
+					Name:      repoMaintenanceJobConfig,
+				},
+				Data: map[string]string{
+					GlobalKeyForRepoMaintenanceJobCM: "{\"keepLatestMaintenanceJobs\":1,\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}],\"priorityClassName\":\"global-priority\",\"podAnnotations\":{\"global-key\":\"global-value\"},\"podLabels\":{\"global-key\":\"global-value\"}}",
+					"test-default-kopia":             "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}],\"priorityClassName\":\"specific-priority\",\"podAnnotations\":{\"specific-key\":\"specific-value\"},\"podLabels\":{\"specific-key\":\"specific-value\"}}",
+				},
+			},
+			expectedConfig: &velerotypes.JobConfigs{
+				KeepLatestMaintenanceJobs: &keepLatestMaintenanceJobs,
+				PodResources: &kube.PodResources{
+					CPURequest:    "100m",
+					CPULimit:      "200m",
+					MemoryRequest: "100Mi",
+					MemoryLimit:   "200Mi",
+				},
+				LoadAffinities: []*kube.LoadAffinity{
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "cloud.google.com/machine-family",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"e2"},
+								},
+							},
+						},
+					},
+				},
+				PriorityClassName: "global-priority",
+				PodAnnotations:    map[string]string{"global-key": "global-value"},
+				PodLabels:         map[string]string{"global-key": "global-value"},
+			},
+			expectedError: nil,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -571,7 +614,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 	repo := &velerov1api.BackupRepository{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: veleroNamespace,
-			Name:      "fake-repo",
+			Name:      "label with more than 63 characters should be modified",
 		},
 		Spec: velerov1api.BackupRepositorySpec{
 			BackupStorageLocation: "default",
@@ -595,7 +638,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job1",
 			Namespace:         veleroNamespace,
-			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			Labels:            map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
 			CreationTimestamp: metav1.Time{Time: now},
 		},
 	}
@@ -604,7 +647,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job1",
 			Namespace:         veleroNamespace,
-			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			Labels:            map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
 			CreationTimestamp: metav1.Time{Time: now},
 		},
 		Status: batchv1api.JobStatus{
@@ -624,7 +667,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job2",
 			Namespace:         veleroNamespace,
-			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			Labels:            map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
 			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour)},
 		},
 		Status: batchv1api.JobStatus{
@@ -645,7 +688,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job3",
 			Namespace:         veleroNamespace,
-			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			Labels:            map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
 			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour * 2)},
 		},
 		Status: batchv1api.JobStatus{
@@ -665,7 +708,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job4",
 			Namespace:         veleroNamespace,
-			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			Labels:            map[string]string{RepositoryNameLabel: velerolabel.ReturnNameOrHash(repo.Name)},
 			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour * 3)},
 		},
 		Status: batchv1api.JobStatus{
@@ -698,7 +741,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		{
 			name:          "list job error",
 			runtimeScheme: schemeFail,
-			expectedError: "error listing maintenance job for repo fake-repo: no kind is registered for the type v1.JobList in scheme",
+			expectedError: "error listing maintenance job for repo label with more than 63 characters should be modified: no kind is registered for the type v1.JobList in scheme",
 		},
 		{
 			name:          "job not exist",
@@ -934,15 +977,16 @@ func TestBuildJob(t *testing.T) {
 		deploy                     *appsv1api.Deployment
 		logLevel                   logrus.Level
 		logFormat                  *logging.FormatFlag
-		thirdPartyLabel            map[string]string
 		expectedJobName            string
 		expectedError              bool
 		expectedEnv                []corev1api.EnvVar
 		expectedEnvFrom            []corev1api.EnvFromSource
 		expectedPodLabel           map[string]string
+		expectedPodAnnotation      map[string]string
 		expectedSecurityContext    *corev1api.SecurityContext
 		expectedPodSecurityContext *corev1api.PodSecurityContext
 		expectedImagePullSecrets   []corev1api.LocalObjectReference
+		backupRepository           *velerov1api.BackupRepository
 	}{
 		{
 			name: "Valid maintenance job without third party labels",
@@ -1060,6 +1104,126 @@ func TestBuildJob(t *testing.T) {
 			expectedJobName: "",
 			expectedError:   true,
 		},
+		{
+			name: "Valid maintenance job customized labels and annotations",
+			m: &velerotypes.JobConfigs{
+				PodResources: &kube.PodResources{
+					CPURequest:    "100m",
+					MemoryRequest: "128Mi",
+					CPULimit:      "200m",
+					MemoryLimit:   "256Mi",
+				},
+				PodLabels: map[string]string{
+					"global-label-1": "global-label-value-1",
+					"global-label-2": "global-label-value-2",
+				},
+				PodAnnotations: map[string]string{
+					"global-annotation-1": "global-annotation-value-1",
+					"global-annotation-2": "global-annotation-value-2",
+				},
+			},
+			deploy:          deploy2,
+			logLevel:        logrus.InfoLevel,
+			logFormat:       logging.NewFormatFlag(),
+			expectedError:   false,
+			expectedJobName: "test-123-maintain-job",
+			expectedEnv: []corev1api.EnvVar{
+				{
+					Name:  "test-name",
+					Value: "test-value",
+				},
+			},
+			expectedEnvFrom: []corev1api.EnvFromSource{
+				{
+					ConfigMapRef: &corev1api.ConfigMapEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
+							Name: "test-configmap",
+						},
+					},
+				},
+				{
+					SecretRef: &corev1api.SecretEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
+							Name: "test-secret",
+						},
+					},
+				},
+			},
+			expectedPodLabel: map[string]string{
+				"global-label-1":    "global-label-value-1",
+				"global-label-2":    "global-label-value-2",
+				RepositoryNameLabel: "test-123",
+			},
+			expectedPodAnnotation: map[string]string{
+				"global-annotation-1": "global-annotation-value-1",
+				"global-annotation-2": "global-annotation-value-2",
+			},
+			expectedSecurityContext:    nil,
+			expectedPodSecurityContext: nil,
+			expectedImagePullSecrets: []corev1api.LocalObjectReference{
+				{
+					Name: "imagePullSecret1",
+				},
+			},
+		},
+		{
+			name: "Valid maintenance job with third party labels and BackupRepository name longer than 63",
+			m: &velerotypes.JobConfigs{
+				PodResources: &kube.PodResources{
+					CPURequest:    "100m",
+					MemoryRequest: "128Mi",
+					CPULimit:      "200m",
+					MemoryLimit:   "256Mi",
+				},
+			},
+			deploy:        deploy2,
+			logLevel:      logrus.InfoLevel,
+			logFormat:     logging.NewFormatFlag(),
+			expectedError: false,
+			expectedEnv: []corev1api.EnvVar{
+				{
+					Name:  "test-name",
+					Value: "test-value",
+				},
+			},
+			expectedEnvFrom: []corev1api.EnvFromSource{
+				{
+					ConfigMapRef: &corev1api.ConfigMapEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
+							Name: "test-configmap",
+						},
+					},
+				},
+				{
+					SecretRef: &corev1api.SecretEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
+							Name: "test-secret",
+						},
+					},
+				},
+			},
+			expectedPodLabel: map[string]string{
+				RepositoryNameLabel:           velerolabel.ReturnNameOrHash("label with more than 63 characters should be modified"),
+				"azure.workload.identity/use": "fake-label-value",
+			},
+			expectedSecurityContext:    nil,
+			expectedPodSecurityContext: nil,
+			expectedImagePullSecrets: []corev1api.LocalObjectReference{
+				{
+					Name: "imagePullSecret1",
+				},
+			},
+			backupRepository: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "label with more than 63 characters should be modified",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					VolumeNamespace: "test-123",
+					RepositoryType:  "kopia",
+				},
+			},
+		},
 	}
 
 	param := provider.RepoParam{
@@ -1083,6 +1247,10 @@ func TestBuildJob(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.backupRepository != nil {
+				param.BackupRepo = tc.backupRepository
+			}
+
 			// Create a fake clientset with resources
 			objs := []runtime.Object{param.BackupLocation, param.BackupRepo}
 

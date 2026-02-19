@@ -706,6 +706,130 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Multiple hooks with non-sequential indices (bug #9359)",
+			initialPod: builder.ForPod("default", "my-pod").
+				Containers(&corev1api.Container{
+					Name: "container1",
+				}).
+				ContainerStatuses(&corev1api.ContainerStatus{
+					Name: "container1",
+					State: corev1api.ContainerState{
+						Running: &corev1api.ContainerStateRunning{},
+					},
+				}).
+				Result(),
+			groupResource: "pods",
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": {
+					{
+						HookName:   "first-hook",
+						HookSource: HookSourceAnnotation,
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/foo"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							ExecTimeout: metav1.Duration{Duration: time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Minute},
+						},
+						hookIndex: 0,
+					},
+					{
+						HookName:   "second-hook",
+						HookSource: HookSourceAnnotation,
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/bar"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							ExecTimeout: metav1.Duration{Duration: time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Minute},
+						},
+						hookIndex: 2,
+					},
+					{
+						HookName:   "third-hook",
+						HookSource: HookSourceAnnotation,
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/third"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							ExecTimeout: metav1.Duration{Duration: time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Minute},
+						},
+						hookIndex: 4,
+					},
+				},
+			},
+			expectedExecutions: []expectedExecution{
+				{
+					name: "first-hook",
+					hook: &velerov1api.ExecHook{
+						Container: "container1",
+						Command:   []string{"/usr/bin/foo"},
+						OnError:   velerov1api.HookErrorModeContinue,
+						Timeout:   metav1.Duration{Duration: time.Second},
+					},
+					error: nil,
+					pod: builder.ForPod("default", "my-pod").
+						ObjectMeta(builder.WithResourceVersion("1")).
+						Containers(&corev1api.Container{
+							Name: "container1",
+						}).
+						ContainerStatuses(&corev1api.ContainerStatus{
+							Name: "container1",
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
+							},
+						}).
+						Result(),
+				},
+				{
+					name: "second-hook",
+					hook: &velerov1api.ExecHook{
+						Container: "container1",
+						Command:   []string{"/usr/bin/bar"},
+						OnError:   velerov1api.HookErrorModeContinue,
+						Timeout:   metav1.Duration{Duration: time.Second},
+					},
+					error: nil,
+					pod: builder.ForPod("default", "my-pod").
+						ObjectMeta(builder.WithResourceVersion("1")).
+						Containers(&corev1api.Container{
+							Name: "container1",
+						}).
+						ContainerStatuses(&corev1api.ContainerStatus{
+							Name: "container1",
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
+							},
+						}).
+						Result(),
+				},
+				{
+					name: "third-hook",
+					hook: &velerov1api.ExecHook{
+						Container: "container1",
+						Command:   []string{"/usr/bin/third"},
+						OnError:   velerov1api.HookErrorModeContinue,
+						Timeout:   metav1.Duration{Duration: time.Second},
+					},
+					error: nil,
+					pod: builder.ForPod("default", "my-pod").
+						ObjectMeta(builder.WithResourceVersion("1")).
+						Containers(&corev1api.Container{
+							Name: "container1",
+						}).
+						ContainerStatuses(&corev1api.ContainerStatus{
+							Name: "container1",
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
+							},
+						}).
+						Result(),
+				},
+			},
+			expectedErrors: nil,
+		},
 	}
 
 	for _, test := range tests {

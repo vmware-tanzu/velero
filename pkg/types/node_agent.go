@@ -68,10 +68,10 @@ type RestorePVC struct {
 
 type CachePVC struct {
 	// StorageClass specifies the storage class for cache PVC
-	StorageClass string
+	StorageClass string `json:"storageClass,omitempty"`
 
-	// ResidentThreshold specifies the minimum size of the backup data to create cache PVC
-	ResidentThreshold int64
+	// ResidentThresholdInMB specifies the minimum size of the backup data to create cache PVC
+	ResidentThresholdInMB int64 `json:"residentThresholdInMB,omitempty"`
 }
 
 type NodeAgentConfigs struct {
@@ -98,4 +98,10 @@ type NodeAgentConfigs struct {
 
 	// CachePVCConfig is the config for cachePVC
 	CachePVCConfig *CachePVC `json:"cachePVC,omitempty"`
+
+	// PodAnnotations are annotations to be added to pods created by node-agent, i.e., data mover pods.
+	PodAnnotations map[string]string `json:"podAnnotations,omitempty"`
+
+	// PodLabels are labels to be added to pods created by node-agent, i.e., data mover pods.
+	PodLabels map[string]string `json:"podLabels,omitempty"`
 }

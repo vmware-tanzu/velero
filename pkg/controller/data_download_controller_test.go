@@ -129,7 +129,26 @@ func initDataDownloadReconcilerWithError(t *testing.T, objects []any, needError 
 
 	dataPathMgr := datapath.NewManager(1)
 
-	return NewDataDownloadReconciler(&fakeClient, nil, fakeKubeClient, dataPathMgr, nil, nil, velerotypes.RestorePVC{}, corev1api.ResourceRequirements{}, "test-node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics(), ""), nil
+	return NewDataDownloadReconciler(
+		&fakeClient,
+		nil,
+		fakeKubeClient,
+		dataPathMgr,
+		nil,
+		nil,
+		velerotypes.RestorePVC{},
+		nil,
+		nil,
+		corev1api.ResourceRequirements{},
+		"test-node",
+		time.Minute*5,
+		velerotest.NewLogger(),
+		metrics.NewServerMetrics(),
+		"",
+		nil,
+		nil, // podLabels
+		nil, // podAnnotations
+	), nil
 }
 
 func TestDataDownloadReconcile(t *testing.T) {
@@ -542,6 +561,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 							ep.On("GetExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 						} else if test.isPeekExposeErr {
 							ep.On("PeekExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("fake-peek-error"))
+							ep.On("DiagnoseExpose", mock.Anything, mock.Anything).Return("")
 						}
 
 						if !test.notMockCleanUp {
@@ -1289,6 +1309,130 @@ func TestResumeCancellableRestore(t *testing.T) {
 			if test.expectedError != "" {
 				assert.EqualError(t, err, test.expectedError)
 			}
+		})
+	}
+}
+
+func TestDataDownloadSetupExposeParam(t *testing.T) {
+	// Common objects for all cases
+	node := builder.ForNode("worker-1").Labels(map[string]string{kube.NodeOSLabel: kube.NodeOSLinux}).Result()
+
+	baseDataDownload := dataDownloadBuilder().Result()
+	baseDataDownload.Namespace = velerov1api.DefaultNamespace
+	baseDataDownload.Spec.OperationTimeout = metav1.Duration{Duration: time.Minute * 10}
+	baseDataDownload.Spec.SnapshotSize = 5368709120 // 5Gi
+
+	type args struct {
+		customLabels      map[string]string
+		customAnnotations map[string]string
+	}
+	type want struct {
+		labels      map[string]string
+		annotations map[string]string
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "label has customize values",
+			args: args{
+				customLabels:      map[string]string{"custom-label": "label-value"},
+				customAnnotations: nil,
+			},
+			want: want{
+				labels: map[string]string{
+					velerov1api.DataDownloadLabel: baseDataDownload.Name,
+					"custom-label":                "label-value",
+				},
+				annotations: map[string]string{},
+			},
+		},
+		{
+			name: "label has no customize values",
+			args: args{
+				customLabels:      nil,
+				customAnnotations: nil,
+			},
+			want: want{
+				labels:      map[string]string{velerov1api.DataDownloadLabel: baseDataDownload.Name},
+				annotations: map[string]string{},
+			},
+		},
+		{
+			name: "annotation has customize values",
+			args: args{
+				customLabels:      nil,
+				customAnnotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+			want: want{
+				labels:      map[string]string{velerov1api.DataDownloadLabel: baseDataDownload.Name},
+				annotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+		},
+		{
+			name: "both label and annotation have customize values",
+			args: args{
+				customLabels:      map[string]string{"custom-label": "label-value"},
+				customAnnotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+			want: want{
+				labels: map[string]string{
+					velerov1api.DataDownloadLabel: baseDataDownload.Name,
+					"custom-label":                "label-value",
+				},
+				annotations: map[string]string{"custom-annotation": "annotation-value"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Fake clients per case
+			fakeClient := FakeClient{
+				Client: velerotest.NewFakeControllerRuntimeClient(t, node, baseDataDownload.DeepCopy()),
+			}
+			fakeKubeClient := clientgofake.NewSimpleClientset(node)
+
+			// Reconciler config per case
+			preparingTimeout := time.Minute * 3
+			podRes := corev1api.ResourceRequirements{}
+			r := NewDataDownloadReconciler(
+				&fakeClient,
+				nil,
+				fakeKubeClient,
+				datapath.NewManager(1),
+				nil,
+				nil,
+				velerotypes.RestorePVC{},
+				nil,
+				nil,
+				podRes,
+				"test-node",
+				preparingTimeout,
+				velerotest.NewLogger(),
+				metrics.NewServerMetrics(),
+				"download-priority",
+				nil, // repoConfigMgr (unused when cacheVolumeConfigs is nil)
+				tt.args.customLabels,
+				tt.args.customAnnotations,
+			)
+
+			// Act
+			got, err := r.setupExposeParam(baseDataDownload)
+
+			// Assert no error
+			require.NoError(t, err)
+
+			// Core fields
+			assert.Equal(t, baseDataDownload.Spec.TargetVolume.PVC, got.TargetPVCName)
+			assert.Equal(t, baseDataDownload.Spec.TargetVolume.Namespace, got.TargetNamespace)
+
+			// Labels and Annotations
+			assert.Equal(t, tt.want.labels, got.HostingPodLabels)
+			assert.Equal(t, tt.want.annotations, got.HostingPodAnnotations)
 		})
 	}
 }

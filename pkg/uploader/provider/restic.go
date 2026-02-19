@@ -73,10 +73,25 @@ func NewResticUploaderProvider(
 	}
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	if bsl.Spec.ObjectStorage != nil && bsl.Spec.ObjectStorage.CACert != nil {
-		provider.caCertFile, err = resticTempCACertFileFunc(bsl.Spec.ObjectStorage.CACert, bsl.Name, filesystem.NewFileSystem())
-		if err != nil {
-			return nil, errors.Wrap(err, "error create temp cert file")
+	if bsl.Spec.ObjectStorage != nil {
+		var caCertData []byte
+
+		// Try CACertRef first (new method), then fall back to CACert (deprecated)
+		if bsl.Spec.ObjectStorage.CACertRef != nil {
+			caCertString, err := credGetter.FromSecret.Get(bsl.Spec.ObjectStorage.CACertRef)
+			if err != nil {
+				return nil, errors.Wrap(err, "error getting CA certificate from secret")
+			}
+			caCertData = []byte(caCertString)
+		} else if bsl.Spec.ObjectStorage.CACert != nil {
+			caCertData = bsl.Spec.ObjectStorage.CACert
+		}
+
+		if caCertData != nil {
+			provider.caCertFile, err = resticTempCACertFileFunc(caCertData, bsl.Name, filesystem.NewFileSystem())
+			if err != nil {
+				return nil, errors.Wrap(err, "error create temp cert file")
+			}
 		}
 	}
 

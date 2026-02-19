@@ -58,9 +58,23 @@ const (
 )
 
 // NewPodVolumeBackupReconciler creates the PodVolumeBackupReconciler instance
-func NewPodVolumeBackupReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
-	counter *exposer.VgdpCounter, nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, podResources corev1api.ResourceRequirements,
-	metrics *metrics.ServerMetrics, logger logrus.FieldLogger, dataMovePriorityClass string, privileged bool) *PodVolumeBackupReconciler {
+func NewPodVolumeBackupReconciler(
+	client client.Client,
+	mgr manager.Manager,
+	kubeClient kubernetes.Interface,
+	dataPathMgr *datapath.Manager,
+	counter *exposer.VgdpCounter,
+	nodeName string,
+	preparingTimeout time.Duration,
+	resourceTimeout time.Duration,
+	podResources corev1api.ResourceRequirements,
+	metrics *metrics.ServerMetrics,
+	logger logrus.FieldLogger,
+	dataMovePriorityClass string,
+	privileged bool,
+	podLabels map[string]string,
+	podAnnotations map[string]string,
+) *PodVolumeBackupReconciler {
 	return &PodVolumeBackupReconciler{
 		client:                client,
 		mgr:                   mgr,
@@ -78,6 +92,8 @@ func NewPodVolumeBackupReconciler(client client.Client, mgr manager.Manager, kub
 		cancelledPVB:          make(map[string]time.Time),
 		dataMovePriorityClass: dataMovePriorityClass,
 		privileged:            privileged,
+		podLabels:             podLabels,
+		podAnnotations:        podAnnotations,
 	}
 }
 
@@ -99,6 +115,8 @@ type PodVolumeBackupReconciler struct {
 	cancelledPVB          map[string]time.Time
 	dataMovePriorityClass string
 	privileged            bool
+	podLabels             map[string]string
+	podAnnotations        map[string]string
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumebackups,verbs=get;list;watch;create;update;patch;delete
@@ -242,6 +260,12 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	} else if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseAccepted {
 		if peekErr := r.exposer.PeekExposed(ctx, getPVBOwnerObject(pvb)); peekErr != nil {
 			log.Errorf("Cancel PVB %s/%s because of expose error %s", pvb.Namespace, pvb.Name, peekErr)
+
+			diags := strings.Split(r.exposer.DiagnoseExpose(ctx, getPVBOwnerObject(pvb)), "\n")
+			for _, diag := range diags {
+				log.Warnf("[Diagnose PVB expose]%s", diag)
+			}
+
 			r.tryCancelPodVolumeBackup(ctx, pvb, fmt.Sprintf("found a PVB %s/%s with expose error: %s. mark it as cancel", pvb.Namespace, pvb.Name, peekErr))
 		} else if pvb.Status.AcceptedTimestamp != nil {
 			if time.Since(pvb.Status.AcceptedTimestamp.Time) >= r.preparingTimeout {
@@ -796,24 +820,36 @@ func (r *PodVolumeBackupReconciler) setupExposeParam(pvb *velerov1api.PodVolumeB
 	}
 
 	hostingPodLabels := map[string]string{velerov1api.PVBLabel: pvb.Name}
-	for _, k := range util.ThirdPartyLabels {
-		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
-			if err != nodeagent.ErrNodeAgentLabelNotFound {
-				log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
-			}
-		} else {
+	if len(r.podLabels) > 0 {
+		for k, v := range r.podLabels {
 			hostingPodLabels[k] = v
+		}
+	} else {
+		for _, k := range util.ThirdPartyLabels {
+			if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
+				if err != nodeagent.ErrNodeAgentLabelNotFound {
+					log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
+				}
+			} else {
+				hostingPodLabels[k] = v
+			}
 		}
 	}
 
 	hostingPodAnnotation := map[string]string{}
-	for _, k := range util.ThirdPartyAnnotations {
-		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
-			if err != nodeagent.ErrNodeAgentAnnotationNotFound {
-				log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
-			}
-		} else {
+	if len(r.podAnnotations) > 0 {
+		for k, v := range r.podAnnotations {
 			hostingPodAnnotation[k] = v
+		}
+	} else {
+		for _, k := range util.ThirdPartyAnnotations {
+			if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
+				if err != nodeagent.ErrNodeAgentAnnotationNotFound {
+					log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
+				}
+			} else {
+				hostingPodAnnotation[k] = v
+			}
 		}
 	}
 

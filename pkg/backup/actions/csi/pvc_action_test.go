@@ -586,6 +586,387 @@ func TestListGroupedPVCs(t *testing.T) {
 	}
 }
 
+func TestFilterPVCsByVolumePolicy(t *testing.T) {
+	tests := []struct {
+		name            string
+		pvcs            []corev1api.PersistentVolumeClaim
+		pvs             []corev1api.PersistentVolume
+		volumePolicyStr string
+		expectCount     int
+		expectError     bool
+	}{
+		{
+			name: "All PVCs should be included when no volume policy",
+			pvcs: []corev1api.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Namespace: "ns-1"},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-1",
+						StorageClassName: pointer.String("sc-1"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Namespace: "ns-1"},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-2",
+						StorageClassName: pointer.String("sc-1"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+			},
+			pvs: []corev1api.PersistentVolume{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-1"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							CSI: &corev1api.CSIPersistentVolumeSource{Driver: "csi-driver-1"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-2"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							CSI: &corev1api.CSIPersistentVolumeSource{Driver: "csi-driver-1"},
+						},
+					},
+				},
+			},
+			expectCount: 2,
+		},
+		{
+			name: "Filter out NFS PVC by volume policy",
+			pvcs: []corev1api.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc-csi", Namespace: "ns-1"},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-csi",
+						StorageClassName: pointer.String("sc-1"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc-nfs", Namespace: "ns-1"},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-nfs",
+						StorageClassName: pointer.String("sc-nfs"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+			},
+			pvs: []corev1api.PersistentVolume{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-csi"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							CSI: &corev1api.CSIPersistentVolumeSource{Driver: "csi-driver"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-nfs"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							NFS: &corev1api.NFSVolumeSource{
+								Server: "nfs-server",
+								Path:   "/export",
+							},
+						},
+					},
+				},
+			},
+			volumePolicyStr: `
+version: v1
+volumePolicies:
+- conditions:
+    nfs: {}
+  action:
+    type: skip
+`,
+			expectCount: 1,
+		},
+		{
+			name: "All PVCs filtered out by volume policy",
+			pvcs: []corev1api.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc-nfs-1", Namespace: "ns-1"},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-nfs-1",
+						StorageClassName: pointer.String("sc-nfs"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc-nfs-2", Namespace: "ns-1"},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-nfs-2",
+						StorageClassName: pointer.String("sc-nfs"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+			},
+			pvs: []corev1api.PersistentVolume{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-nfs-1"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							NFS: &corev1api.NFSVolumeSource{
+								Server: "nfs-server",
+								Path:   "/export/1",
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-nfs-2"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							NFS: &corev1api.NFSVolumeSource{
+								Server: "nfs-server",
+								Path:   "/export/2",
+							},
+						},
+					},
+				},
+			},
+			volumePolicyStr: `
+version: v1
+volumePolicies:
+- conditions:
+    nfs: {}
+  action:
+    type: skip
+`,
+			expectCount: 0,
+		},
+		{
+			name: "Filter out non-CSI PVCs from mixed driver group",
+			pvcs: []corev1api.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pvc-linstor",
+						Namespace: "ns-1",
+						Labels:    map[string]string{"app.kubernetes.io/instance": "myapp"},
+					},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-linstor",
+						StorageClassName: pointer.String("sc-linstor"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pvc-nfs",
+						Namespace: "ns-1",
+						Labels:    map[string]string{"app.kubernetes.io/instance": "myapp"},
+					},
+					Spec: corev1api.PersistentVolumeClaimSpec{
+						VolumeName:       "pv-nfs",
+						StorageClassName: pointer.String("sc-nfs"),
+					},
+					Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+				},
+			},
+			pvs: []corev1api.PersistentVolume{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-linstor"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							CSI: &corev1api.CSIPersistentVolumeSource{Driver: "linstor.csi.linbit.com"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pv-nfs"},
+					Spec: corev1api.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1api.PersistentVolumeSource{
+							NFS: &corev1api.NFSVolumeSource{
+								Server: "nfs-server",
+								Path:   "/export",
+							},
+						},
+					},
+				},
+			},
+			volumePolicyStr: `
+version: v1
+volumePolicies:
+- conditions:
+    nfs: {}
+  action:
+    type: skip
+`,
+			expectCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objs := []runtime.Object{}
+			for i := range tt.pvs {
+				objs = append(objs, &tt.pvs[i])
+			}
+
+			client := velerotest.NewFakeControllerRuntimeClient(t, objs...)
+
+			backup := &velerov1api.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-backup",
+					Namespace: "velero",
+				},
+				Spec: velerov1api.BackupSpec{},
+			}
+
+			// Add volume policy ConfigMap if specified
+			if tt.volumePolicyStr != "" {
+				cm := &corev1api.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "volume-policy",
+						Namespace: "velero",
+					},
+					Data: map[string]string{
+						"volume-policy": tt.volumePolicyStr,
+					},
+				}
+				require.NoError(t, client.Create(t.Context(), cm))
+
+				backup.Spec.ResourcePolicy = &corev1api.TypedLocalObjectReference{
+					Kind: "ConfigMap",
+					Name: "volume-policy",
+				}
+			}
+
+			action := &pvcBackupItemAction{
+				log:      velerotest.NewLogger(),
+				crClient: client,
+			}
+
+			// Pass nil for VolumeHelper in tests - it will fall back to creating a new one per call
+			// This is the expected behavior for testing and third-party plugins
+			result, err := action.filterPVCsByVolumePolicy(tt.pvcs, backup, nil)
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Len(t, result, tt.expectCount)
+
+				// For mixed driver scenarios, verify filtered result can determine single CSI driver
+				if tt.name == "Filter out non-CSI PVCs from mixed driver group" && len(result) > 0 {
+					driver, err := action.determineCSIDriver(result)
+					require.NoError(t, err, "After filtering, determineCSIDriver should not fail with multiple drivers error")
+					require.Equal(t, "linstor.csi.linbit.com", driver, "Should have the Linstor driver after filtering out NFS")
+				}
+			}
+		})
+	}
+}
+
+// TestFilterPVCsByVolumePolicyWithVolumeHelper tests filterPVCsByVolumePolicy when a
+// pre-created VolumeHelper is passed (non-nil). This exercises the cached path used
+// by the CSI PVC BIA plugin for better performance.
+func TestFilterPVCsByVolumePolicyWithVolumeHelper(t *testing.T) {
+	// Create test PVCs and PVs
+	pvcs := []corev1api.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pvc-csi", Namespace: "ns-1"},
+			Spec: corev1api.PersistentVolumeClaimSpec{
+				VolumeName:       "pv-csi",
+				StorageClassName: pointer.String("sc-csi"),
+			},
+			Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pvc-nfs", Namespace: "ns-1"},
+			Spec: corev1api.PersistentVolumeClaimSpec{
+				VolumeName:       "pv-nfs",
+				StorageClassName: pointer.String("sc-nfs"),
+			},
+			Status: corev1api.PersistentVolumeClaimStatus{Phase: corev1api.ClaimBound},
+		},
+	}
+
+	pvs := []corev1api.PersistentVolume{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pv-csi"},
+			Spec: corev1api.PersistentVolumeSpec{
+				PersistentVolumeSource: corev1api.PersistentVolumeSource{
+					CSI: &corev1api.CSIPersistentVolumeSource{Driver: "csi-driver"},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pv-nfs"},
+			Spec: corev1api.PersistentVolumeSpec{
+				PersistentVolumeSource: corev1api.PersistentVolumeSource{
+					NFS: &corev1api.NFSVolumeSource{
+						Server: "nfs-server",
+						Path:   "/export",
+					},
+				},
+			},
+		},
+	}
+
+	// Create fake client with PVs
+	objs := []runtime.Object{}
+	for i := range pvs {
+		objs = append(objs, &pvs[i])
+	}
+	client := velerotest.NewFakeControllerRuntimeClient(t, objs...)
+
+	// Create backup with volume policy that skips NFS volumes
+	volumePolicyStr := `
+version: v1
+volumePolicies:
+- conditions:
+    nfs: {}
+  action:
+    type: skip
+`
+	cm := &corev1api.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "volume-policy",
+			Namespace: "velero",
+		},
+		Data: map[string]string{
+			"volume-policy": volumePolicyStr,
+		},
+	}
+	require.NoError(t, client.Create(t.Context(), cm))
+
+	backup := &velerov1api.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-backup",
+			Namespace: "velero",
+		},
+		Spec: velerov1api.BackupSpec{
+			ResourcePolicy: &corev1api.TypedLocalObjectReference{
+				Kind: "ConfigMap",
+				Name: "volume-policy",
+			},
+		},
+	}
+
+	action := &pvcBackupItemAction{
+		log:      velerotest.NewLogger(),
+		crClient: client,
+	}
+
+	// Create a VolumeHelper using the same method the plugin would use
+	vh, err := action.getOrCreateVolumeHelper(backup)
+	require.NoError(t, err)
+	require.NotNil(t, vh)
+
+	// Test with the pre-created VolumeHelper (non-nil path)
+	result, err := action.filterPVCsByVolumePolicy(pvcs, backup, vh)
+	require.NoError(t, err)
+
+	// Should filter out the NFS PVC, leaving only the CSI PVC
+	require.Len(t, result, 1)
+	require.Equal(t, "pvc-csi", result[0].Name)
+}
+
 func TestDetermineCSIDriver(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -1684,4 +2065,43 @@ func TestPVCRequestSize(t *testing.T) {
 			require.Equal(t, 0, expected.Cmp(updatedSize), "Expected size %s, but got %s", expected.String(), updatedSize.String())
 		})
 	}
+}
+
+// TestGetOrCreateVolumeHelper tests the VolumeHelper and PVC-to-Pod cache behavior.
+// Since plugin instances are unique per backup (created via newPluginManager and
+// cleaned up via CleanupClients at backup completion), we verify that the pvcPodCache
+// is properly initialized and reused across calls.
+func TestGetOrCreateVolumeHelper(t *testing.T) {
+	client := velerotest.NewFakeControllerRuntimeClient(t)
+	action := &pvcBackupItemAction{
+		log:      velerotest.NewLogger(),
+		crClient: client,
+	}
+	backup := &velerov1api.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-backup",
+			Namespace: "velero",
+			UID:       types.UID("test-uid-1"),
+		},
+	}
+
+	// Initially, pvcPodCache should be nil
+	require.Nil(t, action.pvcPodCache, "pvcPodCache should be nil initially")
+
+	// Get VolumeHelper first time - should create new cache and VolumeHelper
+	vh1, err := action.getOrCreateVolumeHelper(backup)
+	require.NoError(t, err)
+	require.NotNil(t, vh1)
+
+	// pvcPodCache should now be initialized
+	require.NotNil(t, action.pvcPodCache, "pvcPodCache should be initialized after first call")
+	cache1 := action.pvcPodCache
+
+	// Get VolumeHelper second time - should reuse the same cache
+	vh2, err := action.getOrCreateVolumeHelper(backup)
+	require.NoError(t, err)
+	require.NotNil(t, vh2)
+
+	// The pvcPodCache should be the same instance
+	require.Same(t, cache1, action.pvcPodCache, "Expected same pvcPodCache instance on repeated calls")
 }

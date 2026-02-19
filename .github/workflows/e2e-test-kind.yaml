@@ -21,7 +21,7 @@ jobs:
       minio-dockerfile-sha: ${{ steps.minio-version.outputs.dockerfile_sha }}
     steps:
       - name: Check out the code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       
       - name: Set up Go version
         uses: actions/setup-go@v6
@@ -112,7 +112,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Check out the code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Go version
         uses: actions/setup-go@v6
@@ -187,5 +187,5 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v5
         with:
-          name: DebugBundle
+          name: DebugBundle-k8s-${{ matrix.k8s }}-job-${{ strategy.job-index }}
           path: /home/runner/work/velero/velero/test/e2e/debug-bundle*

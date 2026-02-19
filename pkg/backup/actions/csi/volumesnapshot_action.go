@@ -84,17 +84,6 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 		return nil, nil, "", nil, errors.WithStack(err)
 	}
 
-	additionalItems := make([]velero.ResourceIdentifier, 0)
-	if vs.Spec.VolumeSnapshotClassName != nil {
-		additionalItems = append(
-			additionalItems,
-			velero.ResourceIdentifier{
-				GroupResource: kuberesource.VolumeSnapshotClasses,
-				Name:          *vs.Spec.VolumeSnapshotClassName,
-			},
-		)
-	}
-
 	if backup.Status.Phase == velerov1api.BackupPhaseFinalizing ||
 		backup.Status.Phase == velerov1api.BackupPhaseFinalizingPartiallyFailed {
 		p.log.
@@ -103,6 +92,24 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 
 		csi.DeleteReadyVolumeSnapshot(*vs, p.crClient, p.log)
 		return item, nil, "", nil, nil
+	}
+
+	additionalItems := make([]velero.ResourceIdentifier, 0)
+
+	if vs.Spec.VolumeSnapshotClassName != nil {
+		// This is still needed to add the VolumeSnapshotClass to the backup.
+		// The secret with VolumeSnapshotClass is still relevant to backup.
+		additionalItems = append(
+			additionalItems,
+			velero.ResourceIdentifier{
+				GroupResource: kuberesource.VolumeSnapshotClasses,
+				Name:          *vs.Spec.VolumeSnapshotClassName,
+			},
+		)
+
+		// Because async operation will update VolumeSnapshot during finalizing phase.
+		// No matter what we do, VolumeSnapshotClass cannot be deleted. So skip it.
+		// Just deleting VolumeSnapshotClass during restore and delete is enough.
 	}
 
 	p.log.Infof("Getting VolumesnapshotContent for Volumesnapshot %s/%s",

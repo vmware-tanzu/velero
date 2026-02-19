@@ -140,7 +140,13 @@ func EnsureDeletePod(ctx context.Context, podGetter corev1client.CoreV1Interface
 func IsPodUnrecoverable(pod *corev1api.Pod, log logrus.FieldLogger) (bool, string) {
 	// Check the Phase field
 	if pod.Status.Phase == corev1api.PodFailed || pod.Status.Phase == corev1api.PodUnknown {
-		message := GetPodTerminateMessage(pod)
+		message := ""
+		if pod.Status.Message != "" {
+			message += pod.Status.Message + "/"
+		}
+
+		message += GetPodTerminateMessage(pod)
+
 		log.Warnf("Pod is in abnormal state %s, message [%s]", pod.Status.Phase, message)
 		return true, fmt.Sprintf("Pod is in abnormal state [%s], message [%s]", pod.Status.Phase, message)
 	}
@@ -224,14 +230,9 @@ func CollectPodLogs(ctx context.Context, podGetter corev1client.CoreV1Interface,
 	return nil
 }
 
-func ToSystemAffinity(loadAffinities []*LoadAffinity) *corev1api.Affinity {
-	if len(loadAffinities) == 0 {
-		return nil
-	}
-	nodeSelectorTermList := make([]corev1api.NodeSelectorTerm, 0)
-
-	for _, loadAffinity := range loadAffinities {
-		requirements := []corev1api.NodeSelectorRequirement{}
+func ToSystemAffinity(loadAffinity *LoadAffinity, volumeTopology *corev1api.NodeSelector) *corev1api.Affinity {
+	requirements := []corev1api.NodeSelectorRequirement{}
+	if loadAffinity != nil {
 		for k, v := range loadAffinity.NodeSelector.MatchLabels {
 			requirements = append(requirements, corev1api.NodeSelectorRequirement{
 				Key:      k,
@@ -247,29 +248,29 @@ func ToSystemAffinity(loadAffinities []*LoadAffinity) *corev1api.Affinity {
 				Operator: corev1api.NodeSelectorOperator(exp.Operator),
 			})
 		}
-
-		nodeSelectorTermList = append(
-			nodeSelectorTermList,
-			corev1api.NodeSelectorTerm{
-				MatchExpressions: requirements,
-			},
-		)
 	}
 
-	if len(nodeSelectorTermList) > 0 {
-		result := new(corev1api.Affinity)
-		result.NodeAffinity = new(corev1api.NodeAffinity)
-		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = new(corev1api.NodeSelector)
-		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = nodeSelectorTermList
+	result := new(corev1api.Affinity)
+	result.NodeAffinity = new(corev1api.NodeAffinity)
+	result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = new(corev1api.NodeSelector)
 
-		return result
+	if volumeTopology != nil {
+		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, volumeTopology.NodeSelectorTerms...)
+	} else if len(requirements) > 0 {
+		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = make([]corev1api.NodeSelectorTerm, 1)
+	} else {
+		return nil
 	}
 
-	return nil
+	for i := range result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i].MatchExpressions = append(result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i].MatchExpressions, requirements...)
+	}
+
+	return result
 }
 
 func DiagnosePod(pod *corev1api.Pod, events *corev1api.EventList) string {
-	diag := fmt.Sprintf("Pod %s/%s, phase %s, node name %s\n", pod.Namespace, pod.Name, pod.Status.Phase, pod.Spec.NodeName)
+	diag := fmt.Sprintf("Pod %s/%s, phase %s, node name %s, message %s\n", pod.Namespace, pod.Name, pod.Status.Phase, pod.Spec.NodeName, pod.Status.Message)
 
 	for _, condition := range pod.Status.Conditions {
 		diag += fmt.Sprintf("Pod condition %s, status %s, reason %s, message %s\n", condition.Type, condition.Status, condition.Reason, condition.Message)

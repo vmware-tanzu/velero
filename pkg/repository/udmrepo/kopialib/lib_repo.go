@@ -19,6 +19,7 @@ package kopialib
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -74,7 +75,9 @@ type kopiaObjectWriter struct {
 	rawWriter object.Writer
 }
 
-type openOptions struct{}
+type openOptions struct {
+	repoLogger io.Writer
+}
 
 const (
 	defaultLogInterval             = time.Second * 10
@@ -98,11 +101,26 @@ func NewKopiaRepoService(logger logrus.FieldLogger) udmrepo.BackupRepoService {
 func (ks *kopiaRepoService) Create(ctx context.Context, repoOption udmrepo.RepoOptions) error {
 	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
 
-	if err := CreateBackupRepo(repoCtx, repoOption, ks.logger); err != nil {
-		return err
+	status, err := GetRepositoryStatus(ctx, repoOption, ks.logger)
+	if err != nil {
+		return errors.Wrap(err, "error getting repo status")
 	}
 
-	return writeInitParameters(repoCtx, repoOption, ks.logger)
+	if status != RepoStatusSystemNotCreated && status != RepoStatusNotInitialized {
+		return errors.Errorf("unexpected repo status %v", status)
+	}
+
+	if status == RepoStatusSystemNotCreated {
+		if err := CreateBackupRepo(repoCtx, repoOption, ks.logger); err != nil {
+			return errors.Wrap(err, "error creating backup repo")
+		}
+	}
+
+	if err := InitializeBackupRepo(ctx, repoOption, ks.logger); err != nil {
+		return errors.Wrap(err, "error initializing backup repo")
+	}
+
+	return nil
 }
 
 func (ks *kopiaRepoService) Connect(ctx context.Context, repoOption udmrepo.RepoOptions) error {
@@ -114,7 +132,17 @@ func (ks *kopiaRepoService) Connect(ctx context.Context, repoOption udmrepo.Repo
 func (ks *kopiaRepoService) IsCreated(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
 	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
 
-	return IsBackupRepoCreated(repoCtx, repoOption, ks.logger)
+	status, err := GetRepositoryStatus(repoCtx, repoOption, ks.logger)
+	if err != nil {
+		return false, err
+	}
+
+	if status != RepoStatusCreated {
+		ks.logger.Infof("Repo is not fully created, status %v", status)
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (ks *kopiaRepoService) Open(ctx context.Context, repoOption udmrepo.RepoOptions) (udmrepo.BackupRepo, error) {
@@ -129,7 +157,7 @@ func (ks *kopiaRepoService) Open(ctx context.Context, repoOption udmrepo.RepoOpt
 
 	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
 
-	r, err := openKopiaRepo(repoCtx, repoConfig, repoOption.RepoPassword, nil)
+	r, err := openKopiaRepo(repoCtx, repoConfig, repoOption.RepoPassword, &openOptions{repoLogger: kopia.RepositoryLogger(ks.logger)})
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +202,7 @@ func (ks *kopiaRepoService) Maintain(ctx context.Context, repoOption udmrepo.Rep
 
 	ks.logger.Info("Start to open repo for maintenance, allow index write on load")
 
-	r, err := openKopiaRepo(repoCtx, repoConfig, repoOption.RepoPassword, nil)
+	r, err := openKopiaRepo(repoCtx, repoConfig, repoOption.RepoPassword, &openOptions{repoLogger: kopia.RepositoryLogger(ks.logger)})
 	if err != nil {
 		return err
 	}
@@ -600,8 +628,10 @@ func (lt *logThrottle) shouldLog() bool {
 	return false
 }
 
-func openKopiaRepo(ctx context.Context, configFile string, password string, _ *openOptions) (repo.Repository, error) {
-	r, err := kopiaRepoOpen(ctx, configFile, password, &repo.Options{})
+func openKopiaRepo(ctx context.Context, configFile string, password string, options *openOptions) (repo.Repository, error) {
+	r, err := kopiaRepoOpen(ctx, configFile, password, &repo.Options{
+		ContentLogWriter: options.repoLogger,
+	})
 	if os.IsNotExist(err) {
 		return nil, errors.Wrap(err, "error to open repo, repo doesn't exist")
 	}
@@ -611,74 +641,4 @@ func openKopiaRepo(ctx context.Context, configFile string, password string, _ *o
 	}
 
 	return r, nil
-}
-
-func writeInitParameters(ctx context.Context, repoOption udmrepo.RepoOptions, logger logrus.FieldLogger) error {
-	r, err := openKopiaRepo(ctx, repoOption.ConfigFilePath, repoOption.RepoPassword, nil)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		c := r.Close(ctx)
-		if c != nil {
-			logger.WithError(c).Error("Failed to close repo")
-		}
-	}()
-
-	err = repo.WriteSession(ctx, r, repo.WriteSessionOptions{
-		Purpose: "set init parameters",
-	}, func(ctx context.Context, w repo.RepositoryWriter) error {
-		p := maintenance.DefaultParams()
-
-		if overwriteFullMaintainInterval != time.Duration(0) {
-			logger.Infof("Full maintenance interval change from %v to %v", p.FullCycle.Interval, overwriteFullMaintainInterval)
-			p.FullCycle.Interval = overwriteFullMaintainInterval
-		}
-
-		if overwriteQuickMaintainInterval != time.Duration(0) {
-			logger.Infof("Quick maintenance interval change from %v to %v", p.QuickCycle.Interval, overwriteQuickMaintainInterval)
-			p.QuickCycle.Interval = overwriteQuickMaintainInterval
-		}
-		// the repoOption.StorageOptions are set via
-		// udmrepo.WithStoreOptions -> udmrepo.GetStoreOptions (interface)
-		// -> pkg/repository/provider.GetStoreOptions(param interface{}) -> pkg/repository/provider.getStorageVariables(..., backupRepoConfig)
-		// where backupRepoConfig comes from param.(RepoParam).BackupRepo.Spec.RepositoryConfig map[string]string
-		// where RepositoryConfig comes from pkg/controller/getBackupRepositoryConfig(...)
-		// where it gets a configMap name from pkg/cmd/server/config/Config.BackupRepoConfig
-		// which gets set via velero server flag `backup-repository-configmap` "The name of ConfigMap containing backup repository configurations."
-		// and data stored as json under ConfigMap.Data[repoType] where repoType is BackupRepository.Spec.RepositoryType: either kopia or restic
-		// repoOption.StorageOptions[udmrepo.StoreOptionKeyFullMaintenanceInterval] would for example look like
-		// configMapName.data.kopia: {"fullMaintenanceInterval": "eagerGC"}
-		fullMaintIntervalOption := udmrepo.FullMaintenanceIntervalOptions(repoOption.StorageOptions[udmrepo.StoreOptionKeyFullMaintenanceInterval])
-		priorMaintInterval := p.FullCycle.Interval
-		switch fullMaintIntervalOption {
-		case udmrepo.FastGC:
-			p.FullCycle.Interval = udmrepo.FastGCInterval
-		case udmrepo.EagerGC:
-			p.FullCycle.Interval = udmrepo.EagerGCInterval
-		case udmrepo.NormalGC:
-			p.FullCycle.Interval = udmrepo.NormalGCInterval
-		case "": // do nothing
-		default:
-			return errors.Errorf("invalid full maintenance interval option %s", fullMaintIntervalOption)
-		}
-		if priorMaintInterval != p.FullCycle.Interval {
-			logger.Infof("Full maintenance interval change from %v to %v", priorMaintInterval, p.FullCycle.Interval)
-		}
-
-		p.Owner = r.ClientOptions().UsernameAtHost()
-
-		if err := maintenance.SetParams(ctx, w, &p); err != nil {
-			return errors.Wrap(err, "error to set maintenance params")
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return errors.Wrap(err, "error to init write repo parameters")
-	}
-
-	return nil
 }

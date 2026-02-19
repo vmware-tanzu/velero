@@ -47,11 +47,13 @@ const (
 	defaultDisableInformerCache        = false
 
 	DefaultItemBlockWorkerCount = 1
+	DefaultConcurrentBackups    = 1
 )
 
 var (
 	// DisableableControllers is a list of controllers that can be disabled
 	DisableableControllers = []string{
+		constant.ControllerBackupQueue,
 		constant.ControllerBackup,
 		constant.ControllerBackupOperations,
 		constant.ControllerBackupDeletion,
@@ -113,7 +115,11 @@ var (
 			"datauploads.velero.io",
 			"persistentvolumes",
 			"persistentvolumeclaims",
+			"clusterroles",
+			"roles",
 			"serviceaccounts",
+			"clusterrolebindings",
+			"rolebindings",
 			"secrets",
 			"configmaps",
 			"limitranges",
@@ -174,6 +180,7 @@ type Config struct {
 	BackupRepoConfig               string
 	RepoMaintenanceJobConfig       string
 	ItemBlockWorkerCount           int
+	ConcurrentBackups              int
 }
 
 func GetDefaultConfig() *Config {
@@ -206,6 +213,7 @@ func GetDefaultConfig() *Config {
 		ScheduleSkipImmediately:        false,
 		CredentialsDirectory:           credentials.DefaultStoreDirectory(),
 		ItemBlockWorkerCount:           DefaultItemBlockWorkerCount,
+		ConcurrentBackups:              DefaultConcurrentBackups,
 	}
 
 	return config
@@ -260,5 +268,11 @@ func (c *Config) BindFlags(flags *pflag.FlagSet) {
 		"item-block-worker-count",
 		c.ItemBlockWorkerCount,
 		"Number of worker threads to process ItemBlocks. Default is one. Optional.",
+	)
+	flags.IntVar(
+		&c.ConcurrentBackups,
+		"concurrent-backups",
+		c.ConcurrentBackups,
+		"Number of backups to process concurrently. Default is one. Optional.",
 	)
 }

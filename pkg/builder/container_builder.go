@@ -22,6 +22,8 @@ import (
 
 	corev1api "k8s.io/api/core/v1"
 	apimachineryRuntime "k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/vmware-tanzu/velero/pkg/label"
 )
 
 // ContainerBuilder builds Container objects
@@ -45,9 +47,9 @@ func ForPluginContainer(image string, pullPolicy corev1api.PullPolicy) *Containe
 	return ForContainer(getName(image), image).PullPolicy(pullPolicy).VolumeMounts(volumeMount)
 }
 
-// getName returns the 'name' component of a docker
-// image that includes the entire string except the registry name, and transforms the combined
-// string into a RFC-1123 compatible name.
+// getName returns the 'name' component of a docker image that includes the entire string
+// except the registry name, and transforms the combined string into a DNS-1123 compatible name
+// that fits within the 63-character limit for Kubernetes container names.
 func getName(image string) string {
 	slashIndex := strings.Index(image, "/")
 	slashCount := 0
@@ -83,7 +85,10 @@ func getName(image string) string {
 	re := strings.NewReplacer("/", "-",
 		"_", "-",
 		".", "-")
-	return re.Replace(image[start:end])
+	name := re.Replace(image[start:end])
+
+	// Ensure the name doesn't exceed Kubernetes container name length limit
+	return label.GetValidName(name)
 }
 
 // Result returns the built Container.

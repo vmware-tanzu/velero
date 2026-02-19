@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"golang.org/x/mod/semver"
 
 	"github.com/vmware-tanzu/velero/test"
 	framework "github.com/vmware-tanzu/velero/test/e2e/test"
@@ -47,7 +46,8 @@ type migrationE2E struct {
 func MigrationWithSnapshots() {
 	for _, veleroCLI2Version := range veleroutil.GetVersionList(
 		test.VeleroCfg.MigrateFromVeleroCLI,
-		test.VeleroCfg.MigrateFromVeleroVersion) {
+		test.VeleroCfg.MigrateFromVeleroVersion,
+	) {
 		framework.TestFunc(
 			&migrationE2E{
 				useVolumeSnapshots: true,
@@ -60,7 +60,8 @@ func MigrationWithSnapshots() {
 func MigrationWithFS() {
 	for _, veleroCLI2Version := range veleroutil.GetVersionList(
 		test.VeleroCfg.MigrateFromVeleroCLI,
-		test.VeleroCfg.MigrateFromVeleroVersion) {
+		test.VeleroCfg.MigrateFromVeleroVersion,
+	) {
 		framework.TestFunc(
 			&migrationE2E{
 				useVolumeSnapshots: false,
@@ -124,24 +125,28 @@ func (m *migrationE2E) Backup() error {
 	var err error
 
 	if m.veleroCLI2Version.VeleroCLI == "" {
-		//Assume tag of velero server image is identical to velero CLI version
-		//Download velero CLI if it's empty according to velero CLI version
+		// Assume tag of velero server image is identical to velero CLI version
+		// Download velero CLI if it's empty according to velero CLI version
 		By(
-			fmt.Sprintf("Install the expected version Velero CLI %s",
-				m.veleroCLI2Version.VeleroVersion),
+			fmt.Sprintf(
+				"Install the expected version Velero CLI %s",
+				m.veleroCLI2Version.VeleroVersion,
+			),
 			func() {
-				// "self" represents 1.14.x and future versions
-				if m.veleroCLI2Version.VeleroVersion == "self" {
+				OriginVeleroCfg, err = veleroutil.SetImagesToDefaultValues(
+					OriginVeleroCfg,
+					m.veleroCLI2Version.VeleroVersion,
+				)
+				Expect(err).To(Succeed(),
+					"Fail to set images for the migrate-from Velero installation.")
+
+				// No need to download Velero CLI if the version is same as the VeleroVersion.
+				// Uses the local built Velero CLI.
+				if m.veleroCLI2Version.VeleroVersion == m.VeleroCfg.VeleroVersion {
 					m.veleroCLI2Version.VeleroCLI = m.VeleroCfg.VeleroCLI
 				} else {
-					OriginVeleroCfg, err = veleroutil.SetImagesToDefaultValues(
-						OriginVeleroCfg,
-						m.veleroCLI2Version.VeleroVersion,
-					)
-					Expect(err).To(Succeed(),
-						"Fail to set images for the migrate-from Velero installation.")
-
 					m.veleroCLI2Version.VeleroCLI, err = veleroutil.InstallVeleroCLI(
+						m.Ctx,
 						m.veleroCLI2Version.VeleroVersion)
 					Expect(err).To(Succeed())
 				}
@@ -164,9 +169,11 @@ func (m *migrationE2E) Backup() error {
 			version, err := veleroutil.GetVeleroVersion(m.Ctx, OriginVeleroCfg.VeleroCLI, true)
 			Expect(err).To(Succeed(), "Fail to get Velero version")
 			OriginVeleroCfg.VeleroVersion = version
-			if OriginVeleroCfg.WorkerOS == common.WorkerOSWindows &&
-				(version != "main" && semver.Compare(version, "v1.16") < 0) {
-				Skip(fmt.Sprintf("Velero CLI version %s doesn't support Windows migration test.", version))
+			if OriginVeleroCfg.WorkerOS == common.WorkerOSWindows {
+				result, err := veleroutil.VersionNoOlderThan(version, "v1.16")
+				if err != nil || !result {
+					Skip(fmt.Sprintf("Velero CLI version %s doesn't support Windows migration test.", version))
+				}
 			}
 
 			if OriginVeleroCfg.SnapshotMoveData {
@@ -174,13 +181,11 @@ func (m *migrationE2E) Backup() error {
 			}
 
 			Expect(veleroutil.VeleroInstall(m.Ctx, &OriginVeleroCfg, false)).To(Succeed())
-			if m.veleroCLI2Version.VeleroVersion != "self" {
-				Expect(veleroutil.CheckVeleroVersion(
-					m.Ctx,
-					OriginVeleroCfg.VeleroCLI,
-					OriginVeleroCfg.MigrateFromVeleroVersion,
-				)).To(Succeed())
-			}
+			Expect(veleroutil.CheckVeleroVersion(
+				m.Ctx,
+				OriginVeleroCfg.VeleroCLI,
+				OriginVeleroCfg.MigrateFromVeleroVersion,
+			)).To(Succeed())
 		},
 	)
 

@@ -60,6 +60,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	repository "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -144,6 +145,7 @@ type nodeAgentServer struct {
 	dataPathConfigs   *velerotypes.NodeAgentConfigs
 	backupRepoConfigs map[string]string
 	vgdpCounter       *exposer.VgdpCounter
+	repoConfigMgr     repository.ConfigManager
 }
 
 func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, config nodeAgentServerConfig) (*nodeAgentServer, error) {
@@ -237,6 +239,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		namespace:      factory.Namespace(),
 		nodeName:       nodeName,
 		metricsAddress: config.metricsAddress,
+		repoConfigMgr:  repository.NewConfigManager(logger),
 	}
 
 	// the cache isn't initialized yet when "validatePodVolumesHostPath" is called, the client returned by the manager cannot
@@ -337,20 +340,74 @@ func (s *nodeAgentServer) run() {
 		}
 	}
 
+	var cachePVCConfig *velerotypes.CachePVC
 	if s.dataPathConfigs != nil && s.dataPathConfigs.CachePVCConfig != nil {
 		if err := s.validateCachePVCConfig(*s.dataPathConfigs.CachePVCConfig); err != nil {
 			s.logger.WithError(err).Warnf("Ignore cache config %v", s.dataPathConfigs.CachePVCConfig)
 		} else {
+			cachePVCConfig = s.dataPathConfigs.CachePVCConfig
 			s.logger.Infof("Using cache volume configs %v", s.dataPathConfigs.CachePVCConfig)
 		}
 	}
 
-	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger, dataMovePriorityClass, privilegedFsBackup)
+	var podLabels map[string]string
+	if s.dataPathConfigs != nil && len(s.dataPathConfigs.PodLabels) > 0 {
+		podLabels = s.dataPathConfigs.PodLabels
+		s.logger.Infof("Using customized pod labels %+v", podLabels)
+	}
+
+	var podAnnotations map[string]string
+	if s.dataPathConfigs != nil && len(s.dataPathConfigs.PodAnnotations) > 0 {
+		podAnnotations = s.dataPathConfigs.PodAnnotations
+		s.logger.Infof("Using customized pod annotations %+v", podAnnotations)
+	}
+
+	if s.backupRepoConfigs != nil {
+		s.logger.Infof("Using backup repo config %v", s.backupRepoConfigs)
+	} else if cachePVCConfig != nil {
+		s.logger.Info("Backup repo config is not provided, using default values for cache volume configs")
+	}
+
+	pvbReconciler := controller.NewPodVolumeBackupReconciler(
+		s.mgr.GetClient(),
+		s.mgr,
+		s.kubeClient,
+		s.dataPathMgr,
+		s.vgdpCounter,
+		s.nodeName,
+		s.config.dataMoverPrepareTimeout,
+		s.config.resourceTimeout,
+		podResources,
+		s.metrics,
+		s.logger,
+		dataMovePriorityClass,
+		privilegedFsBackup,
+		podLabels,
+		podAnnotations,
+	)
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
 	}
 
-	pvrReconciler := controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.logger, dataMovePriorityClass, privilegedFsBackup)
+	pvrReconciler := controller.NewPodVolumeRestoreReconciler(
+		s.mgr.GetClient(),
+		s.mgr,
+		s.kubeClient,
+		s.dataPathMgr,
+		s.vgdpCounter,
+		s.nodeName,
+		s.config.dataMoverPrepareTimeout,
+		s.config.resourceTimeout,
+		s.backupRepoConfigs,
+		cachePVCConfig,
+		podResources,
+		s.logger,
+		dataMovePriorityClass,
+		privilegedFsBackup,
+		s.repoConfigMgr,
+		podLabels,
+		podAnnotations,
+	)
 	if err := pvrReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
@@ -375,6 +432,8 @@ func (s *nodeAgentServer) run() {
 		s.logger,
 		s.metrics,
 		dataMovePriorityClass,
+		podLabels,
+		podAnnotations,
 	)
 	if err := dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
@@ -394,12 +453,17 @@ func (s *nodeAgentServer) run() {
 		s.vgdpCounter,
 		loadAffinity,
 		restorePVCConfig,
+		s.backupRepoConfigs,
+		cachePVCConfig,
 		podResources,
 		s.nodeName,
 		s.config.dataMoverPrepareTimeout,
 		s.logger,
 		s.metrics,
 		dataMovePriorityClass,
+		s.repoConfigMgr,
+		podLabels,
+		podAnnotations,
 	)
 
 	if err := dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {

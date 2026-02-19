@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"errors"
+
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -146,8 +148,15 @@ type ObjectStorageLocation struct {
 	Prefix string `json:"prefix,omitempty"`
 
 	// CACert defines a CA bundle to use when verifying TLS connections to the provider.
+	// Deprecated: Use CACertRef instead.
 	// +optional
 	CACert []byte `json:"caCert,omitempty"`
+
+	// CACertRef is a reference to a Secret containing the CA certificate bundle to use
+	// when verifying TLS connections to the provider. The Secret must be in the same
+	// namespace as the BackupStorageLocation.
+	// +optional
+	CACertRef *corev1api.SecretKeySelector `json:"caCertRef,omitempty"`
 }
 
 // BackupStorageLocationPhase is the lifecycle phase of a Velero BackupStorageLocation.
@@ -177,3 +186,13 @@ const (
 
 // TODO(2.0): remove the AccessMode field from BackupStorageLocationStatus.
 // TODO(2.0): remove the LastSyncedRevision field from BackupStorageLocationStatus.
+
+// Validate validates the BackupStorageLocation to ensure that only one of CACert or CACertRef is set.
+func (bsl *BackupStorageLocation) Validate() error {
+	if bsl.Spec.ObjectStorage != nil &&
+		bsl.Spec.ObjectStorage.CACert != nil &&
+		bsl.Spec.ObjectStorage.CACertRef != nil {
+		return errors.New("cannot specify both caCert and caCertRef in objectStorage")
+	}
+	return nil
+}
