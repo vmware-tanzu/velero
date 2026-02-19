@@ -42,6 +42,8 @@ const (
 	FSBackup VolumeActionType = "fs-backup"
 	// snapshot action can have 3 different meaning based on velero configuration and backup spec - cloud provider based snapshots, local csi snapshots and datamover snapshots
 	Snapshot VolumeActionType = "snapshot"
+	// custom action is  used to identify a volume that will be handled by an external plugin. Velero will not snapshot or use fs-backup if action=="custom"
+	Custom VolumeActionType = "custom"
 )
 
 // Action defined as one action for a specific way of backup
