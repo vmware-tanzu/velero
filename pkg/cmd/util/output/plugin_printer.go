@@ -30,6 +30,7 @@ var (
 		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
 		{Name: "Name", Type: "string", Format: "name"},
 		{Name: "Kind"},
+		{Name: "BuiltIn"},
 	}
 )
 
@@ -57,7 +58,7 @@ func sortByKindAndName(plugins []velerov1api.PluginInfo) {
 func printPlugin(plugin velerov1api.PluginInfo) []metav1.TableRow {
 	row := metav1.TableRow{}
 
-	row.Cells = append(row.Cells, plugin.Name, plugin.Kind)
+	row.Cells = append(row.Cells, plugin.Name, plugin.Kind, plugin.BuiltIn)
 
 	return []metav1.TableRow{row}
 }
