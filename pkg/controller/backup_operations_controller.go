@@ -43,6 +43,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/util/results"
+
+	"github.com/vmware-tanzu/velero/internal/volume"
+	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 )
 
 const (
@@ -58,6 +62,7 @@ type backupOperationsReconciler struct {
 	newPluginManager  func(logger logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
 	metrics           *metrics.ServerMetrics
+	globalCRClient    client.Client
 }
 
 func NewBackupOperationsReconciler(
@@ -68,6 +73,7 @@ func NewBackupOperationsReconciler(
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	metrics *metrics.ServerMetrics,
 	itemOperationsMap *itemoperationmap.BackupItemOperationsMap,
+	globalCRClient client.Client,
 ) *backupOperationsReconciler {
 	abor := &backupOperationsReconciler{
 		Client:            client,
@@ -78,6 +84,7 @@ func NewBackupOperationsReconciler(
 		newPluginManager:  newPluginManager,
 		backupStoreGetter: backupStoreGetter,
 		metrics:           metrics,
+		globalCRClient:    globalCRClient,
 	}
 	if abor.frequency <= 0 {
 		abor.frequency = defaultBackupOperationsFrequency
@@ -266,6 +273,35 @@ func (c *backupOperationsReconciler) updateBackupAndOperationsJSON(
 				removeIfComplete = false
 				return err
 			}
+
+			// Update volume information with latest operation status
+			if err := c.updateVolumeInformation(ctx, backup, backupStore, c.logger); err != nil {
+				c.logger.WithError(err).Error("Failed to update volume information")
+			}
+
+			// If there are new errors from operations, merge them with existing results
+			if len(operations.ErrsSinceUpdate) > 0 {
+				mergedResults, err := c.mergeBackupResults(backupStore, backup.Name, operations.ErrsSinceUpdate)
+				if err != nil {
+					c.logger.WithError(err).Error("Failed to merge backup results")
+				} else {
+					// Upload merged results using BackupInfo
+					resultsJSON, errs := encode.ToJSONGzip(mergedResults, "backup results")
+					if len(errs) > 0 {
+						c.logger.Errorf("Failed to encode backup results: %v", errs)
+					} else {
+						backupInfo := persistence.BackupInfo{
+							Name:          backup.Name,
+							BackupResults: resultsJSON,
+						}
+						if err := backupStore.PutBackup(backupInfo); err != nil {
+							c.logger.WithError(err).Error("Failed to upload backup results")
+						} else {
+							c.logger.Info("Successfully merged and uploaded backup results")
+						}
+					}
+				}
+			}
 		}
 		// update backup
 		err := c.Client.Patch(ctx, backup, client.MergeFrom(original))
@@ -395,4 +431,80 @@ func wrapErrMsg(errMsg string, bia v2.BackupItemAction) string {
 		errMsg += ", "
 	}
 	return fmt.Sprintf("%splugin: %s", errMsg, plugin)
+}
+
+// mergeBackupResults merges new errors with existing backup results, preserving old results
+func (c *backupOperationsReconciler) mergeBackupResults(backupStore persistence.BackupStore, backupName string, newErrors []string) (map[string]results.Result, error) {
+	// Get existing results from storage
+	existingResults, err := backupStore.GetBackupResults(backupName)
+	if err != nil {
+		// If there are no existing results, create default structure
+		c.logger.WithError(err).Debug("Could not get existing backup results, creating new structure")
+		existingResults = map[string]results.Result{
+			"warnings": {},
+			"errors":   {},
+		}
+	}
+
+	// Add new errors to existing errors using the Merge function
+	if len(newErrors) > 0 {
+		newErrorResult := results.Result{
+			Velero: newErrors,
+		}
+		existingErrors := existingResults["errors"]
+		existingErrors.Merge(&newErrorResult)
+		existingResults["errors"] = existingErrors
+	}
+
+	return existingResults, nil
+}
+
+// updateVolumeInformation regenerates and updates volume information for the backup
+func (c *backupOperationsReconciler) updateVolumeInformation(ctx context.Context, backup *velerov1api.Backup, backupStore persistence.BackupStore, log logrus.FieldLogger) error {
+	// Get CSI volume snapshots and related resources
+	volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses := pkgbackup.GetBackupCSIResources(c.Client, c.globalCRClient, backup, log)
+
+	// Get other backup artifacts
+	podVolumeBackups, err := backupStore.GetPodVolumeBackups(backup.Name)
+	if err != nil {
+		log.WithError(err).Error("Failed to get PodVolumeBackups")
+		return err
+	}
+
+	nativeSnapshots, err := backupStore.GetBackupVolumeSnapshots(backup.Name)
+	if err != nil {
+		log.WithError(err).Error("Failed to get native volume snapshots")
+		return err
+	}
+
+	backupOperations, err := backupStore.GetBackupItemOperations(backup.Name)
+	if err != nil {
+		log.WithError(err).Error("Failed to get backup item operations")
+		return err
+	}
+
+	// Create and populate BackupVolumesInformation
+	volumeInfo := &volume.BackupVolumesInformation{
+		BackupName:       backup.Name,
+		PodVolumeBackups: podVolumeBackups,
+		NativeSnapshots:  nativeSnapshots,
+		BackupOperations: backupOperations,
+	}
+	volumeInfo.Init()
+
+	// Generate updated volume information
+	volumeInfos := volumeInfo.Result(volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses, c.globalCRClient, log)
+
+	// Encode and store the updated volume information
+	volumeInfoJSON, errs := encode.ToJSONGzip(volumeInfos, "volume information")
+	if len(errs) > 0 {
+		return fmt.Errorf("error encoding volume information: %v", errs)
+	}
+
+	if err := backupStore.PutBackupVolumeInfos(backup.Name, volumeInfoJSON); err != nil {
+		return errors.Wrap(err, "error uploading volume information")
+	}
+
+	log.Info("Successfully updated backup volume information")
+	return nil
 }

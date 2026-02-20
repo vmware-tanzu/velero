@@ -703,6 +703,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupStoreGetter,
 			s.metrics,
 			backupOpsMap,
+			s.crClient,
 		)
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupOperations)

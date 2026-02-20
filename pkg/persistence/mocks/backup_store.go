@@ -223,6 +223,36 @@ func (_m *BackupStore) GetBackupVolumeInfos(name string) ([]*volume.BackupVolume
 	return r0, r1
 }
 
+// GetBackupResults provides a mock function with given fields: name
+func (_m *BackupStore) GetBackupResults(name string) (map[string]results.Result, error) {
+	ret := _m.Called(name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBackupResults")
+	}
+
+	var r0 map[string]results.Result
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) (map[string]results.Result, error)); ok {
+		return rf(name)
+	}
+	if rf, ok := ret.Get(0).(func(string) map[string]results.Result); ok {
+		r0 = rf(name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]results.Result)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetBackupVolumeSnapshots provides a mock function with given fields: name
 func (_m *BackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error) {
 	ret := _m.Called(name)
