@@ -149,7 +149,8 @@ func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocatio
 	// if there are any slashes in the middle of 'bucket', the user
 	// probably put <bucket>/<prefix> in the bucket field, which we
 	// don't support.
-	if strings.Contains(bucket, "/") {
+	// Exception: MRAP ARNs (arn:aws:s3::...) legitimately contain slashes.
+	if strings.Contains(bucket, "/") && !strings.HasPrefix(bucket, "arn:") {
 		return nil, errors.Errorf("backup storage location's bucket name %q must not contain a '/' (if using a prefix, put it in the 'Prefix' field instead)", location.Spec.ObjectStorage.Bucket)
 	}
 
