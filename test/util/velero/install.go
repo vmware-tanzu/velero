@@ -775,6 +775,23 @@ func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool, u
 	fmt.Println("Waiting for Velero deployment to be ready.")
 	// when doing upgrade by the "kubectl apply" the command "kubectl wait --for=condition=available deployment/velero -n velero --timeout=600s" returns directly
 	// use "rollout status" instead to avoid this. For more detail information, refer to https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#complete-deployment
+
+	err := wait.PollUntilContextTimeout(ctx, 5*time.Second, 1*time.Minute, true, func(fctx context.Context) (bool, error) {
+		stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(fctx, "kubectl", "get", "deployment/velero",
+			"-o", "json", "-n", namespace))
+		if err != nil {
+			return false, errors.Wrapf(err, "failed to get deploy/velero, stdout=%s, stderr=%s", stdout, stderr)
+		}
+		deploy := &appsv1api.Deployment{}
+		if err = json.Unmarshal([]byte(stdout), deploy); err != nil {
+			return false, errors.Wrapf(err, "failed to unmarshal the node-agent daemonset")
+		}
+		if deploy.Status.AvailableReplicas == deploy.Status.ReadyReplicas {
+			return true, nil
+		}
+		fmt.Printf("tutil-debug: debug deploy not ready: %+v\n", deploy)
+		return false, nil
+	})
 	stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "rollout", "status",
 		"deployment/velero", "-n", namespace))
 	if err != nil {
@@ -783,8 +800,8 @@ func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool, u
 
 	if useNodeAgent {
 		fmt.Println("Waiting for node-agent daemonset to be ready.")
-		err := wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
-			stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "daemonset/node-agent",
+		err := wait.PollUntilContextTimeout(ctx, 5*time.Second, 1*time.Minute, true, func(fctx context.Context) (bool, error) {
+			stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(fctx, "kubectl", "get", "daemonset/node-agent",
 				"-o", "json", "-n", namespace))
 			if err != nil {
 				return false, errors.Wrapf(err, "failed to get the node-agent daemonset, stdout=%s, stderr=%s", stdout, stderr)
