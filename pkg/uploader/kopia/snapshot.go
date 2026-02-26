@@ -384,6 +384,10 @@ func (o *fileSystemRestoreOutput) Flush() error {
 	return flushVolumeFunc(o.TargetPath)
 }
 
+func (o *fileSystemRestoreOutput) Terminate() error {
+	return nil
+}
+
 // Restore restore specific sourcePath with given snapshotID and update progress
 func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string,
 	log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
@@ -443,23 +447,22 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 		return 0, 0, errors.Wrap(err, "error to init output")
 	}
 
-	var output restore.Output
-	var flusher Flusher
+	var output RestoreOutput
 	if volMode == uploader.PersistentVolumeBlock {
-		o := &BlockOutput{
+		output = &BlockOutput{
 			FilesystemOutput: fsOutput,
 		}
-
-		output = o
-		flusher = o
 	} else {
-		o := &fileSystemRestoreOutput{
+		output = &fileSystemRestoreOutput{
 			FilesystemOutput: fsOutput,
 		}
-
-		output = o
-		flusher = o
 	}
+
+	defer func() {
+		if err := output.Terminate(); err != nil {
+			log.Warnf("error terminating restore output for %v", path)
+		}
+	}()
 
 	stat, err := restoreEntryFunc(kopiaCtx, rep, output, rootEntry, restore.Options{
 		Parallel:               restoreConcurrency,
@@ -474,14 +477,14 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 		return 0, 0, errors.Wrapf(err, "Failed to copy snapshot data to the target")
 	}
 
-	if err := flusher.Flush(); err != nil {
+	if err := output.Flush(); err != nil {
 		if err == errFlushUnsupported {
 			log.Warnf("Skip flushing data for %v under the current OS %v", path, runtime.GOOS)
 		} else {
 			return 0, 0, errors.Wrapf(err, "Failed to flush data to target")
 		}
 	} else {
-		log.Warnf("Flush done for volume dir %v", path)
+		log.Infof("Flush done for volume dir %v", path)
 	}
 
 	return stat.RestoredTotalFileSize, stat.RestoredFileCount, nil

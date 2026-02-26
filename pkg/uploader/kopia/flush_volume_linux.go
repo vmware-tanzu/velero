@@ -37,11 +37,14 @@ func flushVolume(dirPath string) error {
 		return errors.Wrapf(err, "error getting handle of dir %v", dirPath)
 	}
 
-	raw.Control(func(fd uintptr) {
+	var syncErr error
+	if err := raw.Control(func(fd uintptr) {
 		if e := unix.Syncfs(int(fd)); e != nil {
-			err = e
+			syncErr = e
 		}
-	})
+	}); err != nil {
+		return errors.Wrapf(err, "error calling fs sync from %v", dirPath)
+	}
 
-	return errors.Wrapf(err, "error syncing fs from %v", dirPath)
+	return errors.Wrapf(syncErr, "error syncing fs from %v", dirPath)
 }
