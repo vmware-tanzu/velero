@@ -441,6 +441,12 @@ var _ = Describe(
 )
 
 var _ = Describe(
+	"Restore phase does not block at Finalizing when a container has multiple exec hooks",
+	Label("Basic", "Hooks"),
+	RestoreExecHooksTest,
+)
+
+var _ = Describe(
 	"Backup/restore of 2500 namespaces",
 	Label("Scale", "LongTime"),
 	MultiNSBackupRestore,
