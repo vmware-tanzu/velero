@@ -247,6 +247,8 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	// If err is nil and updatedObj is nil, it means the item is skipped by plugin action,
 	// we should return here to avoid backing up the item, and avoid potential NPE in the following code.
 	if updatedObj == nil {
+		log.Infof("Remove item from the backup's backupItems list and totalItems list because it's skipped by plugin action.")
+		ib.backupRequest.BackedUpItems.DeleteItem(key)
 		return false, itemFiles, nil
 	}
 
