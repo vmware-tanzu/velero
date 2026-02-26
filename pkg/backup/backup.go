@@ -308,7 +308,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		}
 
 		if len(wildcardResult) == 0 {
-			log.Errorf("no namespaces matched the resolution of wildcard patterns")
+			log.Warnf("no namespaces matched the resolution of wildcard patterns ")
 		}
 
 		log.WithFields(logrus.Fields{
