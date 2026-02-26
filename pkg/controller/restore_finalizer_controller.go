@@ -294,16 +294,15 @@ type finalizerContext struct {
 	resourceTimeout          time.Duration
 }
 
-func (ctx *finalizerContext) execute() (results.Result, results.Result) { //nolint:unparam //temporarily ignore the lint report: result 0 is always nil (unparam)
+func (ctx *finalizerContext) execute() (results.Result, results.Result) {
 	warnings, errs := results.Result{}, results.Result{}
 
 	// implement finalization tasks
 	pdpErrs := ctx.patchDynamicPVWithVolumeInfo()
 	errs.Merge(&pdpErrs)
 
-	vgscWarnings, vgscErrs := ctx.cleanupStubVGSC()
+	vgscWarnings := ctx.cleanupStubVGSC()
 	warnings.Merge(&vgscWarnings)
-	errs.Merge(&vgscErrs)
 
 	rehErrs := ctx.WaitRestoreExecHook()
 	errs.Merge(&rehErrs)
@@ -455,7 +454,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 // labeled with velero.io/restore-name for identification.
 // Before deleting each VGSC, it waits for all related VolumeSnapshotContents
 // to become ReadyToUse, since the CSI controller needs the VGSC during VSC reconciliation.
-func (ctx *finalizerContext) cleanupStubVGSC() (warnings results.Result, errs results.Result) {
+func (ctx *finalizerContext) cleanupStubVGSC() (warnings results.Result) {
 	ctx.logger.Info("cleaning up stub VolumeGroupSnapshotContents")
 
 	vgscList := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContentList{}
@@ -469,12 +468,12 @@ func (ctx *finalizerContext) cleanupStubVGSC() (warnings results.Result, errs re
 		// on clusters without VolumeGroupSnapshot support, so treat as warning.
 		ctx.logger.WithError(err).Warn("failed to list stub VolumeGroupSnapshotContents, skipping cleanup")
 		warnings.Add("cluster", errors.Wrap(err, "failed to list stub VolumeGroupSnapshotContents"))
-		return warnings, errs
+		return warnings
 	}
 
 	if len(vgscList.Items) == 0 {
 		ctx.logger.Info("no stub VolumeGroupSnapshotContents to clean up")
-		return warnings, errs
+		return warnings
 	}
 
 	for i := range vgscList.Items {
@@ -534,7 +533,7 @@ func (ctx *finalizerContext) cleanupStubVGSC() (warnings results.Result, errs re
 		}
 	}
 
-	return warnings, errs
+	return warnings
 }
 
 func needPatch(newPV *corev1api.PersistentVolume, pvInfo *volume.PVInfo) bool {

@@ -972,8 +972,7 @@ func TestCleanupStubVGSC(t *testing.T) {
 				require.NoError(t, fakeClient.Create(t.Context(), vsc))
 			}
 
-			warnings, errs := ctx.cleanupStubVGSC()
-			assert.True(t, errs.IsEmpty(), "expected no errors")
+			warnings := ctx.cleanupStubVGSC()
 
 			if tc.expectedWarnings {
 				assert.False(t, warnings.IsEmpty())
