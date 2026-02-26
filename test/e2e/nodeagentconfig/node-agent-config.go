@@ -78,6 +78,14 @@ var LoadAffinities func() = TestFunc(&NodeAgentConfigTestCase{
 			IgnoreDelayBinding: true,
 		},
 		PriorityClassName: test.PriorityClassNameForDataMover,
+		// Explicitly add custom labels and annotations to be tested
+		PodLabels: map[string]string{
+			"spectrocloud.com/connection": "proxy", // Tests appending custom labels (Issue #9435)
+			"azure.workload.identity/use": "true",  // Tests overwriting built-in labels
+		},
+		PodAnnotations: map[string]string{
+			"test-data-mover-annotation": "true",
+		},
 	},
 	nodeAgentConfigMapName: "node-agent-config",
 })
@@ -244,6 +252,16 @@ func (n *NodeAgentConfigTestCase) Backup() error {
 
 	Expect(backupPodList.Items[0].Spec.Affinity).To(Equal(expectedAffinity))
 
+	// Verify PodLabels
+	for k, v := range n.nodeAgentConfigs.PodLabels {
+		Expect(backupPodList.Items[0].Labels[k]).To(Equal(v))
+	}
+
+	// Verify PodAnnotations
+	for k, v := range n.nodeAgentConfigs.PodAnnotations {
+		Expect(backupPodList.Items[0].Annotations[k]).To(Equal(v))
+	}
+
 	fmt.Println("backupPod content verification completed successfully.")
 
 	wait.PollUntilContextTimeout(n.Ctx, 5*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
@@ -320,6 +338,16 @@ func (n *NodeAgentConfigTestCase) Restore() error {
 	expectedAffinity := velerokubeutil.ToSystemAffinity(n.nodeAgentConfigs.LoadAffinity[0], nil)
 
 	Expect(restorePodList.Items[0].Spec.Affinity).To(Equal(expectedAffinity))
+
+	// Verify PodLabels
+	for k, v := range n.nodeAgentConfigs.PodLabels {
+		Expect(restorePodList.Items[0].Labels[k]).To(Equal(v))
+	}
+
+	// Verify PodAnnotations
+	for k, v := range n.nodeAgentConfigs.PodAnnotations {
+		Expect(restorePodList.Items[0].Annotations[k]).To(Equal(v))
+	}
 
 	fmt.Println("restorePod content verification completed successfully.")
 
