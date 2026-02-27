@@ -377,15 +377,31 @@ There are some occasions that the incremental backup won't continue, so the data
 - ChangeId is missing
 - Parent snapshot is missing
 
+### Irregular Volume Size
+As mentioned above, during incremental backup, block uploader IO should be restricted to be aligned to the deduplication chunk size (1MB); on the other hand, there is no hard limit for users' volume size to be aligned.  
+To support volumes with irregular size, below measures are taken:
+- Volume objects in the repository is always aligned to 1MB
+- If the volume size is irregular, zero bytes will be padded to the tail of the volume object
+- A real size is recorded in the repository snapshot
+- During restore, the real size of data is restored
+
+The padding must be always with zero bytes.  
+
 ### Volume Size Change
 Incremental backup could continue when volume is resized.  
 Block uploader supports to write disk with arbibrary size.  
-When volume resize happens, block uploader needs to handle it appropriately in below ways:
-- Loop with CBT to the boundary of RoundDownTo1M(newSize)
-- Read data between RoundDownTo1M(newSize) and newSize to get the tail data
-- Call `WriteAt` from offset RoundDownTo1M(newSize) with the tail data
+The volume resize cases don't need to be handled case by case.  
 
-That is to say, the tail must be rewrite since Incremental Aware Object Extension cannot copy BAT entries halfly for the incremental backup.  
+Instead, when volume resize happens, block uploader needs to handle it appropriately in below ways:
+- Loop with CBT
+- Read data between RoundDownTo1M(newSize) and newSize to get the tail data
+- If there is no tail data, which means the volume size is aligned to 1MB, then call `WriteAt(newSize, nil)`
+- Otherwise, call `WriteAt(RoundDownTo1M(newSize), taildata)`, `taildata` is also padded to 1MB
+
+That is to day:
+- If CBT covers the tail of the volume, loop with CBT is enough for both shink and expand case
+- Otherwise, if volume is expanded, `WriteAt` guarantees to clone appropriate objects entries from the parent object and append zero data for the expanded areas. Particularly, if the parent volume is not in regular size, the zero padding bytes is also reused. Therefore, the parent object's padding bytes must be zero
+- In the case the volume is shrunk, writing the tail data makes sure zero bytes are padding to the new volume object instead of inheriting non-zero data from the parent object
 
 ### Cancellation
 The existing Cancellation mechanism is reused, so there is no change outside of the block uploader.  
