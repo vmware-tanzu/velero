@@ -674,6 +674,12 @@ var _ = Describe(
 	LoadAffinities,
 )
 
+var _ = Describe(
+	"Test data mover dynamic Cache PVC injection",
+	Label("NodeAgentConfig", "CachePVC"),
+	CachePVCTest,
+)
+
 func GetKubeConfigContext() error {
 	var err error
 	var tcDefault, tcStandby k8s.TestClient
