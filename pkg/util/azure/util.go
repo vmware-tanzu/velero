@@ -31,6 +31,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
+	"sigs.k8s.io/cloud-provider-azure/pkg/azclient"
 )
 
 const (
@@ -49,8 +50,8 @@ const (
 	CredentialKeySendCertChain              = "AZURE_CLIENT_SEND_CERTIFICATE_CHAIN" // #nosec
 	CredentialKeyUsername                   = "AZURE_USERNAME"                      // #nosec
 	CredentialKeyPassword                   = "AZURE_PASSWORD"                      // #nosec
-
-	credentialFile = "credentialsFile"
+	CredentialKeyResourceManagerEndpoint    = "AZURE_RESOURCE_MANAGER_ENDPOINT"     // #nosec
+	credentialFile                          = "credentialsFile"
 )
 
 // LoadCredentials gets the credential file from config and loads it into a map
@@ -144,7 +145,23 @@ func getCloudConfiguration(locationCfg, creds map[string]string) (cloud.Configur
 	case "AZUREUSGOVERNMENT", "AZUREUSGOVERNMENTCLOUD":
 		cfg = cloud.AzureGovernment
 	default:
-		return cloud.Configuration{}, errors.New(fmt.Sprintf("unknown cloud: %s", name))
+		// Validate that we have either a ResourceManagerEndpoint or CloudConfig file to load the information from
+		if creds[CredentialKeyResourceManagerEndpoint] == "" && os.Getenv(azclient.EnvironmentFilepathName) == "" {
+			return cloud.Configuration{}, fmt.Errorf("custom cloud must set either %s or %s", CredentialKeyResourceManagerEndpoint, azclient.EnvironmentFilepathName)
+		}
+
+		var env *azclient.Environment
+		var err error
+		cfg, env, err = azclient.GetAzureCloudConfigAndEnvConfig(&azclient.ARMClientConfig{
+			Cloud:                   name,
+			ResourceManagerEndpoint: creds[CredentialKeyResourceManagerEndpoint],
+		})
+		if err != nil {
+			return cloud.Configuration{}, err
+		}
+		cfg.Services[serviceNameBlob] = cloud.ServiceConfiguration{
+			Endpoint: fmt.Sprintf("blob.%s", env.StorageEndpointSuffix),
+		}
 	}
 	if activeDirectoryAuthorityURI != "" {
 		cfg.ActiveDirectoryAuthorityHost = activeDirectoryAuthorityURI
@@ -161,4 +178,30 @@ func GetFromLocationConfigOrCredential(cfg, creds map[string]string, cfgKey, cre
 		return value
 	}
 	return creds[credKey]
+}
+
+// ApiVersionCustomPolicy is a azure client policy that allows changing the x-ms-version header. This is needed for azure
+// environments that may have different supported APIVersion than the defaults for the sdk
+type ApiVersionCustomPolicy struct {
+	Version string
+}
+
+func (c *ApiVersionCustomPolicy) Do(req *policy.Request) (*http.Response, error) {
+	// https://github.com/Azure/azure-sdk-for-go/issues/25289
+	if c.Version != "" {
+		req.Raw().Header["x-ms-version"] = []string{c.Version}
+	}
+	return req.Next()
+}
+
+// SetApiVersionPolicy sets an apiVersion, if provided, through x-ms-version header
+func SetApiVersionPolicy(apiVersion string, clientOptions policy.ClientOptions) policy.ClientOptions {
+	if apiVersion == "" {
+		return clientOptions
+	}
+	if clientOptions.PerCallPolicies == nil {
+		clientOptions.PerCallPolicies = []policy.Policy{}
+	}
+	clientOptions.PerCallPolicies = append(clientOptions.PerCallPolicies, &ApiVersionCustomPolicy{Version: apiVersion})
+	return clientOptions
 }
