@@ -675,6 +675,7 @@ func TestRestore(t *testing.T) {
 		invalidManifestType bool
 		filesystemEntryFunc func(ctx context.Context, rep repo.Repository, rootID string, consistentAttributes bool) (fs.Entry, error)
 		restoreEntryFunc    func(ctx context.Context, rep repo.Repository, output restore.Output, rootEntry fs.Entry, options restore.Options) (restore.Stats, error)
+		flushVolumeFunc     func(string) error
 		dest                string
 		expectedBytes       int64
 		expectedCount       int32
@@ -757,6 +758,30 @@ func TestRestore(t *testing.T) {
 			volMode:       uploader.PersistentVolumeBlock,
 			dest:          "/tmp",
 		},
+		{
+			name: "Flush is not supported",
+			filesystemEntryFunc: func(ctx context.Context, rep repo.Repository, rootID string, consistentAttributes bool) (fs.Entry, error) {
+				return snapshotfs.EntryFromDirEntry(rep, &snapshot.DirEntry{Type: snapshot.EntryTypeFile}), nil
+			},
+			restoreEntryFunc: func(ctx context.Context, rep repo.Repository, output restore.Output, rootEntry fs.Entry, options restore.Options) (restore.Stats, error) {
+				return restore.Stats{}, nil
+			},
+			flushVolumeFunc: func(string) error { return errFlushUnsupported },
+			snapshotID:      "snapshot-123",
+			expectedError:   nil,
+		},
+		{
+			name: "Flush fails",
+			filesystemEntryFunc: func(ctx context.Context, rep repo.Repository, rootID string, consistentAttributes bool) (fs.Entry, error) {
+				return snapshotfs.EntryFromDirEntry(rep, &snapshot.DirEntry{Type: snapshot.EntryTypeFile}), nil
+			},
+			restoreEntryFunc: func(ctx context.Context, rep repo.Repository, output restore.Output, rootEntry fs.Entry, options restore.Options) (restore.Stats, error) {
+				return restore.Stats{}, nil
+			},
+			flushVolumeFunc: func(string) error { return errors.New("fake-flush-error") },
+			snapshotID:      "snapshot-123",
+			expectedError:   errors.New("fake-flush-error"),
+		},
 	}
 
 	em := &manifest.EntryMetadata{
@@ -782,6 +807,10 @@ func TestRestore(t *testing.T) {
 
 			if tc.restoreEntryFunc != nil {
 				restoreEntryFunc = tc.restoreEntryFunc
+			}
+
+			if tc.flushVolumeFunc != nil {
+				flushVolumeFunc = tc.flushVolumeFunc
 			}
 
 			repoWriterMock := &repomocks.RepositoryWriter{}
