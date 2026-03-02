@@ -493,8 +493,10 @@ func (e *genericRestoreExposer) createRestorePod(
 	containerName := string(ownerObject.UID)
 	volumeName := string(ownerObject.UID)
 
+	nodeSelector := map[string]string{}
 	if selectedNode != "" {
 		affinity = nil
+		nodeSelector["kubernetes.io/hostname"] = selectedNode
 		e.log.Infof("Selected node for restore pod. Ignore affinity from the node-agent config.")
 	}
 
@@ -566,7 +568,6 @@ func (e *genericRestoreExposer) createRestorePod(
 	args = append(args, podInfo.logLevelArgs...)
 
 	var securityCtx *corev1api.PodSecurityContext
-	nodeSelector := map[string]string{}
 	podOS := corev1api.PodOS{}
 	if nodeOS == kube.NodeOSWindows {
 		userID := "ContainerAdministrator"
@@ -668,7 +669,6 @@ func (e *genericRestoreExposer) createRestorePod(
 			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes:                       volumes,
-			NodeName:                      selectedNode,
 			RestartPolicy:                 corev1api.RestartPolicyNever,
 			SecurityContext:               securityCtx,
 			Tolerations:                   toleration,
