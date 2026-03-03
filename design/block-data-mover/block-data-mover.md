@@ -7,8 +7,10 @@
 **Velero Generic Data Path (VGDP)**: VGDP is the collective of modules that is introduced in [Unified Repository design][1]. Velero uses these modules to finish data transfer for various purposes (i.e., PodVolume backup/restore, Volume Snapshot Data Movement). VGDP modules include uploaders and the backup repository.  
 **Velero Built-in Data Mover (VBDM)**: VBDM, which is introduced in [Volume Snapshot Data Movement design][2] and [Unified Repository design][1], is the built-in data mover shipped along with Velero, it includes Velero data mover controllers and VGDP.  
 **Data Mover Pods**: Intermediate pods which hold VGDP and complete the data transfer. See [VGDP Micro Service for Volume Snapshot Data Movement][3] for details.   
-**Change Block Tracking (CBT)**: CBT is the mechanism to track changed blocks, so that backups could back up the changed data only. CBT usually provides by the comupting/storage platform.  
+**Change Block Tracking (CBT)**: CBT is the mechanism to track changed blocks, so that backups could back up the changed data only. CBT usually provides by the computing/storage platform.  
 **TCO**: Total Cost of Ownership. This is a general criteria for products/solutions, but also means a lot for BR solutions. For example, this means what kind of backup storage (and its cost) it requires, the retention policy of backup copies, the ways to remove backup data redundancy, etc.  
+**PodVolume Backup**: This is the Velero backup method which accesses the data from live file system, see [Kopia Integration design][1] for how it works.  
+**CAOS and CABS**: Content-Addressable Object Storage and Content-Addressable Block Storage, they are the parts from Kopia repository, see [Kopia Architecture][5].  
 
 ## Background
 Kubernetes supports two kinds of volume mode, `FileSystem` and `Block`, for persistent volumes. Underlyingly, the storage could use a block storage to provision either `FileSystem` mode or `Block` mode volumes; and the storage could use a file storage to provision `FileSystem` mode volumes.  
@@ -32,7 +34,7 @@ Therefore, it is very important for Velero to deliver the block level backup/res
 Meanwhile, file system level backup/restore is still valuable for below scenarios:
 - The volume is backed by file storage, e.g., AWS EFS, Azure File, CephFS, VKS File Volume, etc.
 - The volume is backed by block storage but CBT is not available
-- The volume doesn't support CSI snapshot, so Velero fs-backup method is used
+- The volume doesn't support CSI snapshot, so Velero PodVolume Backup method is used
 
 There are rich features delivered with VGDP, VBDM and [VGDP micro service][3], to reuse these features, block data mover should be built based on these modules.  
 
@@ -46,13 +48,13 @@ Add a block data mover to VBDM and support block level backup/restore for [CSI S
 - Support block level full backup for both `FileSystem` and `Block` mode volumes
 - Support block level incremental backup for both `FileSystem` and `Block` mode volumes
 - Support block level restore from full/incremental backup for both `FileSystem` and `Block` mode volumes
-- Support block level backup/restore for both linux and Windows workloads
+- Support block level backup/restore for both linux and Windows workloads from linux cluster nodes
 - Support all existing features, i.e., load concurrency, node selection, cache volume, deduplication, compression, encryption, etc. for the block data mover
 - Support volumes processed from file system level and block level in the same backup/restore
 
 ## Non-Goals
 
-- fs-backup does the backup/restore from file system level only, so block level backup/restore is not supported  
+- PodVolume Backup does the backup/restore from file system level only, so block level backup/restore is not supported  
 - Volumes that are backed by file system storages, can only be backed up/restored from file system level, so block level backup/restore is not supported
 - Backing up/restoring from Windows nodes is not supported
 - Block level incremental backup requires special capabilities of the backup repository, and Velero [Unified Repository][1] supports multiple kinds of backup repositories. The current design focus on Kopia repository only, block level incremental backup support of other repositories will be considered when the specific backup repository is integrated to [Velero Unified Repository][1]
@@ -67,17 +69,19 @@ Unified Repo interface and the backup repository needs to be enhanced to support
 
 ![Data path overview](data-path-overview.png) 
 
+For more details of VGDP architecture, see [Unified Repository design][1], [Volume Snapshot Data Movement design][2] and [VGDP Micro Service for Volume Snapshot Data Movement][3].  
+
 ### Backup
 
 Below is the architecture for block data mover backup which is developed based on the existing VBDM:  
 
 ![Backup architecture](backup-architecture.png)
 
-Below are the major changes based on the existing VBDM:  
+The existing VBDM is reused, below are the major changes based on the existing VBDM:  
 **Exposer**: Exposer needs to create block mode backupPVC all the time regardless of the sourcePVC mode.   
 **CBT**: This is a new layer to retrieve, transform and store the changed blocks, it interacts with CSI SnapshotMetadataService through gRPC.  
 **Uploader**: A new block uploader is added. It interacts with CBT layer, holds special logics to make performant data read from block devices and holds special logics to write incremental data to Unified Repository.  
-**Extended Kopia repo**: A new Incremental Aware Object Extension is added to Kopia's CAOS, so as to support incremental data write.  
+**Extended Kopia repo**: A new Incremental Aware Object Extension is added to Kopia's CAOS, so as to support incremental data write. Other parts of Kopia repository, including the existing CAOS and CABS, are not changed.    
 
 ### Restore
 
@@ -85,9 +89,11 @@ Below is architecture for block data mover restore which is developed based on t
 
 ![Restore architecture](restore-architecture.png)
 
-Below are the major changes based on the existing VBDM:  
+The existing VBDM is reused, below are the major changes based on the existing VBDM:  
 **Exposer**: While the restorePV is in block mode, exposer needs to rebind the restorePV to a targetPVC in either file system mode or block mode.    
 **Uploader**: The same block uploader holds special logics to make performant data write to block devices and holds special logics to read  data from the backup chain in Unified repository.  
+
+For more details of VBDM, see [Volume Snapshot Data Movement design][2].  
 
 ## Detailed Design
 
@@ -139,7 +145,7 @@ const (
 )
 ```
 
-`action.parameters` is used to provide extra information of the action. This is an ideal place to differentate Velero file system data mover and Velero block data mover.  
+`action.parameters` is used to provide extra information of the action. This is an ideal place to differentiate Velero file system data mover and Velero block data mover.  
 Therefore, Velero built-in data mover will support `dataMover` key in `parameters`, with the value either `velero-fs` or `velero-block`. While `velero-fs` and `velero-block` are with the same meaning with Per Backup Selection.  
 
 As an example, here is how a user might use both `velero-block` and `velero-fs` in a single backup:    
@@ -259,7 +265,7 @@ To support non-Kopia uploader to save metadata, which is used to describe the ba
 kopia-lib for Unified Repo will implement these interfaces by calling the corresponding Kopia repository functions.  
 
 ### Kopia Repository
-CAOS of Kopia repository implements Unfied Repo's Objects. However, CAOS supports full and sequential write only.  
+CAOS of Kopia repository implements Unified Repo's Objects. However, CAOS supports full and sequential write only.  
 To make it support skippable write, a new Incremental Aware Object Extension is created based on the existing CAOS.  
 
 #### Block Address Table
@@ -290,7 +296,7 @@ Since the existing block address table(BAT) of CAOS is reused and kept as is, it
 - The objects written by Velero block uploader is still recognizable by Kopia, for both full backup and incremental backup
 - The existing data management in Kopia repository still works for objects generated by Velero block uploader, e.g., snapshot GC, repository maintenance, etc.
 
-Most importantly, this solution is super perfromant:
+Most importantly, this solution is super performant:
 - During incremental write, it doesn't copy any data from the parent object, instead, it only clones object block address entries
 - During backup deletion, it doesn't need to move any data, it only deletes the BAT for the object  
 
@@ -304,8 +310,8 @@ CBT provides below functionalities:
 1. For a full backup, it provides the allocated data ranges. E.g., for a 1TB volume, there may be only 1MB of files, with this functionality, the uploader could skip the ranges without real data
 2. For an incremental backup, it provides the changed data ranges based on the provided parent snapshot. In this way, the uploader could skip the unchanged data and achieves an incremental backup
 
-For case 1, the uploader calls Unfied Repo Object's `WriteAt` method with the offset for the allocated data, ranges ahead of the offset will be filled as ZERO by unified repository.  
-For case 2, the uploader calls Unfied Repo Object's `WriteAt` method with the offset for the changed data, ranges ahead of the offset will be cloned from the parent object unified repository.  
+For case 1, the uploader calls Unified Repo Object's `WriteAt` method with the offset for the allocated data, ranges ahead of the offset will be filled as ZERO by unified repository.  
+For case 2, the uploader calls Unified Repo Object's `WriteAt` method with the offset for the changed data, ranges ahead of the offset will be cloned from the parent object unified repository.  
 
 A changeId is stored with each backup, the next backup will retrieve the parent snapshot's changeId and use it to retrieve the CBT.  
 
@@ -330,9 +336,15 @@ In this way, CBT layer and uploader are decoupled and CBT bitmap plays as a nort
 Block uploader consists of the reader and writer which are running asynchronously.  
 During backup, reader reads data from the block device and also refers to CBT Bitmap for allocated/changed blocks; writer writes data to the Unified Repo.
 During restore, reader reads data from the Unified Repo; writer writes data to the block device.  
-Reader and writer connects by a ring buffer, that is, reader pushs the block data to the ring buffer and writer gets data from the ring buffer and write to the target.  
+
+Reader and writer connects by a ring buffer, that is, reader pushes the block data to the ring buffer and writer gets data from the ring buffer and write to the target.  
 
 To improve performance, block device is opened with direct IO, so that no data is going through the system cache unnecessarily.  
+
+During restore, to optimize the write throughput and storage usage, zero blocks should be either skipped (for restoring to a new volume) or unmapped (for restoring to an existing volume). To cover the both cases in a unified way, the SCSI command `WRITE_SAME` is used. Logics are as below:  
+- Detect if a block read from the backup is with all zero data
+- If true, the uploader sends `WRITE_SAME` SCSI command by calling `BLKZEROOUT` ioctl   
+- If the call fails, the uploader fallbaks to use the conservative way to write all zero bytes to the disk
 
 Uploader implementation is OS dependent, but since Windows container doesn't support block volumes, the current implementation is for linux only.  
 
@@ -346,14 +358,14 @@ For Kubernetes API, changeId is represented by `BaseSnapshotId`.
 changeId retrieval is storage specific, generally, it is retrieved from the `SnapshotHandle` of the VolumeSnapshotContent object; however, storages may also refer to other places to retrieve the changeId.  
 That is, `SnapshotHandle` and changeId may be two different values, in this case, the both values need to be preserved.  
 
-#### Volume Snapshot retention
+#### Volume Snapshot Retention
 Storages/CSI drivers may support the changeId differently based on the storage's capabilities:
 1. In order to calculate the changes, some storages require the parent snapshot mapping to the changeId always exists at the time of `GetMetadataDelta` is called, then the parent snapshot can NOT be deleted as long as there are incremental backups based on it.  
 2. Some storages don't require the parent snapshot itself at the time of calculating changes, then parent snapshot could be deleted immediately after the parent backup completes.  
 
 The existing exposer works perfectly with Case 1, that is, the snapshot is always deleted when the backup completes.  
 However, for Case 2, since the snapshot must be retained, the exposer needs changes as below:
-- At the end of each backup, keep the current VolumeSnapshot's `deletionPolicy` as `Retain`, then when the VolumeSnapshot is deleted at the end of the backup, the cureent snapshot is retained in the storage
+- At the end of each backup, keep the current VolumeSnapshot's `deletionPolicy` as `Retain`, then when the VolumeSnapshot is deleted at the end of the backup, the current snapshot is retained in the storage
 - `GetMetadataDelta` is called with `BaseSnapshotId` set as the preserved changeId
 - When deleting a backup, a VolumeSnapshot-VolumeSnapshotContent pair is rebuilt with `deletionPolicy` as `delete` and `snapshotHandle` as the preserved one
 - Then the rebuilt VolumeSnapshot is deleted so that the volume snapshot is deleted from the storage
@@ -369,13 +381,18 @@ type Action struct {
 In this way, users could specify --- for storage class "xxx" or CSI driver "yyy", backup through CSI snapshot with Velero block data mover and retain the snapshot.   
 
 #### Incremental Size
-By the end of the backup, incremental size is also returned by the uploader, as same as Velero file system uploader. The size indicates how much data are unquie so processed by the uploader, based on the provided CBT.  
+By the end of the backup, incremental size is also returned by the uploader, as same as Velero file system uploader. The size indicates how much data are unique so processed by the uploader, based on the provided CBT.  
 
 ### Fallback to Full Backup
 There are some occasions that the incremental backup won't continue, so the data mover fallbacks to full backup:
 - `GetMetadataAllocated` or `GetMetadataDelta` returns error
 - ChangeId is missing
 - Parent snapshot is missing
+
+When the fallback happens, the volume will be fully backed up from block level, but since because of the data deduplication from the backup repository, the unallocated/unchanged data would be probably deduplicated.  
+During restore, the volume will also be fully restored. The zero blocks handling as mentioned above is still working, so that write IO for unallocated data would be probably eliminated.  
+
+Fallback is to handle the exceptional cases, for most of the backups/restores, fallback is never expected.  
 
 ### Irregular Volume Size
 As mentioned above, during incremental backup, block uploader IO should be restricted to be aligned to the deduplication chunk size (1MB); on the other hand, there is no hard limit for users' volume size to be aligned.  
@@ -389,7 +406,7 @@ The padding must be always with zero bytes.
 
 ### Volume Size Change
 Incremental backup could continue when volume is resized.  
-Block uploader supports to write disk with arbibrary size.  
+Block uploader supports to write disk with arbitrary size.  
 The volume resize cases don't need to be handled case by case.  
 
 Instead, when volume resize happens, block uploader needs to handle it appropriately in below ways:
@@ -398,8 +415,8 @@ Instead, when volume resize happens, block uploader needs to handle it appropria
 - If there is no tail data, which means the volume size is aligned to 1MB, then call `WriteAt(newSize, nil)`
 - Otherwise, call `WriteAt(RoundDownTo1M(newSize), taildata)`, `taildata` is also padded to 1MB
 
-That is to day:
-- If CBT covers the tail of the volume, loop with CBT is enough for both shink and expand case
+That is to say:
+- If CBT covers the tail of the volume, loop with CBT is enough for both shrink and expand case
 - Otherwise, if volume is expanded, `WriteAt` guarantees to clone appropriate objects entries from the parent object and append zero data for the expanded areas. Particularly, if the parent volume is not in regular size, the zero padding bytes is also reused. Therefore, the parent object's padding bytes must be zero
 - In the case the volume is shrunk, writing the tail data makes sure zero bytes are padding to the new volume object instead of inheriting non-zero data from the parent object
 
@@ -410,7 +427,7 @@ Inside the uploader, cancellation checkpoints are embedded to the uploader reade
 ### Parallelism
 Parallelism among data movers will reuse the existing mechanism --- load concurrency.  
 Inside the data mover, uploader reader and writer are always running in parallel. The number of reader and writer is always 1.  
-Sequaltial read/write of the volume is always optimized, there is no prove that multiple readers/writers are beneficial.  
+Sequential read/write of the volume is always optimized, there is no prove that multiple readers/writers are beneficial.  
 
 ### Progress Report
 Progress report outside of the data mover will reuse the existing mechanism.  
@@ -422,6 +439,7 @@ type Progress struct {
 	BytesDone  int64 `json:"doneBytes,omitempty"`
 }
 ``` 
+By the end of the backup, the progress for block data mover provides the same `GetIncrementalSize` which reports the incremental size of the backup, so that the incremental size is reported to users in the same way as the file system data mover.  
 
 ### Selectable Backup Type
 For many reasons, a periodical full backup is required:  
@@ -442,14 +460,18 @@ Therefore, to solve this problem and to make it align with Velero block data mov
 At present, the data path for Velero file system data mover has already supported it, we only need to expose this functionality to users.  
 
 ### Backup Describe
-Backup type should be added to backup description, this value could be retrieved from `volumeInfo.json`.  
+Backup type should be added to backup description, there are two appearances:
+- The `backupType` in the Backup CR. This is the selected backup type by users
+- The backup type recorded in `volumeInfo.json`, which is the actual type taken by the backup
+With these two values, users are able to know the actual backup type and also whether a fallback happens.  
+
 The `DataMover` item in the existing backup description should be updated to reflect the actual data mover completing the backup, this information could be retrieved from `volumeInfo.json`.  
 
 ### Backup Sync
 No more data is required for sync, so Backup Sync is kept as is.  
 
 ### Backup Deletion
-As mentioned above, no data is moved when deleting a repo snapshot for Velero block data mover, so Backup Deletion is kept as is.  
+As mentioned above, no data is moved when deleting a repo snapshot for Velero block data mover, so Backup Deletion is kept as is regarding to repo snapshot; and for volume snapshot retention case, backup deletion logics will be modified accordingly to delete the retained snapshots.  
 
 ### Restarts
 Restarts mechanism is reused without any change.  
@@ -458,9 +480,9 @@ Restarts mechanism is reused without any change.
 Logging mechanism is not changed.  
 
 ### Backup CRD
-A `backupType` field is added to Backup CRD, three values are supported `""`, `full` or `incremental`.  
+A `backupType` field is added to Backup CRD, two values are supported `full` or `incremental`.  
 `full` indicates the data mover to take a full backup.  
-`""` fallbacks to `incremental` which indicates the data mover to take an incremental backup.  
+`incremental` which is the default value, indicates the data mover to take an incremental backup.  
 
 ```yaml
           spec:
@@ -471,7 +493,6 @@ A `backupType` field is added to Backup CRD, three values are supported `""`, `f
                 enum:
                 - full
                 - incremental
-                - ""
                 type: string
 ```
 
@@ -527,3 +548,4 @@ When the parameter is not specified, by default, Velero goes with incremental ba
 [2]: ../Implemented/volume-snapshot-data-movement/volume-snapshot-data-movement.md
 [3]: ../Implemented/vgdp-micro-service/vgdp-micro-service.md
 [4]: https://kubernetes.io/blog/2025/09/25/csi-changed-block-tracking/
+[5]: https://kopia.io/docs/advanced/architecture/
