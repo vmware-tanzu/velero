@@ -70,10 +70,12 @@ var SpecificRepoMaintenanceTest func() = TestFunc(&RepoMaintenanceTestCase{
 	jobConfigs: velerotypes.JobConfigs{
 		KeepLatestMaintenanceJobs: &keepJobNum,
 		PodResources: &velerokubeutil.PodResources{
-			CPURequest:    "100m",
-			MemoryRequest: "100Mi",
-			CPULimit:      "200m",
-			MemoryLimit:   "200Mi",
+			CPURequest:              "100m",
+			MemoryRequest:           "100Mi",
+			EphemeralStorageRequest: "5Gi",
+			CPULimit:                "200m",
+			MemoryLimit:             "200Mi",
+			EphemeralStorageLimit:   "10Gi",
 		},
 		PriorityClassName: test.PriorityClassNameForRepoMaintenance,
 	},
@@ -230,8 +232,10 @@ func (r *RepoMaintenanceTestCase) Verify() error {
 	resources, err := kube.ParseResourceRequirements(
 		r.jobConfigs.PodResources.CPURequest,
 		r.jobConfigs.PodResources.MemoryRequest,
+		r.jobConfigs.PodResources.EphemeralStorageRequest,
 		r.jobConfigs.PodResources.CPULimit,
 		r.jobConfigs.PodResources.MemoryLimit,
+		r.jobConfigs.PodResources.EphemeralStorageLimit,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse resource requirements for maintenance job")

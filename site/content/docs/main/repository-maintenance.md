@@ -72,6 +72,8 @@ data:
       "podResources": {
         "cpuRequest": "100m",
         "cpuLimit": "200m",
+        "ephemeralStorageRequest": "5Gi",
+        "ephemeralStorageLimit": "10Gi",
         "memoryRequest": "100Mi",
         "memoryLimit": "200Mi"
       },
@@ -99,6 +101,8 @@ data:
       "podResources": {
         "cpuRequest": "200m",
         "cpuLimit": "400m",
+        "ephemeralStorageRequest": "5Gi",
+        "ephemeralStorageLimit": "10Gi",
         "memoryRequest": "200Mi",
         "memoryLimit": "400Mi"
       },

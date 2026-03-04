@@ -275,11 +275,21 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 			return nil, err
 		}
 	}
-	veleroPodResources, err := kubeutil.ParseResourceRequirements(o.VeleroPodCPURequest, o.VeleroPodMemRequest, o.VeleroPodCPULimit, o.VeleroPodMemLimit)
+	veleroPodResources, err := kubeutil.ParseCPUAndMemoryResources(
+		o.VeleroPodCPURequest,
+		o.VeleroPodMemRequest,
+		o.VeleroPodCPULimit,
+		o.VeleroPodMemLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
-	nodeAgentPodResources, err := kubeutil.ParseResourceRequirements(o.NodeAgentPodCPURequest, o.NodeAgentPodMemRequest, o.NodeAgentPodCPULimit, o.NodeAgentPodMemLimit)
+	nodeAgentPodResources, err := kubeutil.ParseCPUAndMemoryResources(
+		o.NodeAgentPodCPURequest,
+		o.NodeAgentPodMemRequest,
+		o.NodeAgentPodCPULimit,
+		o.NodeAgentPodMemLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
