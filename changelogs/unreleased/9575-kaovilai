@@ -1,1 +1,1 @@
-Remove toleration whitelist for PodVolumeBackup and data mover pods
+Remove toleration allowlist for PodVolumeBackup and data mover pods
