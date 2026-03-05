@@ -497,7 +497,7 @@ var _ = Describe(
 var _ = Describe(
 	"Velero test on backup/restore with wildcard namespaces",
 	Label("ResourceFiltering", "WildcardNamespaces"),
-	BackupWithWildcardNamespaces,
+	WildcardNamespacesTest,
 )
 var _ = Describe(
 	"Velero test on include resources from the cluster backup",

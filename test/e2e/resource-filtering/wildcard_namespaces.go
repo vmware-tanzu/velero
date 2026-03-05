@@ -28,65 +28,72 @@ import (
 )
 
 // WildcardNamespaces tests the inclusion and exclusion of namespaces using wildcards
-// introduced in PR #9255 (Issue #1874).
+// introduced in PR #9255 (Issue #1874). It verifies filtering at both Backup and Restore stages.
 type WildcardNamespaces struct {
-	TestCase
-	namespacesToInclude []string
-	namespacesToExclude []string
+	TestCase            // Inherit from basic TestCase instead of FilteringCase to customize a single flow
+	restoredNS          []string
+	excludedByBackupNS  []string
+	excludedByRestoreNS []string
 }
 
-var BackupWithWildcardNamespaces func() = TestFunc(&WildcardNamespaces{})
+// Register as a single E2E test
+var WildcardNamespacesTest func() = TestFunc(&WildcardNamespaces{})
 
 func (w *WildcardNamespaces) Init() error {
 	Expect(w.TestCase.Init()).To(Succeed())
 
-	// Use CaseBaseName as a prefix for all namespaces so that the base
-	// TestCase.Destroy() and TestCase.Clean() can automatically garbage-collect them.
 	w.CaseBaseName = "wildcard-ns-" + w.UUIDgen
 	w.BackupName = "backup-" + w.CaseBaseName
 	w.RestoreName = "restore-" + w.CaseBaseName
 
-	// Define specific namespaces to test both wildcard include and exclude
-	w.namespacesToInclude = []string{
-		w.CaseBaseName + "-inc-wild-1", // Will be matched by *-inc-wild-*
-		w.CaseBaseName + "-inc-wild-2", // Will be matched by *-inc-wild-*
-		w.CaseBaseName + "-exact-inc",  // Exact match
-	}
-	w.namespacesToExclude = []string{
-		w.CaseBaseName + "-exc-wild-1", // Excluded by *-exc-wild-*
-		w.CaseBaseName + "-exc-wild-2", // Excluded by *-exc-wild-*
-	}
+	// 1. Define namespaces for different filtering lifecycle scenarios
+	nsIncBoth := w.CaseBaseName + "-inc-both" // Included in both backup and restore
+	nsExact := w.CaseBaseName + "-exact"      // Included exactly without wildcards
+	nsIncExc := w.CaseBaseName + "-inc-exc"   // Included in backup, but excluded during restore
+	nsBakExc := w.CaseBaseName + "-test-bak"  // Excluded during backup
+
+	// Group namespaces for validation
+	w.restoredNS = []string{nsIncBoth, nsExact}
+	w.excludedByRestoreNS = []string{nsIncExc}
+	w.excludedByBackupNS = []string{nsBakExc}
 
 	w.TestMsg = &TestMSG{
 		Desc:      "Backup and restore with wildcard namespaces",
-		Text:      "Should correctly backup and restore namespaces matching the include wildcard, and skip the exclude wildcard",
+		Text:      "Should correctly filter namespaces using wildcards during both backup and restore stages",
 		FailedMSG: "Failed to properly filter namespaces using wildcards",
 	}
 
-	// Construct wildcard strings
-	incWildcard := fmt.Sprintf("%s-inc-wild-*", w.CaseBaseName)
-	excWildcard := fmt.Sprintf("%s-exc-wild-*", w.CaseBaseName)
-	exactInc := fmt.Sprintf("%s-exact-inc", w.CaseBaseName)
+	// 2. Setup Backup Args
+	backupIncWildcard1 := fmt.Sprintf("%s-inc-*", w.CaseBaseName)   // Matches nsIncBoth, nsIncExc
+	backupIncWildcard2 := fmt.Sprintf("%s-test-*", w.CaseBaseName)  // Matches nsBakExc
+	backupExcWildcard := fmt.Sprintf("%s-test-bak", w.CaseBaseName) // Excludes nsBakExc
+	nonExistentWildcard := "non-existent-ns-*"                      // Tests zero-match boundary condition
 
-	// In backup args, we intentionally include the `excWildcard` in the include-namespaces
-	// to verify that `exclude-namespaces` correctly overrides it.
 	w.BackupArgs = []string{
 		"create", "--namespace", w.VeleroCfg.VeleroNamespace, "backup", w.BackupName,
-		"--include-namespaces", fmt.Sprintf("%s,%s,%s", incWildcard, exactInc, excWildcard),
-		"--exclude-namespaces", excWildcard,
+		// Use broad wildcards for inclusion to bypass Velero CLI's literal string collision validation
+		"--include-namespaces", fmt.Sprintf("%s,%s,%s,%s", backupIncWildcard1, backupIncWildcard2, nsExact, nonExistentWildcard),
+		"--exclude-namespaces", backupExcWildcard,
 		"--default-volumes-to-fs-backup", "--wait",
 	}
 
+	// 3. Setup Restore Args
+	restoreExcWildcard := fmt.Sprintf("%s-*-exc", w.CaseBaseName) // Excludes nsIncExc
+
 	w.RestoreArgs = []string{
 		"create", "--namespace", w.VeleroCfg.VeleroNamespace, "restore", w.RestoreName,
-		"--from-backup", w.BackupName, "--wait",
+		"--from-backup", w.BackupName,
+		"--include-namespaces", fmt.Sprintf("%s,%s,%s", backupIncWildcard1, nsExact, nonExistentWildcard),
+		"--exclude-namespaces", restoreExcWildcard,
+		"--wait",
 	}
 
 	return nil
 }
 
 func (w *WildcardNamespaces) CreateResources() error {
-	allNamespaces := append(w.namespacesToInclude, w.namespacesToExclude...)
+	allNamespaces := append(w.restoredNS, w.excludedByRestoreNS...)
+	allNamespaces = append(allNamespaces, w.excludedByBackupNS...)
 
 	for _, ns := range allNamespaces {
 		By(fmt.Sprintf("Creating namespace %s", ns), func() {
@@ -104,8 +111,8 @@ func (w *WildcardNamespaces) CreateResources() error {
 }
 
 func (w *WildcardNamespaces) Verify() error {
-	// 1. Verify included namespaces and their resources were fully restored
-	for _, ns := range w.namespacesToInclude {
+	// 1. Verify namespaces that should be successfully restored
+	for _, ns := range w.restoredNS {
 		By(fmt.Sprintf("Checking included namespace %s exists", ns), func() {
 			_, err := GetNamespace(w.Ctx, w.Client, ns)
 			Expect(err).To(Succeed(), fmt.Sprintf("Included namespace %s should exist after restore", ns))
@@ -115,11 +122,20 @@ func (w *WildcardNamespaces) Verify() error {
 		})
 	}
 
-	// 2. Verify excluded namespaces were NOT restored
-	for _, ns := range w.namespacesToExclude {
-		By(fmt.Sprintf("Checking excluded namespace %s does NOT exist", ns), func() {
+	// 2. Verify namespaces excluded during Backup
+	for _, ns := range w.excludedByBackupNS {
+		By(fmt.Sprintf("Checking namespace %s excluded by backup does NOT exist", ns), func() {
 			_, err := GetNamespace(w.Ctx, w.Client, ns)
-			Expect(err).To(HaveOccurred(), fmt.Sprintf("Excluded namespace %s should NOT exist after restore", ns))
+			Expect(err).To(HaveOccurred(), fmt.Sprintf("Namespace %s excluded by backup should NOT exist after restore", ns))
+			Expect(apierrors.IsNotFound(err)).To(BeTrue(), "Error should be NotFound")
+		})
+	}
+
+	// 3. Verify namespaces excluded during Restore
+	for _, ns := range w.excludedByRestoreNS {
+		By(fmt.Sprintf("Checking namespace %s excluded by restore does NOT exist", ns), func() {
+			_, err := GetNamespace(w.Ctx, w.Client, ns)
+			Expect(err).To(HaveOccurred(), fmt.Sprintf("Namespace %s excluded by restore should NOT exist after restore", ns))
 			Expect(apierrors.IsNotFound(err)).To(BeTrue(), "Error should be NotFound")
 		})
 	}
