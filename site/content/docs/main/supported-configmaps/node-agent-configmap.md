@@ -224,7 +224,7 @@ Configure different node selection rules for specific storage classes:
 ```
 
 ### Pod Resources (`podResources`)
-Configure CPU and memory resources for Data Mover Pods to optimize performance and prevent resource conflict.
+Configure CPU, memory and ephemeral storage resources for Data Mover Pods to optimize performance and prevent resource conflict.
 
 The configurations work for PodVolumeBackup, PodVolumeRestore, DataUpload, and DataDownload pods.
 
@@ -233,6 +233,8 @@ The configurations work for PodVolumeBackup, PodVolumeRestore, DataUpload, and D
   "podResources": {
     "cpuRequest": "1000m",
     "cpuLimit": "2000m",
+    "ephemeralStorageRequest": "5Gi",
+    "ephemeralStorageLimit": "10Gi",
     "memoryRequest": "1Gi",
     "memoryLimit": "4Gi"
   }
@@ -535,6 +537,8 @@ Here's a comprehensive example showing how all configuration sections work toget
   "podResources": {
     "cpuRequest": "500m",
     "cpuLimit": "1000m",
+    "ephemeralStorageRequest": "5Gi",
+    "ephemeralStorageLimit": "10Gi",
     "memoryRequest": "1Gi",
     "memoryLimit": "2Gi"
   },

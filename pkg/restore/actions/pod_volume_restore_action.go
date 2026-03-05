@@ -163,12 +163,19 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 		memLimit = defaultMemRequestLimit
 	}
 
-	resourceReqs, err := kube.ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit)
+	resourceReqs, err := kube.ParseCPUAndMemoryResources(
+		cpuRequest,
+		memRequest,
+		cpuLimit,
+		memLimit,
+	)
 	if err != nil {
 		log.Errorf("couldn't parse resource requirements: %s.", err)
-		resourceReqs, _ = kube.ParseResourceRequirements(
-			defaultCPURequestLimit, defaultMemRequestLimit, // requests
-			defaultCPURequestLimit, defaultMemRequestLimit, // limits
+		resourceReqs, _ = kube.ParseCPUAndMemoryResources(
+			defaultCPURequestLimit,
+			defaultMemRequestLimit,
+			defaultCPURequestLimit,
+			defaultMemRequestLimit,
 		)
 	}
 
