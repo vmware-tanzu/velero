@@ -321,6 +321,7 @@ func (v *volumeHelperImpl) ShouldPerformCustomAction(obj runtime.Unstructured, g
 	pv := new(corev1api.PersistentVolume)
 	var err error
 
+	var pvNotFoundErr error
 	if groupResource == kuberesource.PersistentVolumeClaims {
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
 			v.logger.WithError(err).Error("fail to convert unstructured into PVC")
@@ -329,8 +330,10 @@ func (v *volumeHelperImpl) ShouldPerformCustomAction(obj runtime.Unstructured, g
 
 		pv, err = kubeutil.GetPVForPVC(pvc, v.client)
 		if err != nil {
-			v.logger.WithError(err).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
-			return false, err
+			// Any error means PV not available - save to return later if no policy matches
+			v.logger.Debugf("PV not found for PVC %s: %v", pvc.Namespace+"/"+pvc.Name, err)
+			pvNotFoundErr = err
+			pv = nil
 		}
 	}
 
@@ -345,7 +348,7 @@ func (v *volumeHelperImpl) ShouldPerformCustomAction(obj runtime.Unstructured, g
 		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
 		action, err := v.volumePolicy.GetMatchAction(vfd)
 		if err != nil {
-			v.logger.WithError(err).Errorf("fail to get VolumePolicy match action for PV %s", pv.Name)
+			v.logger.WithError(err).Errorf("fail to get VolumePolicy match action for %+v", vfd)
 			return false, err
 		}
 
@@ -356,17 +359,23 @@ func (v *volumeHelperImpl) ShouldPerformCustomAction(obj runtime.Unstructured, g
 			if action.Type == resourcepolicies.Custom {
 				for k, requiredValue := range matchParams {
 					if actionValue, ok := action.Parameters[k]; !ok || actionValue != requiredValue {
-						v.logger.Infof("Skipping custom action for pv %s as value for parameter %s is %s rather than the required %s", pv.Name, k, actionValue, requiredValue)
+						v.logger.Infof("Skipping custom action for %+v as value for parameter %s is %s rather than the required %s", vfd, k, actionValue, requiredValue)
 						return false, nil
 					}
 				}
-				v.logger.Infof(fmt.Sprintf("performing custom action for pv %s", pv.Name))
+				v.logger.Infof("performing snapshot action for %+v", vfd)
 				return true, nil
 			} else {
 				v.logger.Infof("Skipping custom action for pv %s as the action type is %s", pv.Name, action.Type)
 				return false, nil
 			}
 		}
+	}
+	// If resource is PVC, and PV is nil (e.g., Pending/Lost PVC with no matching policy), return the original error
+	// Don't error out on no PV, just return false
+	if groupResource == kuberesource.PersistentVolumeClaims && pv == nil && pvNotFoundErr != nil {
+		v.logger.WithError(pvNotFoundErr).Warnf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
+		return false, nil
 	}
 
 	v.logger.Infof(fmt.Sprintf("skipping custom action for pv %s due to no matching volume policy", pv.Name))
