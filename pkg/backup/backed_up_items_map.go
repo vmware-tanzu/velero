@@ -98,6 +98,14 @@ func (m *backedUpItemsMap) AddItem(key itemKey) {
 	m.totalItems[key] = struct{}{}
 }
 
+func (m *backedUpItemsMap) DeleteItem(key itemKey) {
+	m.Lock()
+	defer m.Unlock()
+
+	delete(m.backedUpItems, key)
+	delete(m.totalItems, key)
+}
+
 func (m *backedUpItemsMap) AddItemToTotal(key itemKey) {
 	m.Lock()
 	defer m.Unlock()
