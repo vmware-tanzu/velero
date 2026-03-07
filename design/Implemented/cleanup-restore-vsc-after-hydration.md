@@ -79,6 +79,73 @@ The `PVCRestoreItemAction` already supports async operations for the **data move
 
 The changes are confined to `pkg/restore/actions/csi/pvc_action.go`. The existing `pvcRestoreItemAction` struct already has the `crClient` field needed to query Kubernetes resources.
 
+#### Restore Phase Transition Graphs
+Current Flow (CSI Snapshot Restore : No Data Mover)
+
+```
+┌─────────┐     ┌──────────────┐     ┌──────────────┐     ┌─────────────┐
+│   New   │────▶│  InProgress  │────▶│  Finalizing  │────▶│  Completed  │
+└─────────┘     └──────────────┘     └──────────────┘     └─────────────┘
+                                                                          
+                 No operationID                                           
+                 returned for CSI     PVC hydration        VS/VSC are     
+                 snapshot path ─▶     NOT tracked ─▶       NEVER cleaned  
+                 skips async          goes straight         up (orphaned)  
+                 operation tracking   to Finalizing                                              
+```
+
+Problem: Since no operationID is returned, Velero skips WaitingForPluginOperations entirely. The restore completes immediately without waiting for PVC hydration and without cleaning up the VS/VSC.
+
+New Flow (CSI Snapshot Restore)
+
+```
+┌─────────┐     ┌──────────────┐     ┌───────────────────────────────┐     ┌──────────────┐     ┌─────────────┐
+│   New   │────▶│  InProgress  │────▶│  WaitingForPluginOperations   │────▶│  Finalizing  │────▶│  Completed  │
+└─────────┘     └──────────────┘     └───────────────────────────────┘     └──────────────┘     └─────────────┘
+                                                    │                                                          
+                PVCRestoreItemAction                │ restoreOperationsReconciler                              
+                now returns an                      │ periodically calls Progress()                            
+                operationID for CSI                 │ on PVCRestoreItemAction:                                 
+                snapshot path too                   │                                                          
+                                                    │  ┌─────────────────────────────┐                         
+                                                    │  │ Progress() checks:          │                         
+                                                    ├──│  1. PVC Bound?              │                         
+                                                    │  │  2. VSC ReadyToUse?         │                         
+                                                    │  │  3. VS ReadyToUse?          │                         
+                                                    │  └─────────────────────────────┘                         
+                                                    │                                                          
+                                                    │  Once all checks pass:                                   
+                                                    │  ┌─────────────────────────────┐                         
+                                                    └──│ Cleanup:                    │                         
+                                                       │  1. VSC DeletionPolicy ─▶   │                         
+                                                       │     Change to "Delete"      │                         
+                                                       │  2. Delete VS               │                         
+                                                       │     (cascades to delete VSC)│                         
+                                                       │  3. Report operation        │                         
+                                                       │     complete                │                         
+                                                       └─────────────────────────────┘                         
+```
+
+Error/Partial Failure Paths
+
+```
+┌─────────┐     ┌──────────────┐     ┌─────────────────────────────────────────────┐     ┌──────────────────────────────┐     ┌────────────────────┐
+│   New   │────▶│  InProgress  │──┬─▶│  WaitingForPluginOperations                 │──┬─▶│  Finalizing                  │────▶│  Completed         │
+└─────────┘     └──────────────┘  │  └─────────────────────────────────────────────┘  │  └──────────────────────────────┘     └────────────────────┘
+                                  │                     │                              │                                                             
+                                  │      error during   │                              │                                                             
+                                  │      Progress()     ▼                              │                                                             
+                                  │  ┌─────────────────────────────────────────────┐   │  ┌──────────────────────────────┐     ┌────────────────────┐
+                                  │  │  WaitingForPluginOperationsPartiallyFailed  │───┴─▶│  FinalizingPartiallyFailed   │────▶│  PartiallyFailed   │
+                                  │  └─────────────────────────────────────────────┘      └──────────────────────────────┘     └────────────────────┘
+                                  │                                                                                                                  
+                                  │  (fatal error during InProgress)                                                                                 
+                                  └──────────────────────────────────────────────────────────────────────────────────────────▶┌────────────────────┐
+                                                                                                                             │  Failed            │
+                                                                                                                             └────────────────────┘
+
+```
+
 ### Changes to `PVCRestoreItemAction.Execute()`
 
 In the CSI snapshot restore branch (the `else` block after the data mover check), generate an `operationID` and store the VS/VSC names as metadata for later use by `Progress()`:
