@@ -39,6 +39,10 @@ spec:
   # asynchronous BackupItemAction operations
   # The default value is 4 hour.
   itemOperationTimeout: 4h
+  # BackupOperationsFrequency specifies how often to check the status of
+  # asynchronous BackupItemAction operations during a backup.
+  # The default value is 10s.
+  backupOperationsFrequency: 10s
   # resourcePolicy specifies the referenced resource policies that backup should follow
   # optional
   resourcePolicy:

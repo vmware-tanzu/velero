@@ -166,6 +166,12 @@ type BackupSpec struct {
 	// The default value is 4 hour.
 	// +optional
 	ItemOperationTimeout metav1.Duration `json:"itemOperationTimeout,omitempty"`
+
+	// BackupOperationsFrequency specifies the frequency for checking backup operations progress.
+	// The default value is 10 seconds.
+	// +optional
+	BackupOperationsFrequency metav1.Duration `json:"backupOperationsFrequency,omitempty"`
+
 	// ResourcePolicy specifies the referenced resource policies that backup should follow
 	// +optional
 	ResourcePolicy *corev1api.TypedLocalObjectReference `json:"resourcePolicy,omitempty"`

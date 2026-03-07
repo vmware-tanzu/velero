@@ -60,6 +60,16 @@ type backupOperationsReconciler struct {
 	metrics           *metrics.ServerMetrics
 }
 
+// getBackupOperationsFrequency returns the effective backup operations frequency for a backup.
+// It uses the frequency specified in the backup spec if set, otherwise falls back to the
+// controller's default frequency.
+func (c *backupOperationsReconciler) getBackupOperationsFrequency(backup *velerov1api.Backup) time.Duration {
+	if backup.Spec.BackupOperationsFrequency.Duration > 0 {
+		return backup.Spec.BackupOperationsFrequency.Duration
+	}
+	return c.frequency
+}
+
 func NewBackupOperationsReconciler(
 	logger logrus.FieldLogger,
 	client client.Client,

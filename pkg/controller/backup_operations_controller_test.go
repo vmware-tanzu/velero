@@ -347,3 +347,46 @@ func TestWrapErrMsg(t *testing.T) {
 		})
 	}
 }
+
+func TestGetBackupOperationsFrequency(t *testing.T) {
+	tests := []struct {
+		name              string
+		backupFrequency   time.Duration
+		controllerFreq    time.Duration
+		expectedFrequency time.Duration
+	}{
+		{
+			name:              "backup with custom frequency",
+			backupFrequency:   30 * time.Second,
+			controllerFreq:    10 * time.Second,
+			expectedFrequency: 30 * time.Second,
+		},
+		{
+			name:              "backup without frequency uses controller default",
+			backupFrequency:   0,
+			controllerFreq:    10 * time.Second,
+			expectedFrequency: 10 * time.Second,
+		},
+		{
+			name:              "backup with 1 minute frequency",
+			backupFrequency:   1 * time.Minute,
+			controllerFreq:    10 * time.Second,
+			expectedFrequency: 1 * time.Minute,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			backup := builder.ForBackup(velerov1api.DefaultNamespace, "test-backup").Result()
+			if test.backupFrequency > 0 {
+				backup.Spec.BackupOperationsFrequency.Duration = test.backupFrequency
+			}
+
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t)
+			reconciler := mockBackupOperationsReconciler(fakeClient, testclocks.NewFakeClock(time.Now()), test.controllerFreq)
+
+			freq := reconciler.getBackupOperationsFrequency(backup)
+			assert.Equal(t, test.expectedFrequency, freq)
+		})
+	}
+}

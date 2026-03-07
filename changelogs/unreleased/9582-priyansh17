@@ -1,0 +1,1 @@
+Add backupOperationsFrequency field to Backup CRD for per-backup configuration of async operation check frequency

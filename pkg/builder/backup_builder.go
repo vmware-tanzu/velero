@@ -294,6 +294,12 @@ func (b *BackupBuilder) ItemOperationTimeout(timeout time.Duration) *BackupBuild
 	return b
 }
 
+// BackupOperationsFrequency sets the Backup's BackupOperationsFrequency
+func (b *BackupBuilder) BackupOperationsFrequency(frequency time.Duration) *BackupBuilder {
+	b.object.Spec.BackupOperationsFrequency.Duration = frequency
+	return b
+}
+
 // ResourcePolicies sets the Backup's resource polices.
 func (b *BackupBuilder) ResourcePolicies(name string) *BackupBuilder {
 	b.object.Spec.ResourcePolicy = &corev1api.TypedLocalObjectReference{Kind: resourcepolicies.ConfigmapRefType, Name: name}
