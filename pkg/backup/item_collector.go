@@ -75,6 +75,7 @@ type nsTracker struct {
 	logger              logrus.FieldLogger
 
 	namespaceMap map[string]bool
+	namespaces   []string
 }
 
 // track add the namespace into the namespaceMap.
@@ -124,6 +125,8 @@ func (nt *nsTracker) init(
 			nt.logger.Infof("Skip namespace %s because it's not in Active phase.", namespace.GetName())
 			continue
 		}
+
+		nt.namespaces = append(nt.namespaces, namespace.GetName())
 
 		if nt.singleLabelSelector != nil &&
 			nt.singleLabelSelector.Matches(labels.Set(namespace.GetLabels())) {
@@ -448,21 +451,37 @@ func (r *itemCollector) getResourceItems(
 		}
 	}
 
+	unstructuredNamespaces := []unstructured.Unstructured{}
 	// Handle namespace resource here.
 	// Namespace are filtered by namespace include/exclude filters,
 	// backup LabelSelectors and OrLabelSelectors are checked too.
 	if gr == kuberesource.Namespaces {
+		resourceClient, err := r.dynamicFactory.ClientForGroupVersionResource(gv, resource, "")
+		if err != nil {
+			log.WithError(err).Error("Error getting dynamic client")
+			return nil, errors.WithStack(err)
+		}
+
+		unstructuredList, err := resourceClient.List(metav1.ListOptions{})
+		if err != nil {
+			log.WithError(errors.WithStack(err)).Error("error list namespaces")
+			return nil, errors.WithStack(err)
+		}
+
+		unstructuredNamespaces = unstructuredList.Items
+
 		return r.collectNamespaces(
 			resource,
 			gv,
 			gr,
 			preferredGVR,
 			log,
+			unstructuredList,
 		)
 	}
 
 	clusterScoped := !resource.Namespaced
-	namespacesToList := getNamespacesToList(r.backupRequest.NamespaceIncludesExcludes)
+	namespacesToList := getNamespacesToList(r.backupRequest.NamespaceIncludesExcludes, unstructuredNamespaces)
 
 	// If we get here, we're backing up something other than namespaces
 	if clusterScoped {
@@ -634,21 +653,26 @@ func coreGroupResourcePriority(resource string) int {
 
 // getNamespacesToList examines ie and resolves the includes and excludes to a full list of
 // namespaces to list. If ie is nil or it includes *, the result is just "" (list across all
-// namespaces). Otherwise, the result is a list of every included namespace minus all excluded ones.
-func getNamespacesToList(ie *collections.IncludesExcludes) []string {
+// namespaces). Otherwise, the result is a list of namespaces pass ShouldInclude check.
+func getNamespacesToList(
+	ie *collections.IncludesExcludes,
+	unstructuredNamespaces []unstructured.Unstructured,
+) []string {
 	if ie == nil {
 		return []string{""}
 	}
 
-	if ie.ShouldInclude("*") {
+	// ShouldInclude("*") is not enough to determine including all namespaces,
+	// because there might be excludes. So we need to check excludes too.
+	if ie.ShouldInclude("*") && len(ie.GetExcludes()) == 0 {
 		// "" means all namespaces
 		return []string{""}
 	}
 
 	var list []string
-	for _, i := range ie.GetIncludes() {
-		if ie.ShouldInclude(i) {
-			list = append(list, i)
+	for _, n := range unstructuredNamespaces {
+		if ie.ShouldInclude(n.GetName()) {
+			list = append(list, n.GetName())
 		}
 	}
 
@@ -745,19 +769,8 @@ func (r *itemCollector) collectNamespaces(
 	gr schema.GroupResource,
 	preferredGVR schema.GroupVersionResource,
 	log logrus.FieldLogger,
+	unstructuredList *unstructured.UnstructuredList,
 ) ([]*kubernetesResource, error) {
-	resourceClient, err := r.dynamicFactory.ClientForGroupVersionResource(gv, resource, "")
-	if err != nil {
-		log.WithError(err).Error("Error getting dynamic client")
-		return nil, errors.WithStack(err)
-	}
-
-	unstructuredList, err := resourceClient.List(metav1.ListOptions{})
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("error list namespaces")
-		return nil, errors.WithStack(err)
-	}
-
 	for _, includedNSName := range r.backupRequest.Backup.Spec.IncludedNamespaces {
 		nsExists := false
 		// Skip checking the namespace existing when it's "*".

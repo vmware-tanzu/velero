@@ -21,7 +21,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +30,6 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
@@ -263,24 +261,12 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 					unstructured.Unstructured{Object: unstructuredNS})
 			}
 
-			dc := &test.FakeDynamicClient{}
-			dc.On("List", mock.Anything).Return(&unstructuredNSList, nil)
-
-			factory := &test.FakeDynamicFactory{}
-			factory.On(
-				"ClientForGroupVersionResource",
-				mock.Anything,
-				mock.Anything,
-				mock.Anything,
-			).Return(dc, nil)
-
 			r := itemCollector{
 				backupRequest: &Request{
 					Backup:                    tc.backup,
 					NamespaceIncludesExcludes: tc.ie,
 				},
-				dynamicFactory: factory,
-				dir:            tempDir,
+				dir: tempDir,
 			}
 
 			if tc.converter == nil {
@@ -297,11 +283,65 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 				kuberesource.Namespaces,
 				kuberesource.Namespaces.WithVersion(""),
 				logrus.StandardLogger(),
+				&unstructuredNSList,
 			)
 
 			for _, ns := range tc.expectedTrackedNS {
 				require.True(t, r.nsTracker.isTracked(ns))
 			}
+		})
+	}
+}
+
+func TestGetNamespacesToList(t *testing.T) {
+	tests := []struct {
+		name       string
+		ie         *collections.IncludesExcludes
+		namespaces []unstructured.Unstructured
+		expected   []string
+	}{
+		{
+			name: "IE is nil",
+			namespaces: []unstructured.Unstructured{
+				{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "ns1"}}},
+				{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "ns2"}}},
+			},
+			expected: []string{""},
+		},
+		{
+			name: "Include is *",
+			ie:   collections.NewIncludesExcludes().Includes("*"),
+			namespaces: []unstructured.Unstructured{
+				{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "ns1"}}},
+				{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "ns2"}}},
+			},
+			expected: []string{""},
+		},
+		{
+			name: "Include is *, Exclude is ns1",
+			ie:   collections.NewIncludesExcludes().Includes("*").Excludes("ns1"),
+			namespaces: []unstructured.Unstructured{
+				{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "ns1"}}},
+				{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "ns2"}}},
+			},
+			expected: []string{"ns2"},
+		},
+		{
+			name: "Include is list, Exclude is ns1",
+			ie:   collections.NewIncludesExcludes().Includes("ns1", "ns2").Excludes("ns1"),
+			namespaces: []unstructured.Unstructured{
+				{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "ns1"}}},
+				{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "ns2"}}},
+				{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "ns3"}}},
+			},
+			expected: []string{"ns2"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(*testing.T) {
+			result := getNamespacesToList(tc.ie, tc.namespaces)
+			require.Equal(t, tc.expected, result)
 		})
 	}
 }
