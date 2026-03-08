@@ -200,7 +200,7 @@ func (r *backupQueueReconciler) checkForEarlierRunnableBackups(backup *velerov1a
 func namespacesForBackup(backup *velerov1api.Backup, clusterNamespaces []string) []string {
 	// Ignore error here. If a backup has invalid namespace wildcards, the backup controller
 	// will validate and fail it. Consider the ns list empty for conflict detection purposes.
-	nsList, err := collections.NewNamespaceIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...).ActiveNamespaces(clusterNamespaces).ResolveNamespaceList()
+	nsList, err := collections.NewNamespaceIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...).ActiveNamespaces(clusterNamespaces).ResolveNamespaceList(true)
 	if err != nil {
 		return []string{}
 	}
