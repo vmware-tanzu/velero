@@ -23,4 +23,7 @@ const (
 
 	PluginCSIPVCRestoreRIA            = "velero.io/csi-pvc-restorer"
 	PluginCsiVolumeSnapshotRestoreRIA = "velero.io/csi-volumesnapshot-restorer"
+
+	DefaultEphemeralStorageRequest = "0"
+	DefaultEphemeralStorageLimit   = "0"
 )
