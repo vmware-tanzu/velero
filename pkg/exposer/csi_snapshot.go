@@ -124,6 +124,15 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 		"owner": ownerObject.Name,
 	})
 
+	volumeTopology, err := kube.GetVolumeTopology(ctx, e.kubeClient.CoreV1(), e.kubeClient.StorageV1(), csiExposeParam.SourcePVName, csiExposeParam.StorageClass)
+	if err != nil {
+		return errors.Wrapf(err, "error getting volume topology for PV %s, storage class %s", csiExposeParam.SourcePVName, csiExposeParam.StorageClass)
+	}
+
+	if volumeTopology != nil {
+		curLog.Infof("Using volume topology %v", volumeTopology)
+	}
+
 	curLog.Info("Exposing CSI snapshot")
 
 	volumeSnapshot, err := csi.WaitVolumeSnapshotReady(ctx, e.csiSnapshotClient, csiExposeParam.SnapshotName, csiExposeParam.SourceNamespace, csiExposeParam.ExposeTimeout, curLog)
@@ -254,6 +263,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 		csiExposeParam.NodeOS,
 		csiExposeParam.PriorityClassName,
 		intoleratableNodes,
+		volumeTopology,
 	)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
@@ -588,6 +598,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	nodeOS string,
 	priorityClassName string,
 	intoleratableNodes []string,
+	volumeTopology *corev1api.NodeSelector,
 ) (*corev1api.Pod, error) {
 	podName := ownerObject.Name
 
@@ -701,7 +712,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	}
 
 	if affinity != nil {
-		podAffinity = kube.ToSystemAffinity([]*kube.LoadAffinity{affinity})
+		podAffinity = kube.ToSystemAffinity(affinity, volumeTopology)
 	}
 
 	pod := &corev1api.Pod{
