@@ -1,6 +1,3 @@
-//go:build windows
-// +build windows
-
 /*
 Copyright The Velero Contributors.
 
@@ -20,27 +17,14 @@ limitations under the License.
 package kopia
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/kopia/kopia/fs"
 	"github.com/kopia/kopia/snapshot/restore"
+	"github.com/pkg/errors"
 )
 
-type BlockOutput struct {
-	*restore.FilesystemOutput
+var errFlushUnsupported = errors.New("flush is not supported")
 
-	targetFileName string
-}
-
-func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remoteFile fs.File, progressCb restore.FileWriteProgress) error {
-	return fmt.Errorf("block mode is not supported for Windows")
-}
-
-func (o *BlockOutput) BeginDirectory(ctx context.Context, relativePath string, e fs.Directory) error {
-	return fmt.Errorf("block mode is not supported for Windows")
-}
-
-func (o *BlockOutput) Flush() error {
-	return flushVolume(o.targetFileName)
+type RestoreOutput interface {
+	restore.Output
+	Flush() error
+	Terminate() error
 }
