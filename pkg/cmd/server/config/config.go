@@ -145,32 +145,32 @@ var (
 )
 
 type Config struct {
-	PluginDir                      string
-	MetricsAddress                 string
-	DefaultBackupLocation          string // TODO(2.0) Deprecate defaultBackupLocation
-	BackupSyncPeriod               time.Duration
-	PodVolumeOperationTimeout      time.Duration
-	ResourceTerminatingTimeout     time.Duration
-	DefaultBackupTTL               time.Duration
-	DefaultVGSLabelKey             string
-	StoreValidationFrequency       time.Duration
-	DefaultCSISnapshotTimeout      time.Duration
-	DefaultItemOperationTimeout    time.Duration
-	ResourceTimeout                time.Duration
-	RestoreResourcePriorities      types.Priorities
-	DefaultVolumeSnapshotLocations flag.Map
-	RestoreOnly                    bool
-	DisabledControllers            []string
-	ClientQPS                      float32
-	ClientBurst                    int
-	ClientPageSize                 int
-	ProfilerAddress                string
-	LogLevel                       *logging.LevelFlag
-	LogFormat                      *logging.FormatFlag
-	RepoMaintenanceFrequency       time.Duration
-	GarbageCollectionFrequency     time.Duration
-	ItemOperationSyncFrequency     time.Duration
-	DefaultVolumesToFsBackup       bool
+	PluginDir                       string
+	MetricsAddress                  string
+	DefaultBackupLocation           string // TODO(2.0) Deprecate defaultBackupLocation
+	BackupSyncPeriod                time.Duration
+	PodVolumeOperationTimeout       time.Duration
+	ResourceTerminatingTimeout      time.Duration
+	DefaultBackupTTL                time.Duration
+	DefaultVGSLabelKey              string
+	StoreValidationFrequency        time.Duration
+	DefaultCSISnapshotTimeout       time.Duration
+	DefaultItemOperationTimeout     time.Duration
+	ResourceTimeout                 time.Duration
+	RestoreResourcePriorities       types.Priorities
+	DefaultVolumeSnapshotLocations  flag.Map
+	RestoreOnly                     bool
+	DisabledControllers             []string
+	ClientQPS                       float32
+	ClientBurst                     int
+	ClientPageSize                  int
+	ProfilerAddress                 string
+	LogLevel                        *logging.LevelFlag
+	LogFormat                       *logging.FormatFlag
+	RepoMaintenanceFrequency        time.Duration
+	GarbageCollectionFrequency      time.Duration
+	ItemOperationSyncFrequency      time.Duration
+	DefaultVolumesToFsBackup        bool
 	UploaderType                    string
 	MaxConcurrentK8SConnections     int
 	DefaultSnapshotMoveData         bool

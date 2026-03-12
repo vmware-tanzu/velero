@@ -66,15 +66,15 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, velerov1api.BackupSpec{
-		TTL:                     metav1.Duration{Duration: o.TTL},
-		IncludedNamespaces:      []string(o.IncludeNamespaces),
-		SnapshotVolumes:         o.SnapshotVolumes.Value,
-		IncludeClusterResources: o.IncludeClusterResources.Value,
-		OrderedResources:        orders,
-		OrLabelSelectors:        orLabelSelectors,
-		CSISnapshotTimeout:      metav1.Duration{Duration: o.CSISnapshotTimeout},
+		TTL:                             metav1.Duration{Duration: o.TTL},
+		IncludedNamespaces:              []string(o.IncludeNamespaces),
+		SnapshotVolumes:                 o.SnapshotVolumes.Value,
+		IncludeClusterResources:         o.IncludeClusterResources.Value,
+		OrderedResources:                orders,
+		OrLabelSelectors:                orLabelSelectors,
+		CSISnapshotTimeout:              metav1.Duration{Duration: o.CSISnapshotTimeout},
 		CSISnapshotEarlyFrequentPolling: o.CSISnapshotEarlyFrequentPolling.Value,
-		ItemOperationTimeout:    metav1.Duration{Duration: o.ItemOperationTimeout},
+		ItemOperationTimeout:            metav1.Duration{Duration: o.ItemOperationTimeout},
 	}, backup.Spec)
 
 	assert.Equal(t, map[string]string{

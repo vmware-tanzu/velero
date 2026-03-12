@@ -240,8 +240,8 @@ func NewInstallOptions() *Options {
 		NodeAgentPodCPULimit:      install.DefaultNodeAgentPodCPULimit,
 		NodeAgentPodMemLimit:      install.DefaultNodeAgentPodMemLimit,
 		// Default to creating a VSL unless we're told otherwise
-		UseVolumeSnapshots:       true,
-		NoDefaultBackupLocation:  false,
+		UseVolumeSnapshots:              true,
+		NoDefaultBackupLocation:         false,
 		CRDsOnly:                        false,
 		DefaultVolumesToFsBackup:        false,
 		UploaderType:                    uploader.KopiaType,
