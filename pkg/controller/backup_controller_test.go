@@ -95,7 +95,7 @@ func (b *fakeBackupper) FinalizeBackup(
 }
 
 func defaultBackup() *builder.BackupBuilder {
-	return builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").Phase(velerov1api.BackupPhaseReadyToStart)
+	return builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").Phase(velerov1api.BackupPhaseReadyToStart).CSISnapshotEarlyFrequentPolling(false)
 }
 
 func namedBackup(name string) *builder.BackupBuilder {
