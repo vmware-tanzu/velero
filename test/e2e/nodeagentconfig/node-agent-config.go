@@ -36,7 +36,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	velerokubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
@@ -240,9 +239,13 @@ func (n *NodeAgentConfigTestCase) Backup() error {
 	Expect(backupPodList.Items[0].Spec.PriorityClassName).To(Equal(n.nodeAgentConfigs.PriorityClassName))
 
 	// In backup, only the second element of LoadAffinity array should be used.
-	expectedAffinity := velerokubeutil.ToSystemAffinity(n.nodeAgentConfigs.LoadAffinity[1], nil)
+	expectedLabelKey, _, ok := popFromMap(n.nodeAgentConfigs.LoadAffinity[1].NodeSelector.MatchLabels)
+	Expect(ok).To(BeTrue(), "Expected LoadAffinity's MatchLabels should at least have one key-value pair")
 
-	Expect(backupPodList.Items[0].Spec.Affinity).To(Equal(expectedAffinity))
+	// From 1.18.1, Velero adds some default affinity in the backup/restore pod,
+	// so we can't directly compare the whole affinity,
+	// but we can verify if the expected affinity is contained in the pod affinity.
+	Expect(backupPodList.Items[0].Spec.Affinity.String()).To(ContainSubstring(expectedLabelKey))
 
 	fmt.Println("backupPod content verification completed successfully.")
 
@@ -317,9 +320,13 @@ func (n *NodeAgentConfigTestCase) Restore() error {
 	Expect(restorePodList.Items[0].Spec.PriorityClassName).To(Equal(n.nodeAgentConfigs.PriorityClassName))
 
 	// In restore, only the first element of LoadAffinity array should be used.
-	expectedAffinity := velerokubeutil.ToSystemAffinity(n.nodeAgentConfigs.LoadAffinity[0], nil)
+	expectedLabelKey, _, ok := popFromMap(n.nodeAgentConfigs.LoadAffinity[0].NodeSelector.MatchLabels)
+	Expect(ok).To(BeTrue(), "Expected LoadAffinity's MatchLabels should at least have one key-value pair")
 
-	Expect(restorePodList.Items[0].Spec.Affinity).To(Equal(expectedAffinity))
+	// From 1.18.1, Velero adds some default affinity in the backup/restore pod,
+	// so we can't directly compare the whole affinity,
+	// but we can verify if the expected affinity is contained in the pod affinity.
+	Expect(restorePodList.Items[0].Spec.Affinity.String()).To(ContainSubstring(expectedLabelKey))
 
 	fmt.Println("restorePod content verification completed successfully.")
 
@@ -344,4 +351,13 @@ func (n *NodeAgentConfigTestCase) Restore() error {
 	})
 
 	return nil
+}
+
+func popFromMap[K comparable, V any](m map[K]V) (k K, v V, ok bool) {
+	for key, val := range m {
+		delete(m, key)
+		return key, val, true
+	}
+
+	return
 }
