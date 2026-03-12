@@ -39,6 +39,7 @@ import (
 	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 func TestCreateOptions_BuildBackup(t *testing.T) {
