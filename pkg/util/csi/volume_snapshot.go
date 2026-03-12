@@ -597,6 +597,7 @@ func WaitUntilVSCHandleIsReady(
 	crClient crclient.Client,
 	log logrus.FieldLogger,
 	csiSnapshotTimeout time.Duration,
+	csiSnapshotEarlyFrequentPolling *bool,
 ) (*snapshotv1api.VolumeSnapshotContent, error) {
 	// We'll wait for the VSC to be reconciled, trying a fast poll interval first
 	// before falling back to a slower poll interval for the full csiSnapshotTimeout.
@@ -660,25 +661,28 @@ func WaitUntilVSCHandleIsReady(
 		return true, nil
 	}
 
-	// The short interval for the first ten seconds is due to the fact that
-	// Microsoft VSS backups have a hard-coded unfreeze call after 10 seconds,
-	// so we need to minimize waiting time during the first 10 seconds.
-	// First poll with a short interval and timeout.
-	interval = 1 * time.Second
-	timeout := 10 * time.Second
-	err := wait.PollUntilContextTimeout(
-		context.Background(),
-		interval,
-		timeout,
-		true,
-		pollFunc,
-	)
+	var err error
+	if boolptr.IsSetToTrue(csiSnapshotEarlyFrequentPolling) {
+		// The short interval for the first ten seconds is due to the fact that
+		// Microsoft VSS backups have a hard-coded unfreeze call after 10 seconds,
+		// so we need to minimize waiting time during the first 10 seconds.
+		// First poll with a short interval and timeout.
+		interval = 1 * time.Second
+		timeout := 10 * time.Second
+		err = wait.PollUntilContextTimeout(
+			context.Background(),
+			interval,
+			timeout,
+			true,
+			pollFunc,
+		)
 
-	if err == nil {
-		return vsc, nil
-	}
-	if !wait.Interrupted(err) {
-		return nil, err
+		if err == nil {
+			return vsc, nil
+		}
+		if !wait.Interrupted(err) {
+			return nil, err
+		}
 	}
 
 	// If the first poll timed out, poll with a longer interval and the full timeout.

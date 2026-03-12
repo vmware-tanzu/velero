@@ -351,6 +351,7 @@ func (p *pvcBackupItemAction) Execute(
 		p.crClient,
 		p.log,
 		backup.Spec.CSISnapshotTimeout.Duration,
+		backup.Spec.CSISnapshotEarlyFrequentPolling,
 	)
 	if err != nil {
 		p.log.Errorf("Failed to wait for VolumeSnapshot %s/%s to become ReadyToUse within timeout %v: %s",

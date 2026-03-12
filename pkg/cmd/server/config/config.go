@@ -171,49 +171,51 @@ type Config struct {
 	GarbageCollectionFrequency     time.Duration
 	ItemOperationSyncFrequency     time.Duration
 	DefaultVolumesToFsBackup       bool
-	UploaderType                   string
-	MaxConcurrentK8SConnections    int
-	DefaultSnapshotMoveData        bool
-	DisableInformerCache           bool
-	ScheduleSkipImmediately        bool
-	CredentialsDirectory           string
-	BackupRepoConfig               string
-	RepoMaintenanceJobConfig       string
-	ItemBlockWorkerCount           int
-	ConcurrentBackups              int
+	UploaderType                    string
+	MaxConcurrentK8SConnections     int
+	DefaultSnapshotMoveData         bool
+	CSISnapshotEarlyFrequentPolling bool
+	DisableInformerCache            bool
+	ScheduleSkipImmediately         bool
+	CredentialsDirectory            string
+	BackupRepoConfig                string
+	RepoMaintenanceJobConfig        string
+	ItemBlockWorkerCount            int
+	ConcurrentBackups               int
 }
 
 func GetDefaultConfig() *Config {
 	config := &Config{
-		PluginDir:                      "/plugins",
-		MetricsAddress:                 defaultMetricsAddress,
-		DefaultBackupLocation:          "default",
-		DefaultVolumeSnapshotLocations: flag.NewMap().WithKeyValueDelimiter(':'),
-		BackupSyncPeriod:               defaultBackupSyncPeriod,
-		DefaultBackupTTL:               defaultBackupTTL,
-		DefaultVGSLabelKey:             velerov1api.DefaultVGSLabelKey,
-		DefaultCSISnapshotTimeout:      defaultCSISnapshotTimeout,
-		DefaultItemOperationTimeout:    defaultItemOperationTimeout,
-		ResourceTimeout:                resourceTimeout,
-		StoreValidationFrequency:       defaultStoreValidationFrequency,
-		PodVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
-		RestoreResourcePriorities:      defaultRestorePriorities,
-		ClientQPS:                      defaultClientQPS,
-		ClientBurst:                    defaultClientBurst,
-		ClientPageSize:                 defaultClientPageSize,
-		ProfilerAddress:                defaultProfilerAddress,
-		ResourceTerminatingTimeout:     defaultResourceTerminatingTimeout,
-		LogLevel:                       logging.LogLevelFlag(logrus.InfoLevel),
-		LogFormat:                      logging.NewFormatFlag(),
-		DefaultVolumesToFsBackup:       podvolumeconfigs.DefaultVolumesToFsBackup,
-		UploaderType:                   uploader.KopiaType,
-		MaxConcurrentK8SConnections:    defaultMaxConcurrentK8SConnections,
-		DefaultSnapshotMoveData:        false,
-		DisableInformerCache:           defaultDisableInformerCache,
-		ScheduleSkipImmediately:        false,
-		CredentialsDirectory:           credentials.DefaultStoreDirectory(),
-		ItemBlockWorkerCount:           DefaultItemBlockWorkerCount,
-		ConcurrentBackups:              DefaultConcurrentBackups,
+		PluginDir:                       "/plugins",
+		MetricsAddress:                  defaultMetricsAddress,
+		DefaultBackupLocation:           "default",
+		DefaultVolumeSnapshotLocations:  flag.NewMap().WithKeyValueDelimiter(':'),
+		BackupSyncPeriod:                defaultBackupSyncPeriod,
+		DefaultBackupTTL:                defaultBackupTTL,
+		DefaultVGSLabelKey:              velerov1api.DefaultVGSLabelKey,
+		DefaultCSISnapshotTimeout:       defaultCSISnapshotTimeout,
+		DefaultItemOperationTimeout:     defaultItemOperationTimeout,
+		ResourceTimeout:                 resourceTimeout,
+		StoreValidationFrequency:        defaultStoreValidationFrequency,
+		PodVolumeOperationTimeout:       defaultPodVolumeOperationTimeout,
+		RestoreResourcePriorities:       defaultRestorePriorities,
+		ClientQPS:                       defaultClientQPS,
+		ClientBurst:                     defaultClientBurst,
+		ClientPageSize:                  defaultClientPageSize,
+		ProfilerAddress:                 defaultProfilerAddress,
+		ResourceTerminatingTimeout:      defaultResourceTerminatingTimeout,
+		LogLevel:                        logging.LogLevelFlag(logrus.InfoLevel),
+		LogFormat:                       logging.NewFormatFlag(),
+		DefaultVolumesToFsBackup:        podvolumeconfigs.DefaultVolumesToFsBackup,
+		UploaderType:                    uploader.KopiaType,
+		MaxConcurrentK8SConnections:     defaultMaxConcurrentK8SConnections,
+		DefaultSnapshotMoveData:         false,
+		CSISnapshotEarlyFrequentPolling: false,
+		DisableInformerCache:            defaultDisableInformerCache,
+		ScheduleSkipImmediately:         false,
+		CredentialsDirectory:            credentials.DefaultStoreDirectory(),
+		ItemBlockWorkerCount:            DefaultItemBlockWorkerCount,
+		ConcurrentBackups:               DefaultConcurrentBackups,
 	}
 
 	return config
@@ -247,6 +249,7 @@ func (c *Config) BindFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&c.ResourceTimeout, "resource-timeout", c.ResourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
 	flags.IntVar(&c.MaxConcurrentK8SConnections, "max-concurrent-k8s-connections", c.MaxConcurrentK8SConnections, "Max concurrent connections number that Velero can create with kube-apiserver. Default is 30.")
 	flags.BoolVar(&c.DefaultSnapshotMoveData, "default-snapshot-move-data", c.DefaultSnapshotMoveData, "Move data by default for all snapshots supporting data movement.")
+	flags.BoolVar(&c.CSISnapshotEarlyFrequentPolling, "csi-snapshot-early-frequent-polling", c.CSISnapshotEarlyFrequentPolling, "Use early frequent polling by default for all CSI snapshots. Optional.")
 	flags.BoolVar(&c.DisableInformerCache, "disable-informer-cache", c.DisableInformerCache, "Disable informer cache for Get calls on restore. With this enabled, it will speed up restore in cases where there are backup resources which already exist in the cluster, but for very large clusters this will increase velero memory usage. Default is false (don't disable).")
 	flags.BoolVar(&c.ScheduleSkipImmediately, "schedule-skip-immediately", c.ScheduleSkipImmediately, "Skip the first scheduled backup immediately after creating a schedule. Default is false (don't skip).")
 	flags.Var(&c.DefaultVolumeSnapshotLocations, "default-volume-snapshot-locations", "List of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...)")

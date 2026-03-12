@@ -238,6 +238,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 
 	d.Println()
 	d.Printf("CSISnapshotTimeout:\t%s\n", spec.CSISnapshotTimeout.Duration)
+	d.Printf("CSISnapshotEarlyFrequentPolling:\t%s\n", BoolPointerString(spec.CSISnapshotEarlyFrequentPolling, "false", "true", "auto"))
 	d.Printf("ItemOperationTimeout:\t%s\n", spec.ItemOperationTimeout.Duration)
 
 	d.Println()

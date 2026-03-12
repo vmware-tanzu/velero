@@ -1553,6 +1553,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				defaultBackupLocation:    defaultBackupLocation.Name,
 				defaultVolumesToFsBackup: test.defaultVolumesToFsBackup,
 				defaultSnapshotMoveData:  test.defaultSnapshotMoveData,
+				csiSnapshotEarlyFrequentPolling: false,
 				backupTracker:            NewBackupTracker(),
 				metrics:                  metrics.NewServerMetrics(),
 				clock:                    testclocks.NewFakeClock(now),

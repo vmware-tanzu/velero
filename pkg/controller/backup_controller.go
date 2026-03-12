@@ -105,8 +105,9 @@ type backupReconciler struct {
 	backupStoreGetter           persistence.ObjectBackupStoreGetter
 	formatFlag                  logging.Format
 	credentialFileStore         credentials.FileStore
-	maxConcurrentK8SConnections int
-	defaultSnapshotMoveData     bool
+	maxConcurrentK8SConnections     int
+	defaultSnapshotMoveData         bool
+	csiSnapshotEarlyFrequentPolling bool
 	globalCRClient              kbclient.Client
 	itemBlockWorkerCount        int
 	concurrentBackups           int
@@ -135,6 +136,7 @@ func NewBackupReconciler(
 	credentialStore credentials.FileStore,
 	maxConcurrentK8SConnections int,
 	defaultSnapshotMoveData bool,
+	csiSnapshotEarlyFrequentPolling bool,
 	itemBlockWorkerCount int,
 	concurrentBackups int,
 	globalCRClient kbclient.Client,
@@ -163,6 +165,7 @@ func NewBackupReconciler(
 		credentialFileStore:         credentialStore,
 		maxConcurrentK8SConnections: maxConcurrentK8SConnections,
 		defaultSnapshotMoveData:     defaultSnapshotMoveData,
+		csiSnapshotEarlyFrequentPolling: csiSnapshotEarlyFrequentPolling,
 		itemBlockWorkerCount:        itemBlockWorkerCount,
 		concurrentBackups:           max(concurrentBackups, 1),
 		globalCRClient:              globalCRClient,
@@ -423,6 +426,10 @@ func (b *backupReconciler) prepareBackupRequest(ctx context.Context, backup *vel
 
 	if request.Spec.SnapshotMoveData == nil {
 		request.Spec.SnapshotMoveData = &b.defaultSnapshotMoveData
+	}
+
+	if request.Spec.CSISnapshotEarlyFrequentPolling == nil {
+		request.Spec.CSISnapshotEarlyFrequentPolling = &b.csiSnapshotEarlyFrequentPolling
 	}
 
 	// find which storage location to use

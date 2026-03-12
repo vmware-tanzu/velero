@@ -85,6 +85,7 @@ type CreateOptions struct {
 	SnapshotMoveData                flag.OptionalBool
 	DataMover                       string
 	DefaultVolumesToFsBackup        flag.OptionalBool
+	CSISnapshotEarlyFrequentPolling flag.OptionalBool
 	IncludeNamespaces               flag.StringArray
 	ExcludeNamespaces               flag.StringArray
 	IncludeResources                flag.StringArray
@@ -112,11 +113,12 @@ type CreateOptions struct {
 
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		IncludeNamespaces:       flag.NewStringArray("*"),
-		Labels:                  flag.NewMap(),
-		Annotations:             flag.NewMap(),
-		SnapshotVolumes:         flag.NewOptionalBool(nil),
-		IncludeClusterResources: flag.NewOptionalBool(nil),
+		IncludeNamespaces:               flag.NewStringArray("*"),
+		Labels:                          flag.NewMap(),
+		Annotations:                     flag.NewMap(),
+		SnapshotVolumes:                 flag.NewOptionalBool(nil),
+		CSISnapshotEarlyFrequentPolling: flag.NewOptionalBool(nil),
+		IncludeClusterResources:         flag.NewOptionalBool(nil),
 	}
 }
 
@@ -151,6 +153,9 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f.NoOptDefVal = cmd.TRUE
 
 	f = flags.VarPF(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", "", "Use pod volume file system backup by default for volumes")
+	f.NoOptDefVal = cmd.TRUE
+
+	f = flags.VarPF(&o.CSISnapshotEarlyFrequentPolling, "csi-snapshot-early-frequent-polling", "", "Use early frequent polling for CSI snapshot creation by default for all CSI snapshots.")
 	f.NoOptDefVal = cmd.TRUE
 
 	flags.StringVar(&o.ResPoliciesConfigmap, "resource-policies-configmap", "", "Reference to the resource policies configmap that backup should use")
@@ -413,6 +418,9 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 		}
 		if o.DefaultVolumesToFsBackup.Value != nil {
 			backupBuilder.DefaultVolumesToFsBackup(*o.DefaultVolumesToFsBackup.Value)
+		}
+		if o.CSISnapshotEarlyFrequentPolling.Value != nil {
+			backupBuilder.CSISnapshotEarlyFrequentPolling(*o.CSISnapshotEarlyFrequentPolling.Value)
 		}
 		if o.ResPoliciesConfigmap != "" {
 			backupBuilder.ResourcePolicies(o.ResPoliciesConfigmap)
