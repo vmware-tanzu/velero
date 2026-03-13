@@ -19,8 +19,10 @@ package archive
 import (
 	"archive/tar"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -66,6 +68,16 @@ func (e *Extractor) writeFile(target string, tarRdr *tar.Reader) error {
 	return nil
 }
 
+// sanitizeArchivePath sanitizes archive file path from "G305: Zip Slip vulnerability"
+func sanitizeArchivePath(destDir, sourcePath string) (targetPath string, err error) {
+	targetPath = filepath.Join(destDir, sourcePath)
+	if strings.HasPrefix(targetPath, filepath.Clean(destDir)) {
+		return targetPath, nil
+	}
+
+	return "", fmt.Errorf("invalid archive path %q: escapes target directory", sourcePath)
+}
+
 func (e *Extractor) readBackup(tarRdr *tar.Reader) (string, error) {
 	dir, err := e.fs.TempDir("", "")
 	if err != nil {
@@ -84,7 +96,11 @@ func (e *Extractor) readBackup(tarRdr *tar.Reader) (string, error) {
 			return "", err
 		}
 
-		target := filepath.Join(dir, header.Name) //nolint:gosec // Internal usage. No need to check.
+		target, err := sanitizeArchivePath(dir, header.Name)
+		if err != nil {
+			e.log.Infof("error sanitizing archive path: %s", err.Error())
+			return "", err
+		}
 
 		switch header.Typeflag {
 		case tar.TypeDir:

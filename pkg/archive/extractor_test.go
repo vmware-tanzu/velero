@@ -18,6 +18,7 @@ package archive
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"io"
 	"os"
@@ -85,6 +86,31 @@ func TestUnzipAndExtractBackup(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnzipAndExtractBackupRejectsPathTraversal(t *testing.T) {
+	ext := NewExtractor(test.NewLogger(), test.NewFakeFileSystem())
+
+	var buf bytes.Buffer
+	gzw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gzw)
+
+	err := tw.WriteHeader(&tar.Header{
+		Name:     "../escape.txt",
+		Mode:     0600,
+		Typeflag: tar.TypeReg,
+		Size:     int64(len("data")),
+	})
+	require.NoError(t, err)
+
+	_, err = tw.Write([]byte("data"))
+	require.NoError(t, err)
+	require.NoError(t, tw.Close())
+	require.NoError(t, gzw.Close())
+
+	_, err = ext.UnzipAndExtractBackup(&buf)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid archive path")
 }
 
 func createArchive(files []string, fs filesystem.Interface) (string, error) {
