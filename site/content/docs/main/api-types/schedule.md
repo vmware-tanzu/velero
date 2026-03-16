@@ -63,6 +63,10 @@ spec:
     # CSI VolumeSnapshot status turns to ReadyToUse during creation, before
     # returning error as timeout. The default value is 10 minute.
     csiSnapshotTimeout: 10m
+    # ItemOperationTimeout specifies the time used to wait for
+    # asynchronous BackupItemAction operations
+    # The default value is 4 hour.
+    itemOperationTimeout: 4h
     # resourcePolicy specifies the referenced resource policies that backup should follow
     # optional
     resourcePolicy:
