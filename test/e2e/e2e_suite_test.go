@@ -501,6 +501,11 @@ var _ = Describe(
 	RestoreWithIncludeNamespaces,
 )
 var _ = Describe(
+	"Velero test on backup/restore with wildcard namespaces",
+	Label("ResourceFiltering", "WildcardNamespaces"),
+	WildcardNamespacesTest,
+)
+var _ = Describe(
 	"Velero test on include resources from the cluster backup",
 	Label("ResourceFiltering", "IncludeResources", "Backup"),
 	BackupWithIncludeResources,
