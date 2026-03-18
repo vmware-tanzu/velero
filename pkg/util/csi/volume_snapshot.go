@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -660,25 +662,30 @@ func WaitUntilVSCHandleIsReady(
 		return true, nil
 	}
 
-	// The short interval for the first ten seconds is due to the fact that
-	// Microsoft VSS backups have a hard-coded unfreeze call after 10 seconds,
-	// so we need to minimize waiting time during the first 10 seconds.
-	// First poll with a short interval and timeout.
-	interval = 1 * time.Second
-	timeout := 10 * time.Second
-	err := wait.PollUntilContextTimeout(
-		context.Background(),
-		interval,
-		timeout,
-		true,
-		pollFunc,
-	)
+	var err error
+	frequentPolling, err := strconv.ParseBool(os.Getenv("CSI_SNAPSHOT_EARLY_FREQUENT_POLLING"))
 
-	if err == nil {
-		return vsc, nil
-	}
-	if !wait.Interrupted(err) {
-		return nil, err
+	if err == nil && frequentPolling {
+		// The short interval for the first ten seconds is due to the fact that
+		// Microsoft VSS backups have a hard-coded unfreeze call after 10 seconds,
+		// so we need to minimize waiting time during the first 10 seconds.
+		// First poll with a short interval and timeout.
+		interval = 1 * time.Second
+		timeout := 10 * time.Second
+		err = wait.PollUntilContextTimeout(
+			context.Background(),
+			interval,
+			timeout,
+			true,
+			pollFunc,
+		)
+
+		if err == nil {
+			return vsc, nil
+		}
+		if !wait.Interrupted(err) {
+			return nil, err
+		}
 	}
 
 	// If the first poll timed out, poll with a longer interval and the full timeout.
