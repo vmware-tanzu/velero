@@ -25,6 +25,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -234,6 +236,88 @@ func TestCheckVSCReadiness(t *testing.T) {
 			require.Equal(t, test.ready, ready)
 			if test.expectErr {
 				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestTryDeleteOriginalVSC(t *testing.T) {
+	tests := []struct {
+		name      string
+		vscName   string
+		existing  *snapshotv1api.VolumeSnapshotContent
+		createIt  bool
+		expectRet bool
+	}{
+		{
+			name:      "VSC not found in cluster, returns false",
+			vscName:   "not-found",
+			expectRet: false,
+		},
+		{
+			name:    "VSC found with Retain policy, patches and deletes",
+			vscName: "legacy-vsc",
+			existing: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{Name: "legacy-vsc"},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+					Driver:         "disk.csi.azure.com",
+					Source: snapshotv1api.VolumeSnapshotContentSource{
+						SnapshotHandle: stringPtr("snap-123"),
+					},
+					VolumeSnapshotRef: corev1api.ObjectReference{
+						Name:      "vs-1",
+						Namespace: "default",
+					},
+				},
+			},
+			createIt:  true,
+			expectRet: true,
+		},
+		{
+			name:    "VSC found with Delete policy already, just deletes",
+			vscName: "already-delete-vsc",
+			existing: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{Name: "already-delete-vsc"},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentDelete,
+					Driver:         "disk.csi.azure.com",
+					Source: snapshotv1api.VolumeSnapshotContentSource{
+						SnapshotHandle: stringPtr("snap-456"),
+					},
+					VolumeSnapshotRef: corev1api.ObjectReference{
+						Name:      "vs-2",
+						Namespace: "default",
+					},
+				},
+			},
+			createIt:  true,
+			expectRet: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			crClient := velerotest.NewFakeControllerRuntimeClient(t)
+			logger := logrus.StandardLogger()
+			p := &volumeSnapshotContentDeleteItemAction{
+				log:      logger,
+				crClient: crClient,
+			}
+
+			if test.createIt && test.existing != nil {
+				require.NoError(t, crClient.Create(t.Context(), test.existing))
+			}
+
+			result := p.tryDeleteOriginalVSC(t.Context(), test.vscName)
+			require.Equal(t, test.expectRet, result)
+
+			// If cleanup succeeded, verify the VSC is gone
+			if test.expectRet {
+				err := crClient.Get(t.Context(), crclient.ObjectKey{Name: test.vscName},
+					&snapshotv1api.VolumeSnapshotContent{})
+				require.True(t, apierrors.IsNotFound(err),
+					"VSC should have been deleted from cluster")
 			}
 		})
 	}
