@@ -39,14 +39,44 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
+// fakeClientWithErrors wraps a real client and injects errors for specific operations.
+type fakeClientWithErrors struct {
+	crclient.Client
+	getError    error
+	patchError  error
+	deleteError error
+}
+
+func (c *fakeClientWithErrors) Get(ctx context.Context, key crclient.ObjectKey, obj crclient.Object, opts ...crclient.GetOption) error {
+	if c.getError != nil {
+		return c.getError
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
+}
+
+func (c *fakeClientWithErrors) Patch(ctx context.Context, obj crclient.Object, patch crclient.Patch, opts ...crclient.PatchOption) error {
+	if c.patchError != nil {
+		return c.patchError
+	}
+	return c.Client.Patch(ctx, obj, patch, opts...)
+}
+
+func (c *fakeClientWithErrors) Delete(ctx context.Context, obj crclient.Object, opts ...crclient.DeleteOption) error {
+	if c.deleteError != nil {
+		return c.deleteError
+	}
+	return c.Client.Delete(ctx, obj, opts...)
+}
+
 func TestVSCExecute(t *testing.T) {
 	snapshotHandleStr := "test"
 	tests := []struct {
-		name     string
-		item     runtime.Unstructured
-		vsc      *snapshotv1api.VolumeSnapshotContent
-		backup   *velerov1api.Backup
-		function func(
+		name           string
+		item           runtime.Unstructured
+		vsc            *snapshotv1api.VolumeSnapshotContent
+		backup         *velerov1api.Backup
+		preExistingVSC *snapshotv1api.VolumeSnapshotContent
+		function       func(
 			ctx context.Context,
 			vsc *snapshotv1api.VolumeSnapshotContent,
 			client crclient.Client,
@@ -97,6 +127,21 @@ func TestVSCExecute(t *testing.T) {
 			},
 		},
 		{
+			name:      "Original VSC exists in cluster, cleaned up directly",
+			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
+			backup:    builder.ForBackup("velero", "backup").Result(),
+			expectErr: false,
+			preExistingVSC: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy:    snapshotv1api.VolumeSnapshotContentRetain,
+					Driver:            "disk.csi.azure.com",
+					Source:            snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: stringPtr("snap-123")},
+					VolumeSnapshotRef: corev1api.ObjectReference{Name: "vs-1", Namespace: "default"},
+				},
+			},
+		},
+		{
 			name:      "Error case with CSI error, dangling VSC should be cleaned up",
 			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
 			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
@@ -116,6 +161,10 @@ func TestVSCExecute(t *testing.T) {
 			crClient := velerotest.NewFakeControllerRuntimeClient(t)
 			logger := logrus.StandardLogger()
 			checkVSCReadiness = test.function
+
+			if test.preExistingVSC != nil {
+				require.NoError(t, crClient.Create(t.Context(), test.preExistingVSC))
+			}
 
 			p := volumeSnapshotContentDeleteItemAction{log: logger, crClient: crClient}
 
@@ -321,6 +370,67 @@ func TestTryDeleteOriginalVSC(t *testing.T) {
 			}
 		})
 	}
+
+	// Error injection tests for tryDeleteOriginalVSC
+	t.Run("Get returns non-NotFound error, returns false", func(t *testing.T) {
+		errClient := &fakeClientWithErrors{
+			Client:   velerotest.NewFakeControllerRuntimeClient(t),
+			getError: fmt.Errorf("connection refused"),
+		}
+		p := &volumeSnapshotContentDeleteItemAction{
+			log:      logrus.StandardLogger(),
+			crClient: errClient,
+		}
+		require.False(t, p.tryDeleteOriginalVSC(t.Context(), "some-vsc"))
+	})
+
+	t.Run("Patch fails, returns false", func(t *testing.T) {
+		realClient := velerotest.NewFakeControllerRuntimeClient(t)
+		vsc := &snapshotv1api.VolumeSnapshotContent{
+			ObjectMeta: metav1.ObjectMeta{Name: "patch-fail-vsc"},
+			Spec: snapshotv1api.VolumeSnapshotContentSpec{
+				DeletionPolicy:    snapshotv1api.VolumeSnapshotContentRetain,
+				Driver:            "disk.csi.azure.com",
+				Source:            snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: stringPtr("snap-789")},
+				VolumeSnapshotRef: corev1api.ObjectReference{Name: "vs-3", Namespace: "default"},
+			},
+		}
+		require.NoError(t, realClient.Create(t.Context(), vsc))
+
+		errClient := &fakeClientWithErrors{
+			Client:     realClient,
+			patchError: fmt.Errorf("patch forbidden"),
+		}
+		p := &volumeSnapshotContentDeleteItemAction{
+			log:      logrus.StandardLogger(),
+			crClient: errClient,
+		}
+		require.False(t, p.tryDeleteOriginalVSC(t.Context(), "patch-fail-vsc"))
+	})
+
+	t.Run("Delete fails, returns false", func(t *testing.T) {
+		realClient := velerotest.NewFakeControllerRuntimeClient(t)
+		vsc := &snapshotv1api.VolumeSnapshotContent{
+			ObjectMeta: metav1.ObjectMeta{Name: "delete-fail-vsc"},
+			Spec: snapshotv1api.VolumeSnapshotContentSpec{
+				DeletionPolicy:    snapshotv1api.VolumeSnapshotContentDelete,
+				Driver:            "disk.csi.azure.com",
+				Source:            snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: stringPtr("snap-999")},
+				VolumeSnapshotRef: corev1api.ObjectReference{Name: "vs-4", Namespace: "default"},
+			},
+		}
+		require.NoError(t, realClient.Create(t.Context(), vsc))
+
+		errClient := &fakeClientWithErrors{
+			Client:      realClient,
+			deleteError: fmt.Errorf("delete forbidden"),
+		}
+		p := &volumeSnapshotContentDeleteItemAction{
+			log:      logrus.StandardLogger(),
+			crClient: errClient,
+		}
+		require.False(t, p.tryDeleteOriginalVSC(t.Context(), "delete-fail-vsc"))
+	})
 }
 
 func boolPtr(b bool) *bool {
