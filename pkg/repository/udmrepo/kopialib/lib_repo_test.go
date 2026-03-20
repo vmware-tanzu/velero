@@ -27,6 +27,7 @@ import (
 	"github.com/kopia/kopia/repo/manifest"
 	"github.com/kopia/kopia/repo/object"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -1194,6 +1195,82 @@ func TestClientSideCacheLimit(t *testing.T) {
 			limit := ks.ClientSideCacheLimit(tc.repoOption)
 
 			assert.Equal(t, tc.expected, limit)
+		})
+	}
+}
+
+func TestIsReady(t *testing.T) {
+	testCases := []struct {
+		name         string
+		funGetStatus func(context.Context, udmrepo.RepoOptions, logrus.FieldLogger) (RepoStatus, error)
+		readOnly     bool
+		expected     bool
+		expectedErr  string
+	}{
+		{
+			name: "get status error",
+			funGetStatus: func(context.Context, udmrepo.RepoOptions, logrus.FieldLogger) (RepoStatus, error) {
+				return RepoStatusUnknown, errors.New("fake-get-error")
+			},
+			expectedErr: "fake-get-error",
+		},
+		{
+			name: "success",
+			funGetStatus: func(context.Context, udmrepo.RepoOptions, logrus.FieldLogger) (RepoStatus, error) {
+				return RepoStatusCreated, nil
+			},
+			expected: true,
+		},
+		{
+			name: "not initialized, not readonly",
+			funGetStatus: func(context.Context, udmrepo.RepoOptions, logrus.FieldLogger) (RepoStatus, error) {
+				return RepoStatusNotInitialized, nil
+			},
+		},
+		{
+			name: "not initialized, readonly",
+			funGetStatus: func(context.Context, udmrepo.RepoOptions, logrus.FieldLogger) (RepoStatus, error) {
+				return RepoStatusNotInitialized, nil
+			},
+			readOnly: true,
+			expected: true,
+		},
+		{
+			name: "other status 1",
+			funGetStatus: func(context.Context, udmrepo.RepoOptions, logrus.FieldLogger) (RepoStatus, error) {
+				return RepoStatusUnknown, nil
+			},
+		},
+		{
+			name: "other status 2",
+			funGetStatus: func(context.Context, udmrepo.RepoOptions, logrus.FieldLogger) (RepoStatus, error) {
+				return RepoStatusCorrupted, nil
+			},
+		},
+		{
+			name: "other status 3",
+			funGetStatus: func(context.Context, udmrepo.RepoOptions, logrus.FieldLogger) (RepoStatus, error) {
+				return RepoStatusSystemNotCreated, nil
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ks := &kopiaRepoService{
+				logger: velerotest.NewLogger(),
+			}
+
+			funcGetRepositoryStatus = tc.funGetStatus
+			ready, err := ks.IsReady(t.Context(), udmrepo.RepoOptions{}, tc.readOnly)
+
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, tc.expected, ready)
 		})
 	}
 }

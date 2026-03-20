@@ -129,20 +129,28 @@ func (ks *kopiaRepoService) Connect(ctx context.Context, repoOption udmrepo.Repo
 	return ConnectBackupRepo(repoCtx, repoOption, ks.logger)
 }
 
-func (ks *kopiaRepoService) IsCreated(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
+var funcGetRepositoryStatus = GetRepositoryStatus
+
+func (ks *kopiaRepoService) IsReady(ctx context.Context, repoOption udmrepo.RepoOptions, readOnly bool) (bool, error) {
 	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
 
-	status, err := GetRepositoryStatus(repoCtx, repoOption, ks.logger)
+	status, err := funcGetRepositoryStatus(repoCtx, repoOption, ks.logger)
 	if err != nil {
 		return false, err
 	}
 
-	if status != RepoStatusCreated {
-		ks.logger.Infof("Repo is not fully created, status %v", status)
-		return false, nil
+	if status == RepoStatusCreated {
+		return true, nil
 	}
 
-	return true, nil
+	if status == RepoStatusNotInitialized && readOnly {
+		ks.logger.Warnf("Repo is not initialized, could be for read")
+		return true, nil
+	}
+
+	ks.logger.Infof("Repo is not fully created, status %v", status)
+
+	return false, nil
 }
 
 func (ks *kopiaRepoService) Open(ctx context.Context, repoOption udmrepo.RepoOptions) (udmrepo.BackupRepo, error) {
