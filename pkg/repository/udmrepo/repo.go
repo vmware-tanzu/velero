@@ -85,9 +85,9 @@ type BackupRepoService interface {
 	// repoOption: option to the backup repository and the underlying backup storage.
 	Connect(ctx context.Context, repoOption RepoOptions) error
 
-	// IsCreated checks if the backup repository has been created in the underlying backup storage.
+	// IsReady checks if the backup repository has been ready in the underlying backup storage.
 	// repoOption: option to the underlying backup storage
-	IsCreated(ctx context.Context, repoOption RepoOptions) (bool, error)
+	IsReady(ctx context.Context, repoOption RepoOptions, readOnly bool) (bool, error)
 
 	// Open opens an backup repository that has been created/connected.
 	// repoOption: options to open the backup repository and the underlying storage.
