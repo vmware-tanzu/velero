@@ -129,6 +129,10 @@ func (p *volumeSnapshotContentDeleteItemAction) Execute(
 			return checkVSCReadiness(ctx, &snapCont, p.crClient)
 		},
 	); err != nil {
+		// Clean up the VSC we created since it can't become ready
+		if deleteErr := p.crClient.Delete(context.TODO(), &snapCont); deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
+			p.log.WithError(deleteErr).Errorf("Failed to clean up VolumeSnapshotContent %s", snapCont.Name)
+		}
 		return errors.Wrapf(err, "fail to wait VolumeSnapshotContent %s becomes ready.", snapCont.Name)
 	}
 
@@ -157,6 +161,13 @@ var checkVSCReadiness = func(
 
 	if tmpVSC.Status != nil && boolptr.IsSetToTrue(tmpVSC.Status.ReadyToUse) {
 		return true, nil
+	}
+
+	// Fail fast on permanent CSI driver errors (e.g., InvalidSnapshot.NotFound)
+	if tmpVSC.Status != nil && tmpVSC.Status.Error != nil && tmpVSC.Status.Error.Message != nil {
+		return false, errors.Errorf(
+			"VolumeSnapshotContent %s has error: %s", vsc.Name, *tmpVSC.Status.Error.Message,
+		)
 	}
 
 	return false, nil

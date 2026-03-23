@@ -94,6 +94,19 @@ func TestVSCExecute(t *testing.T) {
 				return false, errors.Errorf("test error case")
 			},
 		},
+		{
+			name:      "Error case with CSI error, dangling VSC should be cleaned up",
+			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
+			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
+			expectErr: true,
+			function: func(
+				ctx context.Context,
+				vsc *snapshotv1api.VolumeSnapshotContent,
+				client crclient.Client,
+			) (bool, error) {
+				return false, errors.Errorf("VolumeSnapshotContent %s has error: InvalidSnapshot.NotFound", vsc.Name)
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -190,6 +203,24 @@ func TestCheckVSCReadiness(t *testing.T) {
 			expectErr: false,
 			ready:     false,
 		},
+		{
+			name: "VSC has error from CSI driver",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "vsc-1",
+					Namespace: "velero",
+				},
+				Status: &snapshotv1api.VolumeSnapshotContentStatus{
+					ReadyToUse: boolPtr(false),
+					Error: &snapshotv1api.VolumeSnapshotError{
+						Message: stringPtr("InvalidSnapshot.NotFound: The snapshot 'snap-0abc123' does not exist."),
+					},
+				},
+			},
+			createVSC: true,
+			expectErr: true,
+			ready:     false,
+		},
 	}
 
 	for _, test := range tests {
@@ -207,4 +238,12 @@ func TestCheckVSCReadiness(t *testing.T) {
 			}
 		})
 	}
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func stringPtr(s string) *string {
+	return &s
 }
