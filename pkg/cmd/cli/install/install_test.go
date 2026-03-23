@@ -17,11 +17,18 @@ limitations under the License.
 package install
 
 import (
+	"context"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestPriorityClassNameFlag(t *testing.T) {
@@ -88,6 +95,137 @@ func TestPriorityClassNameFlag(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedServerValue, veleroOptions.ServerPriorityClassName)
 			assert.Equal(t, tc.expectedNodeAgentValue, veleroOptions.NodeAgentPriorityClassName)
+		})
+	}
+}
+
+// makeValidateCmd returns a minimal *cobra.Command that satisfies output.ValidateFlags.
+func makeValidateCmd() *cobra.Command {
+	c := &cobra.Command{}
+	// output.ValidateFlags only inspects the "output" flag; add it so validation passes.
+	c.Flags().StringP("output", "o", "", "output format")
+	return c
+}
+
+// configMapInNamespace builds a ConfigMap with a single JSON data entry in the given namespace.
+func configMapInNamespace(namespace, name, jsonValue string) *corev1api.ConfigMap {
+	return &corev1api.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Data: map[string]string{
+			"config": jsonValue,
+		},
+	}
+}
+
+// TestValidateConfigMapsUseFactoryNamespace verifies that Validate resolves the target
+// namespace via f.Namespace() (not o.Namespace) for all three ConfigMap flags.
+//
+// Before the fix, o.Namespace was "" at Validate time (Complete had not run yet),
+// so VerifyJSONConfigs queried the "default" namespace instead of the intended one.
+func TestValidateConfigMapsUseFactoryNamespace(t *testing.T) {
+	const targetNS = "tenant-b"
+	const defaultNS = "default"
+
+	// Shared options that satisfy every other validation gate:
+	//   - NoDefaultBackupLocation=true + UseVolumeSnapshots=false skips provider/bucket/plugins checks
+	//   - NoSecret=true satisfies the secret-file check
+	//   - o.Namespace is intentionally left as "" to mirror the pre-Complete state
+	baseOptions := func() *Options {
+		o := NewInstallOptions()
+		o.NoDefaultBackupLocation = true
+		o.UseVolumeSnapshots = false
+		o.NoSecret = true
+		return o
+	}
+
+	tests := []struct {
+		name       string
+		setupOpts  func(o *Options, cmName string)
+		cmJSON     string
+		wantErrMsg string // substring expected in error; empty means success
+	}{
+		{
+			name: "NodeAgentConfigMap found in factory namespace",
+			setupOpts: func(o *Options, cmName string) {
+				o.NodeAgentConfigMap = cmName
+			},
+			cmJSON: `{}`,
+		},
+		{
+			name: "NodeAgentConfigMap not found when only in default namespace",
+			setupOpts: func(o *Options, cmName string) {
+				o.NodeAgentConfigMap = cmName
+			},
+			cmJSON:     `{}`,
+			wantErrMsg: "--node-agent-configmap specified ConfigMap",
+		},
+		{
+			name: "RepoMaintenanceJobConfigMap found in factory namespace",
+			setupOpts: func(o *Options, cmName string) {
+				o.RepoMaintenanceJobConfigMap = cmName
+			},
+			cmJSON: `{}`,
+		},
+		{
+			name: "RepoMaintenanceJobConfigMap not found when only in default namespace",
+			setupOpts: func(o *Options, cmName string) {
+				o.RepoMaintenanceJobConfigMap = cmName
+			},
+			cmJSON:     `{}`,
+			wantErrMsg: "--repo-maintenance-job-configmap specified ConfigMap",
+		},
+		{
+			name: "BackupRepoConfigMap found in factory namespace",
+			setupOpts: func(o *Options, cmName string) {
+				o.BackupRepoConfigMap = cmName
+			},
+			cmJSON: `{}`,
+		},
+		{
+			name: "BackupRepoConfigMap not found when only in default namespace",
+			setupOpts: func(o *Options, cmName string) {
+				o.BackupRepoConfigMap = cmName
+			},
+			cmJSON:     `{}`,
+			wantErrMsg: "--backup-repository-configmap specified ConfigMap",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			const cmName = "my-config"
+
+			// Decide where to place the ConfigMap:
+			// "not found" cases put it in "default", so the factory namespace lookup misses it.
+			cmNamespace := targetNS
+			if tc.wantErrMsg != "" {
+				cmNamespace = defaultNS
+			}
+
+			cm := configMapInNamespace(cmNamespace, cmName, tc.cmJSON)
+			kbClient := velerotest.NewFakeControllerRuntimeClient(t, cm)
+
+			f := &factorymocks.Factory{}
+			f.On("Namespace").Return(targetNS)
+			f.On("KubebuilderClient").Return(kbClient, nil)
+
+			o := baseOptions()
+			tc.setupOpts(o, cmName)
+
+			c := makeValidateCmd()
+			c.SetContext(context.Background())
+
+			err := o.Validate(c, []string{}, f)
+
+			if tc.wantErrMsg == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErrMsg)
+			}
 		})
 	}
 }
