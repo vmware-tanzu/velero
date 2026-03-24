@@ -102,8 +102,8 @@ func TestVSCExecute(t *testing.T) {
 		},
 		{
 			name:      "Normal case, VolumeSnapshot should be deleted",
-			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
-			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
+			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).VolumeSnapshotClassName("volumesnapshotclass").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
+			backup:    builder.ForBackup("velero", "backup").Result(),
 			expectErr: false,
 			function: func(
 				ctx context.Context,
@@ -116,7 +116,7 @@ func TestVSCExecute(t *testing.T) {
 		{
 			name:      "Normal case, VolumeSnapshot should be deleted",
 			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
-			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
+			backup:    builder.ForBackup("velero", "backup").Result(),
 			expectErr: true,
 			function: func(
 				ctx context.Context,
@@ -144,7 +144,7 @@ func TestVSCExecute(t *testing.T) {
 		{
 			name:      "Error case with CSI error, dangling VSC should be cleaned up",
 			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
-			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
+			backup:    builder.ForBackup("velero", "backup").Result(),
 			expectErr: true,
 			function: func(
 				ctx context.Context,

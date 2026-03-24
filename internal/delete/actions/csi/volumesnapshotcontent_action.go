@@ -18,7 +18,6 @@ package csi
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
@@ -27,14 +26,11 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
@@ -119,34 +115,22 @@ func (p *volumeSnapshotContentDeleteItemAction) Execute(
 	}
 	p.log.Infof("Created temp VolumeSnapshotContent %s with DeletionPolicy=Delete to trigger cloud snapshot cleanup", snapCont.Name)
 
-	// Read resource timeout from backup annotation, if not set, use default value.
-	timeout, err := time.ParseDuration(
-		input.Backup.Annotations[velerov1api.ResourceTimeoutAnnotation])
-	if err != nil {
-		p.log.Warnf("fail to parse resource timeout annotation %s: %s",
-			input.Backup.Annotations[velerov1api.ResourceTimeoutAnnotation], err.Error())
-		timeout = 10 * time.Minute
-	}
-	p.log.Debugf("resource timeout is set to %s", timeout.String())
-
-	interval := 5 * time.Second
-
-	// Wait until VSC created and ReadyToUse is true.
-	if err := wait.PollUntilContextTimeout(
-		context.Background(),
-		interval,
-		timeout,
-		true,
-		func(ctx context.Context) (bool, error) {
-			return checkVSCReadiness(ctx, &snapCont, p.crClient)
-		},
-	); err != nil {
-		// Clean up the VSC we created since it can't become ready
-		p.log.WithError(err).Warnf("Temp VolumeSnapshotContent %s did not become ready, cleaning up", snapCont.Name)
+	// Check if the VSC is ready before proceeding to deletion.
+	ready, err := checkVSCReadiness(context.TODO(), &snapCont, p.crClient)
+	if err != nil || !ready {
+		// Clean up the VSC we created since it isn't ready
+		if err != nil {
+			p.log.WithError(err).Warnf("Temp VolumeSnapshotContent %s is not ready, cleaning up", snapCont.Name)
+		} else {
+			p.log.Warnf("Temp VolumeSnapshotContent %s is not ready, cleaning up", snapCont.Name)
+		}
 		if deleteErr := p.crClient.Delete(context.TODO(), &snapCont); deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
 			p.log.WithError(deleteErr).Errorf("Failed to clean up temp VolumeSnapshotContent %s", snapCont.Name)
 		}
-		return errors.Wrapf(err, "fail to wait VolumeSnapshotContent %s becomes ready.", snapCont.Name)
+		if err != nil {
+			return errors.Wrapf(err, "VolumeSnapshotContent %s is not ready", snapCont.Name)
+		}
+		return errors.Errorf("VolumeSnapshotContent %s is not ready", snapCont.Name)
 	}
 
 	p.log.Infof("Temp VolumeSnapshotContent %s is ready, deleting to trigger cloud snapshot removal", snapCont.Name)
@@ -204,6 +188,9 @@ func (p *volumeSnapshotContentDeleteItemAction) tryDeleteOriginalVSC(
 	return true
 }
 
+// checkVSCReadiness checks if the given VolumeSnapshotContent has a SnapshotHandle in its status,
+// which indicates that the CSI driver has processed the VSC and it's ready for deletion.
+// It also checks for any permanent errors reported by the CSI driver and fails fast if such an error is found.
 var checkVSCReadiness = func(
 	ctx context.Context,
 	vsc *snapshotv1api.VolumeSnapshotContent,
@@ -216,7 +203,7 @@ var checkVSCReadiness = func(
 		)
 	}
 
-	if tmpVSC.Status != nil && boolptr.IsSetToTrue(tmpVSC.Status.ReadyToUse) {
+	if tmpVSC.Status != nil && tmpVSC.Status.SnapshotHandle != nil {
 		return true, nil
 	}
 
