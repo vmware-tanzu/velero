@@ -121,10 +121,11 @@ func configMapInNamespace(namespace, name, jsonValue string) *corev1api.ConfigMa
 }
 
 // TestValidateConfigMapsUseFactoryNamespace verifies that Validate resolves the target
-// namespace via f.Namespace() (not o.Namespace) for all three ConfigMap flags.
+// namespace correctly for all three ConfigMap flags.
 //
-// Before the fix, o.Namespace was "" at Validate time (Complete had not run yet),
-// so VerifyJSONConfigs queried the "default" namespace instead of the intended one.
+// The fix (Option B) calls Complete before Validate in NewCommand so that o.Namespace is
+// populated from f.Namespace() before VerifyJSONConfigs runs. Tests mirror that order by
+// calling Complete before Validate.
 func TestValidateConfigMapsUseFactoryNamespace(t *testing.T) {
 	const targetNS = "tenant-b"
 	const defaultNS = "default"
@@ -132,7 +133,6 @@ func TestValidateConfigMapsUseFactoryNamespace(t *testing.T) {
 	// Shared options that satisfy every other validation gate:
 	//   - NoDefaultBackupLocation=true + UseVolumeSnapshots=false skips provider/bucket/plugins checks
 	//   - NoSecret=true satisfies the secret-file check
-	//   - o.Namespace is intentionally left as "" to mirror the pre-Complete state
 	baseOptions := func() *Options {
 		o := NewInstallOptions()
 		o.NoDefaultBackupLocation = true
@@ -215,6 +215,9 @@ func TestValidateConfigMapsUseFactoryNamespace(t *testing.T) {
 			o := baseOptions()
 			tc.setupOpts(o, cmName)
 
+			// Mirror the NewCommand call order: Complete populates o.Namespace before Validate runs.
+			require.NoError(t, o.Complete([]string{}, f))
+
 			c := makeValidateCmd()
 			c.SetContext(context.Background())
 
@@ -228,4 +231,35 @@ func TestValidateConfigMapsUseFactoryNamespace(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestNewCommandRunClosureOrder covers the Run closure in NewCommand (the lines that were
+// reordered by the fix: Complete → Validate → Run).
+//
+// The closure uses CheckError which calls os.Exit on any error, so the only safe path is one
+// where all three steps return nil. DryRun=true causes o.Run to return after PrintWithFormat
+// (which is a no-op when no --output flag is set) without touching any cluster clients.
+func TestNewCommandRunClosureOrder(t *testing.T) {
+	const targetNS = "tenant-b"
+	const cmName = "my-config"
+
+	cm := configMapInNamespace(targetNS, cmName, `{}`)
+	kbClient := velerotest.NewFakeControllerRuntimeClient(t, cm)
+
+	f := &factorymocks.Factory{}
+	f.On("Namespace").Return(targetNS)
+	f.On("KubebuilderClient").Return(kbClient, nil)
+
+	c := NewCommand(f)
+	c.SetArgs([]string{
+		"--no-default-backup-location",
+		"--use-volume-snapshots=false",
+		"--no-secret",
+		"--dry-run",
+		"--node-agent-configmap", cmName,
+	})
+
+	// Execute drives the full Run closure: Complete populates o.Namespace, Validate
+	// looks up the ConfigMap in targetNS (succeeds), Run returns early via DryRun.
+	require.NoError(t, c.Execute())
 }

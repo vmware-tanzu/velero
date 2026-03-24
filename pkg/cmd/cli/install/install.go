@@ -385,8 +385,8 @@ This is useful as a starting point for more customized installations.
 
   # velero install --provider azure --plugins velero/velero-plugin-for-microsoft-azure:v1.0.0 --bucket $BLOB_CONTAINER --secret-file ./credentials-velero --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]`,
 		Run: func(c *cobra.Command, args []string) {
-			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Complete(args, f))
+			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
 	}
@@ -570,20 +570,20 @@ func (o *Options) Validate(c *cobra.Command, args []string, f client.Factory) er
 	}
 
 	if len(o.NodeAgentConfigMap) > 0 {
-		if err := kubeutil.VerifyJSONConfigs(c.Context(), f.Namespace(), crClient, o.NodeAgentConfigMap, &velerotypes.NodeAgentConfigs{}); err != nil {
+		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.NodeAgentConfigMap, &velerotypes.NodeAgentConfigs{}); err != nil {
 			return fmt.Errorf("--node-agent-configmap specified ConfigMap %s is invalid: %w", o.NodeAgentConfigMap, err)
 		}
 	}
 
 	if len(o.RepoMaintenanceJobConfigMap) > 0 {
-		if err := kubeutil.VerifyJSONConfigs(c.Context(), f.Namespace(), crClient, o.RepoMaintenanceJobConfigMap, &velerotypes.JobConfigs{}); err != nil {
+		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.RepoMaintenanceJobConfigMap, &velerotypes.JobConfigs{}); err != nil {
 			return fmt.Errorf("--repo-maintenance-job-configmap specified ConfigMap %s is invalid: %w", o.RepoMaintenanceJobConfigMap, err)
 		}
 	}
 
 	if len(o.BackupRepoConfigMap) > 0 {
 		config := make(map[string]any)
-		if err := kubeutil.VerifyJSONConfigs(c.Context(), f.Namespace(), crClient, o.BackupRepoConfigMap, &config); err != nil {
+		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.BackupRepoConfigMap, &config); err != nil {
 			return fmt.Errorf("--backup-repository-configmap specified ConfigMap %s is invalid: %w", o.BackupRepoConfigMap, err)
 		}
 	}
