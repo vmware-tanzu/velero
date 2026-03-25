@@ -132,7 +132,7 @@ func TestItemBlockActionGRPCServerGetRelatedItems(t *testing.T) {
 
 			s := &ItemBlockActionGRPCServer{mux: &common.ServerMux{
 				ServerLog: velerotest.NewLogger(),
-				Handlers: map[string]interface{}{
+				Handlers: map[string]any{
 					"xyz": itemAction,
 				},
 			}}

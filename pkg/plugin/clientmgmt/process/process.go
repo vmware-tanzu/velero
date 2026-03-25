@@ -40,7 +40,7 @@ func (pf *processFactory) newProcess(command string, logger logrus.FieldLogger, 
 }
 
 type Process interface {
-	dispense(key KindAndName) (interface{}, error)
+	dispense(key KindAndName) (any, error)
 	exited() bool
 	kill()
 }
@@ -97,7 +97,7 @@ func removeFeaturesFlag(args []string) []string {
 	return commandArgs
 }
 
-func (r *process) dispense(key KindAndName) (interface{}, error) {
+func (r *process) dispense(key KindAndName) (any, error) {
 	// This calls GRPCClient(clientConn) on the plugin instance registered for key.name.
 	dispensed, err := r.protocolClient.Dispense(key.Kind.String())
 	if err != nil {

@@ -136,6 +136,6 @@ func (p *volumeSnapshotContentBackupItemAction) Cancel(
 // VolumeSnapshotContentBackupItemAction instance.
 func NewVolumeSnapshotContentBackupItemAction(
 	logger logrus.FieldLogger,
-) (interface{}, error) {
+) (any, error) {
 	return &volumeSnapshotContentBackupItemAction{log: logger}, nil
 }

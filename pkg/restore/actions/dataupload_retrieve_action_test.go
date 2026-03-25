@@ -90,7 +90,7 @@ func TestDataUploadRetrieveActionExectue(t *testing.T) {
 
 			fakeClient := fakeClientBuilder.WithRuntimeObjects(tc.veleroObjs...).Build()
 
-			var unstructuredDataUpload map[string]interface{}
+			var unstructuredDataUpload map[string]any
 			if tc.dataUpload != nil {
 				var err error
 				unstructuredDataUpload, err = runtime.DefaultUnstructuredConverter.ToUnstructured(tc.dataUpload)

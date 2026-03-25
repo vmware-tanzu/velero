@@ -28,7 +28,7 @@ type ClientBase struct {
 }
 
 type ClientDispenser interface {
-	ClientFor(name string) interface{}
+	ClientFor(name string) any
 }
 
 // clientDispenser supports the initialization and retrieval of multiple implementations for a single plugin kind, such as
@@ -41,10 +41,10 @@ type clientDispenser struct {
 	// initFunc returns a client that implements a plugin interface, such as ObjectStore.
 	initFunc clientInitFunc
 	// clients keeps track of all the initialized implementations.
-	clients map[string]interface{}
+	clients map[string]any
 }
 
-type clientInitFunc func(base *ClientBase, clientConn *grpc.ClientConn) interface{}
+type clientInitFunc func(base *ClientBase, clientConn *grpc.ClientConn) any
 
 // newClientDispenser creates a new clientDispenser.
 func NewClientDispenser(logger logrus.FieldLogger, clientConn *grpc.ClientConn, initFunc clientInitFunc) *clientDispenser {
@@ -52,13 +52,13 @@ func NewClientDispenser(logger logrus.FieldLogger, clientConn *grpc.ClientConn, 
 		clientConn: clientConn,
 		logger:     logger,
 		initFunc:   initFunc,
-		clients:    make(map[string]interface{}),
+		clients:    make(map[string]any),
 	}
 }
 
 // ClientFor returns a gRPC client stub for the implementation of a plugin named name. If the client stub does not
 // currently exist, clientFor creates it.
-func (cd *clientDispenser) ClientFor(name string) interface{} {
+func (cd *clientDispenser) ClientFor(name string) any {
 	if client, found := cd.clients[name]; found {
 		return client
 	}

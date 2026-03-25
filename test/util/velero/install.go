@@ -262,7 +262,7 @@ func cleanVSpherePluginConfig(c clientset.Interface, ns, secretName, configMapNa
 	return nil
 }
 
-func installVeleroServer(ctx context.Context, cli, cloudProvider string, options *installOptions) error {
+func installVeleroServer(ctx context.Context, cli, _ string, options *installOptions) error {
 	args := []string{"install"}
 	namespace := "velero"
 	if len(options.Namespace) > 0 {
@@ -478,7 +478,7 @@ func patchResources(resources *unstructured.UnstructuredList, namespace string, 
 					".dockerconfigjson": credential,
 				},
 			}
-			resource.Object["imagePullSecrets"] = []map[string]interface{}{
+			resource.Object["imagePullSecrets"] = []map[string]any{
 				{
 					"name": "image-pull-secret",
 				},
@@ -559,7 +559,7 @@ func patchResources(resources *unstructured.UnstructuredList, namespace string, 
 	return nil
 }
 
-func toUnstructured(res interface{}) (unstructured.Unstructured, error) {
+func toUnstructured(res any) (unstructured.Unstructured, error) {
 	un := unstructured.Unstructured{}
 	data, err := json.Marshal(res)
 	if err != nil {
@@ -672,7 +672,7 @@ func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroCo
 		fmt.Printf("error in checking velero status with %v", err)
 		ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 		defer ctxCancel()
-		VeleroUninstall(ctx, veleroCfg)
+		_ = VeleroUninstall(ctx, veleroCfg)
 		ready = false
 	}
 	if ready {

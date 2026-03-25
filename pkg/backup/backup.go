@@ -338,7 +338,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(items)}
 
-	var resourcePolicy *resourcepolicies.Policies = nil
+	var resourcePolicy *resourcepolicies.Policies
 	if backupRequest.ResPolicies != nil {
 		resourcePolicy = backupRequest.ResPolicies
 	}
@@ -432,7 +432,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	var itemBlock *BackupItemBlock
 
 	for i := range items {
-		log.WithFields(map[string]interface{}{
+		log.WithFields(map[string]any{
 			"progress":  "",
 			"resource":  items[i].groupResource.String(),
 			"namespace": items[i].namespace,
@@ -492,7 +492,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 			itemsBackedUp: len(backupRequest.BackedUpItems),
 		}
 
-		log.WithFields(map[string]interface{}{
+		log.WithFields(map[string]any{
 			"progress":  "",
 			"resource":  items[i].groupResource.String(),
 			"namespace": items[i].namespace,
@@ -959,7 +959,7 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 	unstructuredDataUploads := make([]unstructured.Unstructured, 0)
 
 	for i, item := range items {
-		log.WithFields(map[string]interface{}{
+		log.WithFields(map[string]any{
 			"progress":  "",
 			"resource":  item.groupResource.String(),
 			"namespace": item.namespace,
@@ -1001,7 +1001,7 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 		// how many items we know of that are remaining"
 		totalItems := len(backupRequest.BackedUpItems) + (len(items) - (i + 1))
 
-		log.WithFields(map[string]interface{}{
+		log.WithFields(map[string]any{
 			"progress":  "",
 			"resource":  item.groupResource.String(),
 			"namespace": item.namespace,

@@ -73,7 +73,7 @@ func CompareActions(t *testing.T, expected, actual []core.Action) {
 // that the action is a PatchAction, that the patch decodes from JSON
 // with the provided decode func and has no extraneous fields, and that
 // the decoded patch matches the expected.
-func ValidatePatch(t *testing.T, action core.Action, expected interface{}, decodeFunc func(*json.Decoder) (interface{}, error)) {
+func ValidatePatch(t *testing.T, action core.Action, expected any, decodeFunc func(*json.Decoder) (any, error)) {
 	t.Helper()
 	patchAction, ok := action.(core.PatchAction)
 	require.True(t, ok, "action is not a PatchAction")
@@ -97,7 +97,7 @@ func TimesAreEqual(t1, t2 time.Time) bool {
 // AssertDeepEqual asserts the semantic equality of objects.
 // This function exists in order to make sure time.Time and metav1.Time objects
 // can be compared correctly. See https://github.com/stretchr/testify/issues/502.
-func AssertDeepEqual(t *testing.T, expected, actual interface{}) bool {
+func AssertDeepEqual(t *testing.T, expected, actual any) bool {
 	t.Helper()
 	// By default, the equality.Semantic object doesn't have a function for comparing time.Times
 	err := equality.Semantic.AddFunc(TimesAreEqual)

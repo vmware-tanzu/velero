@@ -429,69 +429,69 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 
 func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 	pvcStandardSc := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "PersistentVolumeClaim",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "test-pvc",
 				"namespace": "foo",
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"storageClassName": "standard",
 			},
 		},
 	}
 
 	pvcPremiumSc := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "PersistentVolumeClaim",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "test-pvc",
 				"namespace": "foo",
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"storageClassName": "premium",
 			},
 		},
 	}
 
 	pvcGoldSc := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "PersistentVolumeClaim",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "test-pvc",
 				"namespace": "foo",
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"storageClassName": "gold",
 			},
 		},
 	}
 
 	deployNginxOneReplica := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "apps/v1",
 			"kind":       "Deployment",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "test-deployment",
 				"namespace": "foo",
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					"app": "nginx",
 				},
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"replicas": int64(1),
-				"template": map[string]interface{}{
-					"metadata": map[string]interface{}{
-						"labels": map[string]interface{}{
+				"template": map[string]any{
+					"metadata": map[string]any{
+						"labels": map[string]any{
 							"app": "nginx",
 						},
 					},
-					"spec": map[string]interface{}{
-						"containers": []interface{}{
-							map[string]interface{}{
+					"spec": map[string]any{
+						"containers": []any{
+							map[string]any{
 								"name":  "nginx",
 								"image": "nginx:latest",
 							},
@@ -502,27 +502,27 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 		},
 	}
 	deployNginxTwoReplica := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "apps/v1",
 			"kind":       "Deployment",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "test-deployment",
 				"namespace": "foo",
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					"app": "nginx",
 				},
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"replicas": int64(2),
-				"template": map[string]interface{}{
-					"metadata": map[string]interface{}{
-						"labels": map[string]interface{}{
+				"template": map[string]any{
+					"metadata": map[string]any{
+						"labels": map[string]any{
 							"app": "nginx",
 						},
 					},
-					"spec": map[string]interface{}{
-						"containers": []interface{}{
-							map[string]interface{}{
+					"spec": map[string]any{
+						"containers": []any{
+							map[string]any{
 								"name":  "nginx",
 								"image": "nginx:latest",
 							},
@@ -533,31 +533,31 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 		},
 	}
 	deployNginxMysql := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "apps/v1",
 			"kind":       "Deployment",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "test-deployment",
 				"namespace": "foo",
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					"app": "nginx",
 				},
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"replicas": int64(1),
-				"template": map[string]interface{}{
-					"metadata": map[string]interface{}{
-						"labels": map[string]interface{}{
+				"template": map[string]any{
+					"metadata": map[string]any{
+						"labels": map[string]any{
 							"app": "nginx",
 						},
 					},
-					"spec": map[string]interface{}{
-						"containers": []interface{}{
-							map[string]interface{}{
+					"spec": map[string]any{
+						"containers": []any{
+							map[string]any{
 								"name":  "nginx",
 								"image": "nginx:latest",
 							},
-							map[string]interface{}{
+							map[string]any{
 								"name":  "mysql",
 								"image": "mysql:latest",
 							},
@@ -568,19 +568,19 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 		},
 	}
 	cmTrue := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"data": map[string]interface{}{
+			"data": map[string]any{
 				"test": "true",
 			},
 		},
 	}
 	cmFalse := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"data": map[string]interface{}{
+			"data": map[string]any{
 				"test": "false",
 			},
 		},

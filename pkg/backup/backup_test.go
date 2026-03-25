@@ -1355,7 +1355,7 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
 						Action: resourcepolicies.Action{Type: "snapshot"},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2"},
 						},
 					},
@@ -1837,7 +1837,7 @@ func TestBackupActionModifications(t *testing.T) {
 			},
 			actions: []biav2.BackupItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
-					item.Object["spec"].(map[string]interface{})["nodeName"] = "foo"
+					item.Object["spec"].(map[string]any)["nodeName"] = "foo"
 				}),
 			},
 			want: map[string]unstructuredObject{
@@ -4249,7 +4249,7 @@ func defaultBackup() *builder.BackupBuilder {
 	return builder.ForBackup(velerov1.DefaultNamespace, "backup-1").DefaultVolumesToFsBackup(false)
 }
 
-func toUnstructuredOrFail(t *testing.T, obj interface{}) map[string]interface{} {
+func toUnstructuredOrFail(t *testing.T, obj any) map[string]any {
 	t.Helper()
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
@@ -4285,7 +4285,7 @@ func assertTarballContents(t *testing.T, backupFile io.Reader, items ...string) 
 }
 
 // unstructuredObject is a type alias to improve readability.
-type unstructuredObject map[string]interface{}
+type unstructuredObject map[string]any
 
 // assertTarballFileContents verifies that the gzipped tarball stored in the provided
 // backupFile contains the files specified as keys in 'want', and for each of those

@@ -1621,14 +1621,14 @@ func TestWaitUntilVSCHandleIsReady(t *testing.T) {
 			volSnap:     vsWithNilStatusField,
 		},
 		{
-			name:        "waitDisabled should find volumesnapshotcontent volumesnapshotcontent status is nil",
+			name:        "waitDisabled should find volumesnapshotcontent status is nil",
 			wait:        false,
 			expectError: false,
 			exepctedVSC: vscWithNilStatus,
 			volSnap:     vsForNilStatusVsc,
 		},
 		{
-			name:        "waitDisabled should find volumesnapshotcontent volumesnapshotcontent status.SnapshotHandle is nil",
+			name:        "waitDisabled should find volumesnapshotcontent status.SnapshotHandle is nil",
 			wait:        false,
 			expectError: false,
 			exepctedVSC: vscWithNilStatusField,

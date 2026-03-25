@@ -69,7 +69,7 @@ func (a *AdmissionWebhookConfigurationAction) Execute(input *velero.RestoreItemA
 		logger.Info("webhooks is not set, skip")
 		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
-	newWebhooks := make([]interface{}, 0)
+	newWebhooks := make([]any, 0)
 	for i := range webhooks {
 		logger2 := logger.WithField("index", i)
 		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&webhooks[i])

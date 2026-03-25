@@ -40,7 +40,7 @@ func (h HookExecutionEntry) String() string {
 	return fmt.Sprintf("%s.%s.%s.%s", h.Namespace, h.Name, h.HookName, strings.Join(h.HookCommand, ","))
 }
 
-func (e *MockPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *v1.ExecHook) error {
+func (e *MockPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, item map[string]any, namespace, name, hookName string, hook *v1.ExecHook) error {
 	e.HookExecutionLog = append(e.HookExecutionLog, HookExecutionEntry{
 		Namespace:   namespace,
 		Name:        name,

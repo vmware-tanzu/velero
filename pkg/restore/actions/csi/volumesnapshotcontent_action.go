@@ -108,6 +108,6 @@ func (p *volumeSnapshotContentRestoreItemAction) AreAdditionalItemsReady(
 	return true, nil
 }
 
-func NewVolumeSnapshotContentRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+func NewVolumeSnapshotContentRestoreItemAction(logger logrus.FieldLogger) (any, error) {
 	return &volumeSnapshotContentRestoreItemAction{logger}, nil
 }

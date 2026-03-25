@@ -34,7 +34,7 @@ type VolumeSnapshotterPlugin struct {
 }
 
 // GRPCClient returns a VolumeSnapshotter gRPC client.
-func (p *VolumeSnapshotterPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+func (p *VolumeSnapshotterPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (any, error) {
 	return common.NewClientDispenser(p.ClientLogger, clientConn, newVolumeSnapshotterGRPCClient), nil
 }
 

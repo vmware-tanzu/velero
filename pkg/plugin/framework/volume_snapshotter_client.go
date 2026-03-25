@@ -43,7 +43,7 @@ type VolumeSnapshotterGRPCClient struct {
 	grpcClient proto.VolumeSnapshotterClient
 }
 
-func newVolumeSnapshotterGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) interface{} {
+func newVolumeSnapshotterGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) any {
 	return &VolumeSnapshotterGRPCClient{
 		ClientBase: base,
 		grpcClient: proto.NewVolumeSnapshotterClient(clientConn),

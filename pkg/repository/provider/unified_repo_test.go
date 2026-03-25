@@ -537,7 +537,7 @@ func TestGetStoreOptions(t *testing.T) {
 	testCases := []struct {
 		name        string
 		funcTable   localFuncTable
-		repoParam   interface{}
+		repoParam   any
 		expected    map[string]string
 		expectedErr string
 	}{
@@ -741,9 +741,9 @@ func TestForget(t *testing.T) {
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
 		backupRepo      *reposervicenmocks.BackupRepo
-		retFuncOpen     []interface{}
-		retFuncDelete   interface{}
-		retFuncFlush    interface{}
+		retFuncOpen     []any
+		retFuncDelete   any
+		retFuncFlush    any
 		credStoreReturn string
 		credStoreError  error
 		expectedErr     string
@@ -765,7 +765,7 @@ func TestForget(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -790,7 +790,7 @@ func TestForget(t *testing.T) {
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
 			backupRepo:  new(reposervicenmocks.BackupRepo),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -818,7 +818,7 @@ func TestForget(t *testing.T) {
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
 			backupRepo:  new(reposervicenmocks.BackupRepo),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -890,9 +890,9 @@ func TestBatchForget(t *testing.T) {
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
 		backupRepo      *reposervicenmocks.BackupRepo
-		retFuncOpen     []interface{}
-		retFuncDelete   interface{}
-		retFuncFlush    interface{}
+		retFuncOpen     []any
+		retFuncDelete   any
+		retFuncFlush    any
 		credStoreReturn string
 		credStoreError  error
 		snapshots       []string
@@ -915,7 +915,7 @@ func TestBatchForget(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -940,7 +940,7 @@ func TestBatchForget(t *testing.T) {
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
 			backupRepo:  new(reposervicenmocks.BackupRepo),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -969,7 +969,7 @@ func TestBatchForget(t *testing.T) {
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
 			backupRepo:  new(reposervicenmocks.BackupRepo),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -1042,7 +1042,7 @@ func TestInitRepo(t *testing.T) {
 		funcTable       localFuncTable
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
-		retFuncInit     interface{}
+		retFuncInit     any
 		credStoreReturn string
 		credStoreError  error
 		expectedErr     string
@@ -1130,7 +1130,7 @@ func TestConnectToRepo(t *testing.T) {
 		funcTable       localFuncTable
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
-		retFuncInit     interface{}
+		retFuncInit     any
 		credStoreReturn string
 		credStoreError  error
 		expectedErr     string
@@ -1221,8 +1221,8 @@ func TestBoostRepoConnect(t *testing.T) {
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
 		backupRepo      *reposervicenmocks.BackupRepo
-		retFuncInit     interface{}
-		retFuncOpen     []interface{}
+		retFuncInit     any
+		retFuncOpen     []any
 		credStoreReturn string
 		credStoreError  error
 		expectedErr     string
@@ -1244,7 +1244,7 @@ func TestBoostRepoConnect(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -1271,7 +1271,7 @@ func TestBoostRepoConnect(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -1298,7 +1298,7 @@ func TestBoostRepoConnect(t *testing.T) {
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
 			backupRepo:  new(reposervicenmocks.BackupRepo),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -1362,7 +1362,7 @@ func TestPruneRepo(t *testing.T) {
 		funcTable       localFuncTable
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
-		retFuncMaintain interface{}
+		retFuncMaintain any
 		credStoreReturn string
 		credStoreError  error
 		expectedErr     string

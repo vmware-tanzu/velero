@@ -157,7 +157,7 @@ func newBackupper(
 
 	b.handlerRegistration, _ = pvbInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: func(_, obj interface{}) {
+			UpdateFunc: func(_, obj any) {
 				pvb, ok := obj.(*velerov1api.PodVolumeBackup)
 				if !ok {
 					log.Errorf("expected PodVolumeBackup, but got %T", obj)

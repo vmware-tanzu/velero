@@ -24,7 +24,7 @@ import (
 )
 
 // HandlePanic is a panic handler for the server half of velero plugins.
-func HandlePanic(p interface{}) error {
+func HandlePanic(p any) error {
 	if p == nil {
 		return nil
 	}

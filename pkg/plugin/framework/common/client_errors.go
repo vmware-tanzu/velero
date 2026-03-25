@@ -37,8 +37,7 @@ func FromGRPCError(err error) error {
 	}
 
 	for _, detail := range statusErr.Details() {
-		switch t := detail.(type) {
-		case *proto.Stack:
+		if t, ok := detail.(*proto.Stack); ok {
 			return &ProtoStackError{
 				error: err,
 				stack: t,
