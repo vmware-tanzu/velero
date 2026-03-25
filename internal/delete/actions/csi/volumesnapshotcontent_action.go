@@ -115,25 +115,8 @@ func (p *volumeSnapshotContentDeleteItemAction) Execute(
 	}
 	p.log.Infof("Created temp VolumeSnapshotContent %s with DeletionPolicy=Delete to trigger cloud snapshot cleanup", snapCont.Name)
 
-	// Check if the VSC is ready before proceeding to deletion.
-	ready, err := checkVSCReadiness(context.TODO(), &snapCont, p.crClient)
-	if err != nil || !ready {
-		// Clean up the VSC we created since it isn't ready
-		if err != nil {
-			p.log.WithError(err).Warnf("Temp VolumeSnapshotContent %s is not ready, cleaning up", snapCont.Name)
-		} else {
-			p.log.Warnf("Temp VolumeSnapshotContent %s is not ready, cleaning up", snapCont.Name)
-		}
-		if deleteErr := p.crClient.Delete(context.TODO(), &snapCont); deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
-			p.log.WithError(deleteErr).Errorf("Failed to clean up temp VolumeSnapshotContent %s", snapCont.Name)
-		}
-		if err != nil {
-			return errors.Wrapf(err, "VolumeSnapshotContent %s is not ready", snapCont.Name)
-		}
-		return errors.Errorf("VolumeSnapshotContent %s is not ready", snapCont.Name)
-	}
-
-	p.log.Infof("Temp VolumeSnapshotContent %s is ready, deleting to trigger cloud snapshot removal", snapCont.Name)
+	// Delete the temp VSC immediately to trigger cloud snapshot removal.
+	// The CSI driver will handle the actual cloud snapshot deletion.
 	if err := p.crClient.Delete(
 		context.TODO(),
 		&snapCont,
@@ -186,35 +169,6 @@ func (p *volumeSnapshotContentDeleteItemAction) tryDeleteOriginalVSC(
 
 	p.log.Infof("Deleted original VolumeSnapshotContent %s with DeletionPolicy=Delete, CSI driver will remove cloud snapshot", vscName)
 	return true
-}
-
-// checkVSCReadiness checks if the given VolumeSnapshotContent has a SnapshotHandle in its status,
-// which indicates that the CSI driver has processed the VSC and it's ready for deletion.
-// It also checks for any permanent errors reported by the CSI driver and fails fast if such an error is found.
-var checkVSCReadiness = func(
-	ctx context.Context,
-	vsc *snapshotv1api.VolumeSnapshotContent,
-	client crclient.Client,
-) (bool, error) {
-	tmpVSC := new(snapshotv1api.VolumeSnapshotContent)
-	if err := client.Get(ctx, crclient.ObjectKeyFromObject(vsc), tmpVSC); err != nil {
-		return false, errors.Wrapf(
-			err, "failed to get VolumeSnapshotContent %s", vsc.Name,
-		)
-	}
-
-	if tmpVSC.Status != nil && tmpVSC.Status.SnapshotHandle != nil {
-		return true, nil
-	}
-
-	// Fail fast on permanent CSI driver errors (e.g., InvalidSnapshot.NotFound)
-	if tmpVSC.Status != nil && tmpVSC.Status.Error != nil && tmpVSC.Status.Error.Message != nil {
-		return false, errors.Errorf(
-			"VolumeSnapshotContent %s has error: %s", vsc.Name, *tmpVSC.Status.Error.Message,
-		)
-	}
-
-	return false, nil
 }
 
 func NewVolumeSnapshotContentDeleteItemAction(

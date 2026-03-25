@@ -21,8 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
-	"github.com/pkg/errors"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
@@ -76,12 +75,7 @@ func TestVSCExecute(t *testing.T) {
 		vsc            *snapshotv1api.VolumeSnapshotContent
 		backup         *velerov1api.Backup
 		preExistingVSC *snapshotv1api.VolumeSnapshotContent
-		function       func(
-			ctx context.Context,
-			vsc *snapshotv1api.VolumeSnapshotContent,
-			client crclient.Client,
-		) (bool, error)
-		expectErr bool
+		expectErr      bool
 	}{
 		{
 			name: "VolumeSnapshotContent doesn't have backup label",
@@ -105,26 +99,6 @@ func TestVSCExecute(t *testing.T) {
 			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).VolumeSnapshotClassName("volumesnapshotclass").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
 			backup:    builder.ForBackup("velero", "backup").Result(),
 			expectErr: false,
-			function: func(
-				ctx context.Context,
-				vsc *snapshotv1api.VolumeSnapshotContent,
-				client crclient.Client,
-			) (bool, error) {
-				return true, nil
-			},
-		},
-		{
-			name:      "Normal case, VolumeSnapshot should be deleted",
-			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
-			backup:    builder.ForBackup("velero", "backup").Result(),
-			expectErr: true,
-			function: func(
-				ctx context.Context,
-				vsc *snapshotv1api.VolumeSnapshotContent,
-				client crclient.Client,
-			) (bool, error) {
-				return false, errors.Errorf("test error case")
-			},
 		},
 		{
 			name:      "Original VSC exists in cluster, cleaned up directly",
@@ -141,26 +115,12 @@ func TestVSCExecute(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:      "Error case with CSI error, dangling VSC should be cleaned up",
-			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
-			backup:    builder.ForBackup("velero", "backup").Result(),
-			expectErr: true,
-			function: func(
-				ctx context.Context,
-				vsc *snapshotv1api.VolumeSnapshotContent,
-				client crclient.Client,
-			) (bool, error) {
-				return false, errors.Errorf("VolumeSnapshotContent %s has error: InvalidSnapshot.NotFound", vsc.Name)
-			},
-		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			crClient := velerotest.NewFakeControllerRuntimeClient(t)
 			logger := logrus.StandardLogger()
-			checkVSCReadiness = test.function
 
 			if test.preExistingVSC != nil {
 				require.NoError(t, crClient.Create(context.Background(), test.preExistingVSC))
@@ -220,75 +180,6 @@ func TestNewVolumeSnapshotContentDeleteItemAction(t *testing.T) {
 	plugin1 := NewVolumeSnapshotContentDeleteItemAction(f1)
 	_, err1 := plugin1(logger)
 	require.NoError(t, err1)
-}
-
-func TestCheckVSCReadiness(t *testing.T) {
-	tests := []struct {
-		name      string
-		vsc       *snapshotv1api.VolumeSnapshotContent
-		createVSC bool
-		expectErr bool
-		ready     bool
-	}{
-		{
-			name: "VSC not exist",
-			vsc: &snapshotv1api.VolumeSnapshotContent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "vsc-1",
-					Namespace: "velero",
-				},
-			},
-			createVSC: false,
-			expectErr: true,
-			ready:     false,
-		},
-		{
-			name: "VSC not ready",
-			vsc: &snapshotv1api.VolumeSnapshotContent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "vsc-1",
-					Namespace: "velero",
-				},
-			},
-			createVSC: true,
-			expectErr: false,
-			ready:     false,
-		},
-		{
-			name: "VSC has error from CSI driver",
-			vsc: &snapshotv1api.VolumeSnapshotContent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "vsc-1",
-					Namespace: "velero",
-				},
-				Status: &snapshotv1api.VolumeSnapshotContentStatus{
-					ReadyToUse: boolPtr(false),
-					Error: &snapshotv1api.VolumeSnapshotError{
-						Message: stringPtr("InvalidSnapshot.NotFound: The snapshot 'snap-0abc123' does not exist."),
-					},
-				},
-			},
-			createVSC: true,
-			expectErr: true,
-			ready:     false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
-			crClient := velerotest.NewFakeControllerRuntimeClient(t)
-			if test.createVSC {
-				require.NoError(t, crClient.Create(ctx, test.vsc))
-			}
-
-			ready, err := checkVSCReadiness(ctx, test.vsc, crClient)
-			require.Equal(t, test.ready, ready)
-			if test.expectErr {
-				require.Error(t, err)
-			}
-		})
-	}
 }
 
 func TestTryDeleteOriginalVSC(t *testing.T) {
