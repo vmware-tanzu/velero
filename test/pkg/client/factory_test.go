@@ -31,14 +31,14 @@ func TestFactory(t *testing.T) {
 
 	// Env variable should set the namespace if no config or argument are used
 	os.Setenv("VELERO_NAMESPACE", "env-velero")
-	f := NewFactory("velero", "", make(map[string]interface{}))
+	f := NewFactory("velero", "", make(map[string]any))
 
 	assert.Equal(t, "env-velero", f.Namespace())
 
 	os.Unsetenv("VELERO_NAMESPACE")
 
 	// Argument should change the namespace
-	f = NewFactory("velero", "", make(map[string]interface{}))
+	f = NewFactory("velero", "", make(map[string]any))
 	s := "flag-velero"
 	flags := new(pflag.FlagSet)
 
@@ -50,7 +50,7 @@ func TestFactory(t *testing.T) {
 
 	// An argument overrides the env variable if both are set.
 	os.Setenv("VELERO_NAMESPACE", "env-velero")
-	f = NewFactory("velero", "", make(map[string]interface{}))
+	f = NewFactory("velero", "", make(map[string]any))
 	flags = new(pflag.FlagSet)
 
 	f.BindFlags(flags)

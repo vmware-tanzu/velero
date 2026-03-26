@@ -419,20 +419,20 @@ func resourceInfo(ctx context.Context, g, v, r string, index int) (map[string]ma
 		return nil, errors.Wrap(err, errMsg)
 	}
 
-	var info map[string]interface{}
+	var info map[string]any
 	if err := json.Unmarshal([]byte(stdout), &info); err != nil {
 		return nil, errors.Wrap(err, "unmarshal resource info JSON")
 	}
-	items := info["items"].([]interface{})
+	items := info["items"].([]any)
 
 	if len(items) < 1 {
 		return nil, errors.New("resource info is empty")
 	}
 
-	item := items[0].(map[string]interface{})
-	metadata := item["metadata"].(map[string]interface{})
-	annotations := metadata["annotations"].(map[string]interface{})
-	specs := item["spec"].(map[string]interface{})
+	item := items[0].(map[string]any)
+	metadata := item["metadata"].(map[string]any)
+	annotations := metadata["annotations"].(map[string]any)
+	specs := item["spec"].(map[string]any)
 
 	annoSpec := make(map[string]map[string]string)
 

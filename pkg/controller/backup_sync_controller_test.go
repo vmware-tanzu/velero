@@ -556,30 +556,30 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			{
 				name:         "no overlapping backups",
 				namespace:    "ns-1",
-				cloudBackups: sets.New[string]("backup-1", "backup-2", "backup-3"),
+				cloudBackups: sets.New("backup-1", "backup-2", "backup-3"),
 				k8sBackups: []*velerov1api.Backup{
 					baseBuilder("backupA").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backupB").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backupC").Phase(velerov1api.BackupPhasePartiallyFailed).Result(),
 				},
-				expectedDeletes: sets.New[string]("backupA", "backupB", "backupC"),
+				expectedDeletes: sets.New("backupA", "backupB", "backupC"),
 			},
 			{
 				name:         "some overlapping backups",
 				namespace:    "ns-1",
-				cloudBackups: sets.New[string]("backup-1", "backup-2", "backup-3"),
+				cloudBackups: sets.New("backup-1", "backup-2", "backup-3"),
 				k8sBackups: []*velerov1api.Backup{
 					baseBuilder("backup-1").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backup-2").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backup-B").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backup-C").Phase(velerov1api.BackupPhasePartiallyFailed).Result(),
 				},
-				expectedDeletes: sets.New[string]("backup-B", "backup-C"),
+				expectedDeletes: sets.New("backup-B", "backup-C"),
 			},
 			{
 				name:         "all overlapping backups",
 				namespace:    "ns-1",
-				cloudBackups: sets.New[string]("backup-1", "backup-2", "backup-3"),
+				cloudBackups: sets.New("backup-1", "backup-2", "backup-3"),
 				k8sBackups: []*velerov1api.Backup{
 					baseBuilder("backup-1").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backup-2").Phase(velerov1api.BackupPhaseCompleted).Result(),
@@ -590,7 +590,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			{
 				name:         "no overlapping backups but including backups that are not complete",
 				namespace:    "ns-1",
-				cloudBackups: sets.New[string]("backup-1", "backup-2", "backup-3"),
+				cloudBackups: sets.New("backup-1", "backup-2", "backup-3"),
 				k8sBackups: []*velerov1api.Backup{
 					baseBuilder("backupA").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backupB").Phase(velerov1api.BackupPhasePartiallyFailed).Result(),
@@ -600,12 +600,12 @@ var _ = Describe("Backup Sync Reconciler", func() {
 					baseBuilder("InProgress").Phase(velerov1api.BackupPhaseInProgress).Result(),
 					baseBuilder("New").Phase(velerov1api.BackupPhaseNew).Result(),
 				},
-				expectedDeletes: sets.New[string]("backupA", "backupB"),
+				expectedDeletes: sets.New("backupA", "backupB"),
 			},
 			{
 				name:         "all overlapping backups and all backups that are not complete",
 				namespace:    "ns-1",
-				cloudBackups: sets.New[string]("backup-1", "backup-2", "backup-3"),
+				cloudBackups: sets.New("backup-1", "backup-2", "backup-3"),
 				k8sBackups: []*velerov1api.Backup{
 					baseBuilder("backup-1").Phase(velerov1api.BackupPhaseFailed).Result(),
 					baseBuilder("backup-2").Phase(velerov1api.BackupPhaseFailedValidation).Result(),
@@ -616,7 +616,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			{
 				name:         "no completed backups in other locations are deleted",
 				namespace:    "ns-1",
-				cloudBackups: sets.New[string]("backup-1", "backup-2", "backup-3"),
+				cloudBackups: sets.New("backup-1", "backup-2", "backup-3"),
 				k8sBackups: []*velerov1api.Backup{
 					baseBuilder("backup-1").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backup-2").Phase(velerov1api.BackupPhaseCompleted).Result(),
@@ -627,12 +627,12 @@ var _ = Describe("Backup Sync Reconciler", func() {
 					baseBuilder("backup-5").ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "alternate")).Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backup-6").ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "alternate")).Phase(velerov1api.BackupPhasePartiallyFailed).Result(),
 				},
-				expectedDeletes: sets.New[string]("backup-C", "backup-D"),
+				expectedDeletes: sets.New("backup-C", "backup-D"),
 			},
 			{
 				name:         "some overlapping backups",
 				namespace:    "ns-1",
-				cloudBackups: sets.New[string]("backup-1", "backup-2", "backup-3"),
+				cloudBackups: sets.New("backup-1", "backup-2", "backup-3"),
 				k8sBackups: []*velerov1api.Backup{
 					builder.ForBackup("ns-1", "backup-1").
 						ObjectMeta(
@@ -659,7 +659,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 						Phase(velerov1api.BackupPhasePartiallyFailed).
 						Result(),
 				},
-				expectedDeletes: sets.New[string]("backup-C", "backup-D"),
+				expectedDeletes: sets.New("backup-C", "backup-D"),
 				useLongBSLName:  true,
 			},
 		}
@@ -879,7 +879,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			},
 		}
 		for _, test := range testCases {
-			test := test
+
 			It(test.name, func() {
 				logger := velerotest.NewLogger()
 				b := backupSyncReconciler{

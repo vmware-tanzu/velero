@@ -94,12 +94,12 @@ func TestValidate(t *testing.T) {
 				VolumePolicies: []VolumePolicy{
 					{
 						Action: Action{Type: "skip"},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"capacity":     "0,10Gi",
 							"unknown":      "",
 							"storageClass": []string{"gp2", "ebs-sc"},
-							"csi": interface{}(
-								map[string]interface{}{
+							"csi": any(
+								map[string]any{
 									"driver": "aws.efs.csi.driver",
 								}),
 						},
@@ -115,11 +115,11 @@ func TestValidate(t *testing.T) {
 				VolumePolicies: []VolumePolicy{
 					{
 						Action: Action{Type: "skip"},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"capacity":     "10Gi",
 							"storageClass": []string{"gp2", "ebs-sc"},
-							"csi": interface{}(
-								map[string]interface{}{
+							"csi": any(
+								map[string]any{
 									"driver": "aws.efs.csi.driver",
 								}),
 						},
@@ -135,11 +135,11 @@ func TestValidate(t *testing.T) {
 				VolumePolicies: []VolumePolicy{
 					{
 						Action: Action{Type: "skip"},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"capacity":     "0,10Gi",
 							"storageClass": "ebs-sc",
-							"csi": interface{}(
-								map[string]interface{}{
+							"csi": any(
+								map[string]any{
 									"driver": "aws.efs.csi.driver",
 								}),
 						},
@@ -155,7 +155,7 @@ func TestValidate(t *testing.T) {
 				VolumePolicies: []VolumePolicy{
 					{
 						Action: Action{Type: "skip"},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"capacity":     "0,10Gi",
 							"storageClass": []string{"gp2", "ebs-sc"},
 							"csi":          "aws.efs.csi.driver",
@@ -172,10 +172,10 @@ func TestValidate(t *testing.T) {
 				VolumePolicies: []VolumePolicy{
 					{
 						Action: Action{Type: "skip"},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"capacity": "0,10Gi",
-							"csi": interface{}(
-								map[string]interface{}{
+							"csi": any(
+								map[string]any{
 									"driver": "aws.efs.csi.driver",
 								}),
 						},
@@ -191,10 +191,10 @@ func TestValidate(t *testing.T) {
 				VolumePolicies: []VolumePolicy{
 					{
 						Action: Action{Type: "unsupported"},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"capacity": "0,10Gi",
-							"csi": interface{}(
-								map[string]interface{}{
+							"csi": any(
+								map[string]any{
 									"driver": "aws.efs.csi.driver",
 								}),
 						},
@@ -210,7 +210,7 @@ func TestValidate(t *testing.T) {
 				VolumePolicies: []VolumePolicy{
 					{
 						Action: Action{Type: "skip"},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"capacity":     "0,10Gi",
 							"storageClass": []string{"gp2", "ebs-sc"},
 							"nfs":          "aws.efs.csi.driver",
@@ -227,15 +227,15 @@ func TestValidate(t *testing.T) {
 				VolumePolicies: []VolumePolicy{
 					{
 						Action: Action{Type: "skip"},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"capacity":     "0,10Gi",
 							"storageClass": []string{"gp2", "ebs-sc"},
-							"csi": interface{}(
-								map[string]interface{}{
+							"csi": any(
+								map[string]any{
 									"driver": "aws.efs.csi.driver",
 								}),
-							"nfs": interface{}(
-								map[string]interface{}{
+							"nfs": any(
+								map[string]any{
 									"server": "192.168.20.90",
 									"path":   "/mnt/data/",
 								}),
@@ -252,15 +252,15 @@ func TestValidate(t *testing.T) {
 				VolumePolicies: []VolumePolicy{
 					{
 						Action: Action{Type: "snapshot"},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"capacity":     "0,10Gi",
 							"storageClass": []string{"gp2", "ebs-sc"},
-							"csi": interface{}(
-								map[string]interface{}{
+							"csi": any(
+								map[string]any{
 									"driver": "aws.efs.csi.driver",
 								}),
-							"nfs": interface{}(
-								map[string]interface{}{
+							"nfs": any(
+								map[string]any{
 									"server": "192.168.20.90",
 									"path":   "/mnt/data/",
 								}),
@@ -277,15 +277,15 @@ func TestValidate(t *testing.T) {
 				VolumePolicies: []VolumePolicy{
 					{
 						Action: Action{Type: "fs-backup"},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"capacity":     "0,10Gi",
 							"storageClass": []string{"gp2", "ebs-sc"},
-							"csi": interface{}(
-								map[string]interface{}{
+							"csi": any(
+								map[string]any{
 									"driver": "aws.efs.csi.driver",
 								}),
-							"nfs": interface{}(
-								map[string]interface{}{
+							"nfs": any(
+								map[string]any{
 									"server": "192.168.20.90",
 									"path":   "/mnt/data/",
 								}),
@@ -302,15 +302,15 @@ func TestValidate(t *testing.T) {
 				VolumePolicies: []VolumePolicy{
 					{
 						Action: Action{Type: Snapshot},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2"},
 						},
 					},
 					{
 						Action: Action{Type: FSBackup},
-						Conditions: map[string]interface{}{
-							"nfs": interface{}(
-								map[string]interface{}{
+						Conditions: map[string]any{
+							"nfs": any(
+								map[string]any{
 									"server": "192.168.20.90",
 									"path":   "/mnt/data/",
 								}),

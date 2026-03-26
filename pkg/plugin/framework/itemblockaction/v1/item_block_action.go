@@ -34,7 +34,7 @@ type ItemBlockActionPlugin struct {
 }
 
 // GRPCClient returns a clientDispenser for ItemBlockAction gRPC clients.
-func (p *ItemBlockActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+func (p *ItemBlockActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (any, error) {
 	return common.NewClientDispenser(p.ClientLogger, clientConn, newItemBlockActionGRPCClient), nil
 }
 

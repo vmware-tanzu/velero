@@ -99,7 +99,7 @@ func (r *BackupMicroService) Init() error {
 
 	handler, err := r.duInformer.AddEventHandler(
 		cachetool.ResourceEventHandlerFuncs{
-			UpdateFunc: func(oldObj interface{}, newObj interface{}) {
+			UpdateFunc: func(oldObj any, newObj any) {
 				oldDu := oldObj.(*velerov2alpha1api.DataUpload)
 				newDu := newObj.(*velerov2alpha1api.DataUpload)
 

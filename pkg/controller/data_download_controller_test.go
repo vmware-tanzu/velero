@@ -70,7 +70,7 @@ func dataDownloadBuilder() *builder.DataDownloadBuilder {
 }
 
 func initDataDownloadReconciler(objects []runtime.Object, needError ...bool) (*DataDownloadReconciler, error) {
-	var errs []error = make([]error, 6)
+	errs := make([]error, 6)
 	for k, isError := range needError {
 		if k == 0 && isError {
 			errs[0] = fmt.Errorf("Get error")
@@ -503,13 +503,9 @@ func TestDataDownloadReconcile(t *testing.T) {
 				assert.Contains(t, dd.Status.Message, test.expectedStatusMsg)
 			}
 			if test.dd.Namespace == velerov1api.DefaultNamespace {
-				if controllerutil.ContainsFinalizer(test.dd, DataUploadDownloadFinalizer) {
-					assert.True(t, true, apierrors.IsNotFound(err))
-				} else {
+				if !controllerutil.ContainsFinalizer(test.dd, DataUploadDownloadFinalizer) {
 					require.NoError(t, err)
 				}
-			} else {
-				assert.True(t, true, apierrors.IsNotFound(err))
 			}
 
 			if !test.needCreateFSBR {
@@ -955,9 +951,10 @@ type ddResumeTestHelper struct {
 	asyncBR      datapath.AsyncBR
 }
 
-func (dt *ddResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler, _ context.Context, _ *velerov2alpha1api.DataUpload, _ logrus.FieldLogger) error {
-	return dt.resumeErr
-}
+// Unused function - golangci-lint
+// func (dt *ddResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler, _ context.Context, _ *velerov2alpha1api.DataUpload, _ logrus.FieldLogger) error {
+// 	return dt.resumeErr
+// }
 
 func (dt *ddResumeTestHelper) Expose(context.Context, corev1.ObjectReference, string, string, map[string]string, corev1.ResourceRequirements, time.Duration) error {
 	return nil

@@ -97,11 +97,11 @@ type fakeFSBR struct {
 	clock  clock.WithTickerAndDelayedExecution
 }
 
-func (b *fakeFSBR) Init(ctx context.Context, param interface{}) error {
+func (b *fakeFSBR) Init(ctx context.Context, param any) error {
 	return nil
 }
 
-func (b *fakeFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param interface{}) error {
+func (b *fakeFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param any) error {
 	pvb := b.pvb
 
 	original := b.pvb.DeepCopy()

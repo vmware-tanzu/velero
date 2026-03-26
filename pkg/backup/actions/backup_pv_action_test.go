@@ -36,9 +36,9 @@ import (
 
 func TestBackupPVAction(t *testing.T) {
 	pvc := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec":   map[string]interface{}{},
-			"status": map[string]interface{}{},
+		Object: map[string]any{
+			"spec":   map[string]any{},
+			"status": map[string]any{},
 		},
 	}
 
@@ -54,7 +54,7 @@ func TestBackupPVAction(t *testing.T) {
 
 	// empty spec.volumeName should result in no error
 	// and no additional items
-	pvc.Object["spec"].(map[string]interface{})["volumeName"] = ""
+	pvc.Object["spec"].(map[string]any)["volumeName"] = ""
 	_, additional, err = a.Execute(pvc, backup)
 	assert.NoError(t, err)
 	assert.Empty(t, additional)
@@ -116,28 +116,28 @@ func TestBackupPVAction(t *testing.T) {
 
 	// non-empty spec.volumeName when status.phase is empty
 	// should result in no error and no additional items
-	pvc.Object["spec"].(map[string]interface{})["volumeName"] = "myVolume"
+	pvc.Object["spec"].(map[string]any)["volumeName"] = "myVolume"
 	_, additional, err = a.Execute(pvc, backup)
 	require.NoError(t, err)
 	require.Empty(t, additional)
 
 	// non-empty spec.volumeName when status.phase is 'Pending'
 	// should result in no error and no additional items
-	pvc.Object["status"].(map[string]interface{})["phase"] = corev1api.ClaimPending
+	pvc.Object["status"].(map[string]any)["phase"] = corev1api.ClaimPending
 	_, additional, err = a.Execute(pvc, backup)
 	require.NoError(t, err)
 	require.Empty(t, additional)
 
 	// non-empty spec.volumeName when status.phase is 'Lost'
 	// should result in no error and no additional items
-	pvc.Object["status"].(map[string]interface{})["phase"] = corev1api.ClaimLost
+	pvc.Object["status"].(map[string]any)["phase"] = corev1api.ClaimLost
 	_, additional, err = a.Execute(pvc, backup)
 	require.NoError(t, err)
 	require.Empty(t, additional)
 
 	// non-empty spec.volumeName when status.phase is 'Bound'
 	// should result in no error and one additional item for the PV
-	pvc.Object["status"].(map[string]interface{})["phase"] = corev1api.ClaimBound
+	pvc.Object["status"].(map[string]any)["phase"] = corev1api.ClaimBound
 	_, additional, err = a.Execute(pvc, backup)
 	require.NoError(t, err)
 	require.Len(t, additional, 1)
@@ -145,7 +145,7 @@ func TestBackupPVAction(t *testing.T) {
 
 	// empty spec.volumeName when status.phase is 'Bound' should
 	// result in no error and no additional items
-	pvc.Object["spec"].(map[string]interface{})["volumeName"] = ""
+	pvc.Object["spec"].(map[string]any)["volumeName"] = ""
 	_, additional, err = a.Execute(pvc, backup)
 	assert.NoError(t, err)
 	assert.Empty(t, additional)

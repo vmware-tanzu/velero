@@ -168,7 +168,7 @@ func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resource
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
-	if res.Keys == nil || len(res.Keys) == 0 {
+	if len(res.Keys) == 0 {
 		return "", errors.New("No storage keys found")
 	}
 

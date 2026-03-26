@@ -18,6 +18,7 @@ package label
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +39,7 @@ func GetValidName(label string) string {
 	}
 
 	sha := sha256.Sum256([]byte(label))
-	strSha := fmt.Sprintf("%x", sha)
+	strSha := hex.EncodeToString(sha[:])
 	charsFromLabel := validation.DNS1035LabelMaxLength - 6
 	if charsFromLabel < 0 {
 		// Derive the label name from sha hash in case the DNS1035LabelMaxLength is less than 6

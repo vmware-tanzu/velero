@@ -187,7 +187,7 @@ func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocatio
 		return nil, err
 	}
 
-	log := logger.WithFields(logrus.Fields(map[string]interface{}{
+	log := logger.WithFields(logrus.Fields(map[string]any{
 		"bucket": bucket,
 		"prefix": prefix,
 	}))
@@ -410,7 +410,7 @@ func tryGet(objectStore velero.ObjectStore, bucket, key string) (io.ReadCloser, 
 
 // decode extracts a .json.gz file reader into the object pointed to
 // by 'into'.
-func decode(jsongzReader io.Reader, into interface{}) error {
+func decode(jsongzReader io.Reader, into any) error {
 	gzr, err := gzip.NewReader(jsongzReader)
 	if err != nil {
 		return errors.WithStack(err)

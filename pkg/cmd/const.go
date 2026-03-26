@@ -1,3 +1,3 @@
 package cmd
 
-var TRUE string = "true"
+var TRUE = "true"

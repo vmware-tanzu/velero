@@ -69,7 +69,7 @@ func NewPluginListerPlugin(impl PluginLister) *PluginListerPlugin {
 //////////////////////////////////////////////////////////////////////////////
 
 // GRPCClient returns a PluginLister gRPC client.
-func (p *PluginListerPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+func (p *PluginListerPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (any, error) {
 	return &PluginListerGRPCClient{grpcClient: proto.NewPluginListerClient(clientConn)}, nil
 }
 

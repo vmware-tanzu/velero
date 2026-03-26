@@ -230,7 +230,7 @@ func (h *harness) addResource(t *testing.T, resource *test.APIResource) {
 }
 
 // recordResourcesAction is a delete item action that can be configured to run
-// for specific resources/namespaces and simply record the items that is is
+// for specific resources/namespaces and simply record the items that is
 // executed for.
 type recordResourcesAction struct {
 	selector velero.ResourceSelector

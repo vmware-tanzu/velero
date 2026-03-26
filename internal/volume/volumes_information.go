@@ -836,7 +836,7 @@ func (t *RestoreVolumeInfoTracker) Result() []*RestoreVolumeInfo {
 			continue
 		}
 		pvcNS, pvcName := n[0], n[1]
-		var restoreSize int64 = 0
+		var restoreSize int64
 		if csiSnapshot.Status != nil && csiSnapshot.Status.RestoreSize != nil {
 			restoreSize = csiSnapshot.Status.RestoreSize.Value()
 		}

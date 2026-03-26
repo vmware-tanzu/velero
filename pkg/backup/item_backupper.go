@@ -159,7 +159,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	namespace := metadata.GetNamespace()
 	name := metadata.GetName()
 
-	log := logger.WithFields(map[string]interface{}{
+	log := logger.WithFields(map[string]any{
 		"name":      name,
 		"resource":  groupResource.String(),
 		"namespace": namespace,
@@ -218,7 +218,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 					ib.podVolumeSnapshotTracker.Track(pod, volume.Name)
 
 					if found, pvcName := ib.podVolumeSnapshotTracker.TakenForPodVolume(pod, volume.Name); found {
-						log.WithFields(map[string]interface{}{
+						log.WithFields(map[string]any{
 							"podVolume": volume,
 							"pvcName":   pvcName,
 						}).Info("Pod volume uses a persistent volume claim which has already been backed up from another pod, skipping.")
