@@ -24,7 +24,8 @@ ENV GOPROXY=${GOPROXY}
 # Use setup-envtest to download envtest binaries (GCS tarball URL is no longer valid).
 RUN go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20250308055145-5fe7bb3edc86 && \
     mkdir -p /usr/local/kubebuilder/bin && \
-    setup-envtest use --bin-dir /usr/local/kubebuilder/bin 1.23.5
+    ENVTEST_ASSETS_DIR=$(setup-envtest use 1.23.5 --bin-dir /usr/local/kubebuilder/bin -p path) && \
+    cp -r ${ENVTEST_ASSETS_DIR}/* /usr/local/kubebuilder/bin/
 
 RUN wget --quiet https://github.com/kubernetes-sigs/kubebuilder/releases/download/v3.2.0/kubebuilder_linux_$(go env GOARCH) && \
     mv kubebuilder_linux_$(go env GOARCH) /usr/local/kubebuilder/bin/kubebuilder && \
