@@ -280,7 +280,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 }
 
 // mockPVRestorer is a test double for PVRestorer that returns a pre-configured
-// result. It is used to test code paths that depend on pvRestorer behaviour
+// result. It is used to test code paths that depend on pvRestorer behavior
 // without standing up real volume snapshotter plugins.
 type mockPVRestorer struct {
 	result *unstructured.Unstructured
