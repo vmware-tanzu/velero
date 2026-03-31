@@ -55,10 +55,12 @@ var GlobalRepoMaintenanceTest func() = TestFunc(&RepoMaintenanceTestCase{
 	jobConfigs: velerotypes.JobConfigs{
 		KeepLatestMaintenanceJobs: &keepJobNum,
 		PodResources: &velerokubeutil.PodResources{
-			CPURequest:    "100m",
-			MemoryRequest: "100Mi",
-			CPULimit:      "200m",
-			MemoryLimit:   "200Mi",
+			CPURequest:              "100m",
+			MemoryRequest:           "100Mi",
+			EphemeralStorageRequest: "5Gi",
+			CPULimit:                "200m",
+			MemoryLimit:             "200Mi",
+			EphemeralStorageLimit:   "10Gi",
 		},
 		PriorityClassName: test.PriorityClassNameForRepoMaintenance,
 	},
