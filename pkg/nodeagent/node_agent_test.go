@@ -118,6 +118,16 @@ func TestIsRunningInNode(t *testing.T) {
 		Phase(corev1api.PodRunning).
 		NodeName("fake-node").
 		Result()
+	nodeAgentPodTerminating := builder.ForPod("fake-ns", "fake-pod-terminating").
+		Labels(map[string]string{"role": "node-agent"}).
+		Phase(corev1api.PodPending).
+		NodeName("fake-node").
+		Result()
+	nodeAgentPodNotRunningOnNode := builder.ForPod("fake-ns", "fake-pod-not-running").
+		Labels(map[string]string{"role": "node-agent"}).
+		Phase(corev1api.PodPending).
+		NodeName("fake-node").
+		Result()
 
 	tests := []struct {
 		name          string
@@ -135,16 +145,16 @@ func TestIsRunningInNode(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				nonNodeAgentPod,
 			},
-			expectErr: "daemonset pod not found in running state in node fake-node",
+			expectErr: "daemonset pod not found in node fake-node",
 		},
 		{
-			name:     "ds po are not all running",
+			name:     "no pods on target node",
 			nodeName: "fake-node",
 			kubeClientObj: []runtime.Object{
 				nodeAgentPodNotRunning,
 				nodeAgentPodRunning1,
 			},
-			expectErr: "daemonset pod not found in running state in node fake-node",
+			expectErr: "daemonset pod not found in node fake-node",
 		},
 		{
 			name:     "ds pods wrong node name",
@@ -154,7 +164,24 @@ func TestIsRunningInNode(t *testing.T) {
 				nodeAgentPodRunning1,
 				nodeAgentPodRunning2,
 			},
-			expectErr: "daemonset pod not found in running state in node fake-node",
+			expectErr: "daemonset pod not found in node fake-node",
+		},
+		{
+			name:     "all pods on node are not running",
+			nodeName: "fake-node",
+			kubeClientObj: []runtime.Object{
+				nodeAgentPodTerminating,
+				nodeAgentPodNotRunningOnNode,
+			},
+			expectErr: "daemonset pod not found in running state in node fake-node, err:",
+		},
+		{
+			name:     "multiple pods on node - one running",
+			nodeName: "fake-node",
+			kubeClientObj: []runtime.Object{
+				nodeAgentPodTerminating,
+				nodeAgentPodRunning3,
+			},
 		},
 		{
 			name:     "succeed",
@@ -179,7 +206,11 @@ func TestIsRunningInNode(t *testing.T) {
 			if test.expectErr == "" {
 				assert.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, test.expectErr)
+				if test.name == "all pods on node are not running" {
+					assert.Contains(t, err.Error(), test.expectErr)
+				} else {
+					assert.EqualError(t, err, test.expectErr)
+				}
 			}
 		})
 	}
