@@ -89,5 +89,6 @@ func TestFindVolumeRestoresForPodLegacy(t *testing.T) {
 		},
 	}).Build()
 	requests = reconciler.findVolumeRestoresForPod(t.Context(), pod)
-	assert.Len(t, requests, 1)
+	// Legacy Restic-only PVR reconciliation is removed; no PVR matches IsLegacyPVR.
+	assert.Empty(t, requests)
 }

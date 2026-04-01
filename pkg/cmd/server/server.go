@@ -1164,10 +1164,6 @@ func markPodVolumeRestoresCancel(ctx context.Context, client ctrlclient.Client, 
 
 	for i := range pvrs.Items {
 		pvr := pvrs.Items[i]
-		if controller.IsLegacyPVR(&pvr) {
-			log.WithField("PVR", pvr.GetName()).Warn("Found a legacy PVR during velero server restart, cannot stop it")
-			continue
-		}
 
 		if pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseAccepted ||
 			pvr.Status.Phase == velerov1api.PodVolumeRestorePhasePrepared ||

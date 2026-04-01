@@ -17,6 +17,7 @@ limitations under the License.
 package podvolume
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -35,6 +36,12 @@ const (
 	// TODO(2.0): remove
 	podAnnotationPrefix = "snapshot.velero.io/"
 )
+
+// ErrResticFileSystemBackupUnsupported is returned when a restore targets PodVolumeBackups
+// created with Restic, which Velero no longer supports for file-system backup.
+// If any volume for the pod is Restic-backed, the entire pod volume restore is aborted (including
+// volumes that used Kopia in the same backup set), so the message reflects whole-pod behavior.
+var ErrResticFileSystemBackupUnsupported = errors.New("Restic file-system backup is no longer supported; when any volume for this pod is Restic-backed, the entire pod volume restore is skipped (including non-Restic volumes). Create a new backup with the Kopia uploader and restore from it")
 
 // volumeBackupInfo describes the backup info of a volume backed up by PodVolumeBackups
 type volumeBackupInfo struct {

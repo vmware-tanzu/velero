@@ -49,6 +49,7 @@ import (
 	datapathmockes "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	exposermockes "github.com/vmware-tanzu/velero/pkg/exposer/mocks"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/restorehelper"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -699,6 +700,12 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 			name:         "pvr not found",
 			pvr:          pvrBuilder().Result(),
 			notCreatePVR: true,
+		},
+		{
+			name:        "restic uploader is not supported",
+			pvr:         builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, pvrName).UploaderType(uploader.ResticType).Result(),
+			expected:    builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, pvrName).UploaderType(uploader.ResticType).Phase(velerov1api.PodVolumeRestorePhaseFailed).Message(podvolume.ErrResticFileSystemBackupUnsupported.Error()).Result(),
+			expectedErr: podvolume.ErrResticFileSystemBackupUnsupported.Error(),
 		},
 		{
 			name: "pvr not created in velero default namespace",

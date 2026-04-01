@@ -48,6 +48,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	repository "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	"github.com/vmware-tanzu/velero/pkg/restorehelper"
 	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
@@ -145,6 +146,10 @@ func (r *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	log = log.WithField("pod", fmt.Sprintf("%s/%s", pvr.Spec.Pod.Namespace, pvr.Spec.Pod.Name))
 	if len(pvr.OwnerReferences) == 1 {
 		log = log.WithField("restore", fmt.Sprintf("%s/%s", pvr.Namespace, pvr.OwnerReferences[0].Name))
+	}
+
+	if !isPVRInFinalState(pvr) && pvr.Spec.UploaderType == uploader.ResticType {
+		return r.errorOut(ctx, pvr, podvolume.ErrResticFileSystemBackupUnsupported, podvolume.ErrResticFileSystemBackupUnsupported.Error(), log)
 	}
 
 	// Logic for clear resources when pvr been deleted

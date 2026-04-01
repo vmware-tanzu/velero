@@ -205,7 +205,9 @@ func TestRestorePodVolumes(t *testing.T) {
 			},
 		},
 		{
-			name: "get repository type fail",
+			// Mixed uploader types: early exit now fails the whole pod restore before getVolumesRepositoryType
+			// (previously this pair hit "multiple repository type in one backup").
+			name: "restic backup unsupported",
 			pvbs: []*velerov1api.PodVolumeBackup{
 				createPVBObj(true, true, 1, "restic"),
 				createPVBObj(true, true, 2, "kopia"),
@@ -217,8 +219,7 @@ func TestRestorePodVolumes(t *testing.T) {
 			sourceNamespace: "fake-ns",
 			errs: []expectError{
 				{
-					err:        "multiple repository type in one backup",
-					prefixOnly: true,
+					err: ErrResticFileSystemBackupUnsupported.Error(),
 				},
 			},
 		},
