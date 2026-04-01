@@ -1,0 +1,1 @@
+Issue #9468: Remove Restic path for Pod Volume Restore; Restic file-system restores are no longer supported
