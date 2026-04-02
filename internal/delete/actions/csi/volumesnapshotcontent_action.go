@@ -18,7 +18,6 @@ package csi
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -27,14 +26,11 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
@@ -71,7 +67,7 @@ func (p *volumeSnapshotContentDeleteItemAction) Execute(
 	// So skip deleting VolumeSnapshotContent not have the backup name
 	// in its labels.
 	if !kubeutil.HasBackupLabel(&snapCont.ObjectMeta, input.Backup.Name) {
-		p.log.Info(
+		p.log.Infof(
 			"VolumeSnapshotContent %s was not taken by backup %s, skipping deletion",
 			snapCont.Name,
 			input.Backup.Name,
@@ -81,6 +77,17 @@ func (p *volumeSnapshotContentDeleteItemAction) Execute(
 
 	p.log.Infof("Deleting VolumeSnapshotContent %s", snapCont.Name)
 
+	// Try to delete the original VSC from the cluster first.
+	// This handles legacy (pre-1.15) backups where the original VSC
+	// with DeletionPolicy=Retain still exists in the cluster.
+	originalVSCName := snapCont.Name
+	if cleaned := p.tryDeleteOriginalVSC(context.TODO(), originalVSCName); cleaned {
+		p.log.Infof("Successfully deleted original VolumeSnapshotContent %s from cluster, skipping temp VSC creation", originalVSCName)
+		return nil
+	}
+
+	// create a temp VSC to trigger cloud snapshot deletion
+	// (for backups where the original VSC no longer exists in cluster)
 	uuid, err := uuid.NewRandom()
 	if err != nil {
 		p.log.WithError(err).Errorf("Fail to generate the UUID to create VSC %s", snapCont.Name)
@@ -114,71 +121,62 @@ func (p *volumeSnapshotContentDeleteItemAction) Execute(
 	if err := p.crClient.Create(context.TODO(), &snapCont); err != nil {
 		return errors.Wrapf(err, "fail to create VolumeSnapshotContent %s", snapCont.Name)
 	}
+	p.log.Infof("Created temp VolumeSnapshotContent %s with DeletionPolicy=Delete to trigger cloud snapshot cleanup", snapCont.Name)
 
-	// Read resource timeout from backup annotation, if not set, use default value.
-	timeout, err := time.ParseDuration(
-		input.Backup.Annotations[velerov1api.ResourceTimeoutAnnotation])
-	if err != nil {
-		p.log.Warnf("fail to parse resource timeout annotation %s: %s",
-			input.Backup.Annotations[velerov1api.ResourceTimeoutAnnotation], err.Error())
-		timeout = 10 * time.Minute
-	}
-	p.log.Debugf("resource timeout is set to %s", timeout.String())
-
-	interval := 5 * time.Second
-
-	// Wait until VSC created and ReadyToUse is true.
-	if err := wait.PollUntilContextTimeout(
-		context.Background(),
-		interval,
-		timeout,
-		true,
-		func(ctx context.Context) (bool, error) {
-			return checkVSCReadiness(ctx, &snapCont, p.crClient)
-		},
-	); err != nil {
-		// Clean up the VSC we created since it can't become ready
-		if deleteErr := p.crClient.Delete(context.TODO(), &snapCont); deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
-			p.log.WithError(deleteErr).Errorf("Failed to clean up VolumeSnapshotContent %s", snapCont.Name)
-		}
-		return errors.Wrapf(err, "fail to wait VolumeSnapshotContent %s becomes ready.", snapCont.Name)
-	}
-
+	// Delete the temp VSC immediately to trigger cloud snapshot removal.
+	// The CSI driver will handle the actual cloud snapshot deletion.
 	if err := p.crClient.Delete(
 		context.TODO(),
 		&snapCont,
 	); err != nil && !apierrors.IsNotFound(err) {
-		p.log.Infof("VolumeSnapshotContent %s not found", snapCont.Name)
+		p.log.WithError(err).Errorf("Failed to delete temp VolumeSnapshotContent %s", snapCont.Name)
 		return err
 	}
 
+	p.log.Infof("Successfully triggered deletion of VolumeSnapshotContent %s and its cloud snapshot", snapCont.Name)
 	return nil
 }
 
-var checkVSCReadiness = func(
+// tryDeleteOriginalVSC attempts to find and delete the original VSC from
+// the cluster (legacy pre-1.15 backups). It patches the DeletionPolicy to
+// Delete so the CSI driver also removes the cloud snapshot, then deletes
+// the VSC object itself.
+// Returns true if the original VSC was found and deletion was initiated.
+func (p *volumeSnapshotContentDeleteItemAction) tryDeleteOriginalVSC(
 	ctx context.Context,
-	vsc *snapshotv1api.VolumeSnapshotContent,
-	client crclient.Client,
-) (bool, error) {
-	tmpVSC := new(snapshotv1api.VolumeSnapshotContent)
-	if err := client.Get(ctx, crclient.ObjectKeyFromObject(vsc), tmpVSC); err != nil {
-		return false, errors.Wrapf(
-			err, "failed to get VolumeSnapshotContent %s", vsc.Name,
-		)
+	vscName string,
+) bool {
+	existing := new(snapshotv1api.VolumeSnapshotContent)
+	if err := p.crClient.Get(ctx, crclient.ObjectKey{Name: vscName}, existing); err != nil {
+		if apierrors.IsNotFound(err) {
+			p.log.Debugf("Original VolumeSnapshotContent %s not found in cluster, will use temp VSC flow", vscName)
+		} else {
+			p.log.WithError(err).Warnf("Error looking up original VolumeSnapshotContent %s, will use temp VSC flow", vscName)
+		}
+		return false
 	}
 
-	if tmpVSC.Status != nil && boolptr.IsSetToTrue(tmpVSC.Status.ReadyToUse) {
-		return true, nil
+	p.log.Debugf("Found original VolumeSnapshotContent %s in cluster (legacy backup), cleaning up directly", vscName)
+
+	// Patch DeletionPolicy to Delete so the CSI driver removes the cloud snapshot
+	if existing.Spec.DeletionPolicy != snapshotv1api.VolumeSnapshotContentDelete {
+		original := existing.DeepCopy()
+		existing.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentDelete
+		if err := p.crClient.Patch(ctx, existing, crclient.MergeFrom(original)); err != nil {
+			p.log.WithError(err).Warnf("Failed to patch DeletionPolicy on original VSC %s, will use temp VSC flow", vscName)
+			return false
+		}
+		p.log.Debugf("Patched DeletionPolicy to Delete on original VolumeSnapshotContent %s", vscName)
 	}
 
-	// Fail fast on permanent CSI driver errors (e.g., InvalidSnapshot.NotFound)
-	if tmpVSC.Status != nil && tmpVSC.Status.Error != nil && tmpVSC.Status.Error.Message != nil {
-		return false, errors.Errorf(
-			"VolumeSnapshotContent %s has error: %s", vsc.Name, *tmpVSC.Status.Error.Message,
-		)
+	// Delete the original VSC — the CSI driver will clean up the cloud snapshot
+	if err := p.crClient.Delete(ctx, existing); err != nil && !apierrors.IsNotFound(err) {
+		p.log.WithError(err).Warnf("Failed to delete original VolumeSnapshotContent %s, will use temp VSC flow", vscName)
+		return false
 	}
 
-	return false, nil
+	p.log.Infof("Deleted original VolumeSnapshotContent %s with DeletionPolicy=Delete, CSI driver will remove cloud snapshot", vscName)
+	return true
 }
 
 func NewVolumeSnapshotContentDeleteItemAction(
