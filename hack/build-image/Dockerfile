@@ -22,7 +22,7 @@ ENV GOPROXY=${GOPROXY}
 
 # kubebuilder test bundle is separated from kubebuilder. Need to setup it for CI test.
 # Using setup-envtest to download envtest binaries
-RUN go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest && \
+RUN go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20260305094418-8122a6266696 && \
     mkdir -p /usr/local/kubebuilder/bin && \
     ENVTEST_ASSETS_DIR=$(setup-envtest use 1.33.0 --bin-dir /usr/local/kubebuilder/bin -p path) && \
     cp -r ${ENVTEST_ASSETS_DIR}/* /usr/local/kubebuilder/bin/
