@@ -79,6 +79,9 @@ func (r *RepositoryService) DefaultMaintenanceFrequency() time.Duration {
 func (r *RepositoryService) exec(cmd *restic.Command, bsl *velerov1api.BackupStorageLocation) error {
 	file, err := r.credGetter.FromFile.Path(repokey.RepoKeySelector())
 	if err != nil {
+		if r.log != nil {
+			r.log.Warn("Could not fetch repository credentials secret; filesystem-level backups will not work. If you intentionally disabled secret creation, this is expected.")
+		}
 		return err
 	}
 	// ignore error since there's nothing we can do and it's a temp file.
