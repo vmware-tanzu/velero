@@ -284,8 +284,8 @@ func TestCancelPodVolumeRestore(t *testing.T) {
 	}{
 		{
 			name:                "no fs restore",
-			expectedEventReason: datapath.EventReasonCancelled,
-			expectedEventMsg:    "Data path for PVR fake-pvr canceled",
+			expectedEventReason: datapath.EventReasonStopped,
+			expectedEventMsg:    "Data path for fake-pvr exited without start",
 			expectedErr:         datapath.ErrCancelled,
 		},
 	}
