@@ -203,8 +203,8 @@ func TestCancelDataDownload(t *testing.T) {
 	}{
 		{
 			name:                "no fs restore",
-			expectedEventReason: datapath.EventReasonCancelled,
-			expectedEventMsg:    "Data path for data download fake-data-download canceled",
+			expectedEventReason: datapath.EventReasonStopped,
+			expectedEventMsg:    "Data path for fake-data-download exited without start",
 			expectedErr:         datapath.ErrCancelled,
 		},
 	}

@@ -259,8 +259,8 @@ func TestCancelDataUpload(t *testing.T) {
 	}{
 		{
 			name:                "no fs backup",
-			expectedEventReason: datapath.EventReasonCancelled,
-			expectedEventMsg:    "Data path for data upload fake-data-upload canceled",
+			expectedEventReason: datapath.EventReasonStopped,
+			expectedEventMsg:    "Data path for fake-data-upload exited without start",
 			expectedErr:         datapath.ErrCancelled,
 		},
 	}
