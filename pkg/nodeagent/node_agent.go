@@ -97,7 +97,10 @@ func isRunningInNode(ctx context.Context, namespace string, nodeName string, crC
 	}
 
 	if crClient != nil {
-		err = crClient.List(ctx, pods, &ctrlclient.ListOptions{LabelSelector: parsedSelector})
+		err = crClient.List(ctx, pods, &ctrlclient.ListOptions{
+			LabelSelector: parsedSelector,
+			Namespace:     namespace,
+		})
 	} else {
 		pods, err = kubeClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: parsedSelector.String()})
 	}
