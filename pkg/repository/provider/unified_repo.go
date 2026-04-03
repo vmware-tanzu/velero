@@ -208,14 +208,16 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 		return errors.Wrap(err, "error to get repo options")
 	}
 
-	if created, err := urp.repoService.IsCreated(ctx, *repoOption); err != nil {
+	readOnly := (param.BackupLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly)
+
+	if ready, err := urp.repoService.IsReady(ctx, *repoOption, readOnly); err != nil {
 		return errors.Wrap(err, "error to check backup repo")
-	} else if created {
+	} else if ready {
 		log.Info("Repo has already been initialized")
 		return nil
 	}
 
-	if param.BackupLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
+	if readOnly {
 		return errors.Errorf("cannot create new backup repo for read-only backup storage location %s/%s", param.BackupLocation.Namespace, param.BackupLocation.Name)
 	}
 
