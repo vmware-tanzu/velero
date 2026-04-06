@@ -1,0 +1,1 @@
+Fix backup stuck in WaitingForPluginOperations when CSI VolumeSnapshot has a persistent error beyond CSISnapshotTimeout
