@@ -363,10 +363,10 @@ func (v *volumeHelperImpl) ShouldPerformCustomAction(obj runtime.Unstructured, g
 						return false, nil
 					}
 				}
-				v.logger.Infof("performing snapshot action for %+v", vfd)
+				v.logger.Infof("performing custom action for %+v", vfd)
 				return true, nil
 			} else {
-				v.logger.Infof("Skipping custom action for pv %s as the action type is %s", pv.Name, action.Type)
+				v.logger.Infof("Skipping custom action for %+v as the action type is %s", vfd, action.Type)
 				return false, nil
 			}
 		}
@@ -378,7 +378,7 @@ func (v *volumeHelperImpl) ShouldPerformCustomAction(obj runtime.Unstructured, g
 		return false, nil
 	}
 
-	v.logger.Infof(fmt.Sprintf("skipping custom action for pv %s due to no matching volume policy", pv.Name))
+	v.logger.Infof("skipping custom action for pv %s due to no matching volume policy", pv.Name)
 	return false, nil
 }
 
@@ -397,8 +397,8 @@ func (v *volumeHelperImpl) GetActionParameters(obj runtime.Unstructured, groupRe
 
 		pv, err = kubeutil.GetPVForPVC(pvc, v.client)
 		if err != nil {
-			v.logger.WithError(err).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
-			return false, "", nil, err
+			v.logger.WithError(err).Warnf("failed to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
+			return false, "", nil, nil
 		}
 	}
 
@@ -421,12 +421,12 @@ func (v *volumeHelperImpl) GetActionParameters(obj runtime.Unstructured, groupRe
 		// if the provided parameters match as well, else return false.
 		// If there is no match action, also return false
 		if action != nil {
-			v.logger.Infof(fmt.Sprintf("found matching action for pv %s, returning parameters", pv.Name))
+			v.logger.Infof("found matching action for pv %s, returning parameters", pv.Name)
 			return true, string(action.Type), action.Parameters, nil
 		}
 	}
 
-	v.logger.Infof(fmt.Sprintf("no matching volume policy found for pv %s, no parameters to return", pv.Name))
+	v.logger.Infof("no matching volume policy found for pv %s, no parameters to return", pv.Name)
 	return false, "", nil, nil
 }
 
