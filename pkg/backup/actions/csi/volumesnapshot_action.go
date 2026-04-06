@@ -308,7 +308,7 @@ func (p *volumeSnapshotBackupItemAction) Progress(
 			if t, err := time.Parse(time.RFC3339, existingTime); err == nil {
 				firstObservedTime = t
 			} else {
-				p.log.Warnf("VolumeSnapshot %s/%s has an unparseable %s annotation value %q, resetting timer: %v",
+				p.log.Warnf("VolumeSnapshot %s/%s has an unparsable %s annotation value %q, resetting timer: %v",
 					vs.Namespace, vs.Name, velerov1api.VSErrorFirstObservedTimeAnnotation, existingTime, err)
 			}
 		} else {
