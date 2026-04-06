@@ -179,4 +179,9 @@ const (
 
 	// Annotation prefix on Backup to override VGS class per CSI driver
 	VolumeGroupSnapshotClassAnnotationBackupPrefix = "velero.io/csi-volumegroupsnapshot-class_"
+
+	// VSErrorFirstObservedTimeAnnotation is the annotation key used to record the time
+	// when a VolumeSnapshot error was first observed during an async backup operation.
+	// This is used by Progress() to detect errors that persist beyond CSISnapshotTimeout.
+	VSErrorFirstObservedTimeAnnotation = "velero.io/vs-error-first-observed-time"
 )
