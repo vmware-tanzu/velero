@@ -33,18 +33,21 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/itemoperationmap"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/persistence"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav2mocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks/backupitemaction/v2"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
 var (
@@ -62,6 +65,7 @@ func mockBackupOperationsReconciler(fakeClient kbclient.Client, fakeClock *testc
 		NewFakeSingleObjectBackupStoreGetter(backupStore),
 		metrics.NewServerMetrics(),
 		itemoperationmap.NewBackupItemOperationsMap(),
+		fakeClient,
 	)
 	abor.clock = fakeClock
 	return abor
@@ -286,6 +290,20 @@ func TestBackupOperationsReconcile(t *testing.T) {
 			backupStore.On("GetBackupItemOperations", test.backup.Name).Return(test.backupOperations, nil)
 			backupStore.On("PutBackupItemOperations", mock.Anything, mock.Anything).Return(nil)
 			backupStore.On("PutBackupMetadata", mock.Anything, mock.Anything).Return(nil)
+
+			// Mock expectations for new volume information update method
+			backupStore.On("GetPodVolumeBackups", test.backup.Name).Return([]*velerov1api.PodVolumeBackup{}, nil)
+			backupStore.On("GetBackupVolumeSnapshots", test.backup.Name).Return([]*volume.Snapshot{}, nil)
+			backupStore.On("PutBackupVolumeInfos", test.backup.Name, mock.Anything).Return(nil)
+
+			// Mock expectations for backup results merging
+			backupStore.On("GetBackupResults", test.backup.Name).Return(map[string]results.Result{
+				"warnings": {},
+				"errors":   {},
+			}, nil)
+			backupStore.On("PutBackup", mock.MatchedBy(func(info persistence.BackupInfo) bool {
+				return info.Name == test.backup.Name
+			})).Return(nil)
 			for _, operation := range test.backupOperations {
 				bia.On("Name").Return("test")
 				bia.On("Progress", operation.Spec.OperationID, mock.Anything).
