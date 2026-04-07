@@ -43,7 +43,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
-	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
 	"github.com/vmware-tanzu/velero/pkg/repository/maintenance"
 	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -249,7 +248,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if backupRepo.Status.Phase == "" || backupRepo.Status.Phase == velerov1api.BackupRepositoryPhaseNew {
-		if err := r.initializeRepo(ctx, backupRepo, bsl, log); err != nil {
+		if err := r.initializeRepo(ctx, backupRepo, log); err != nil {
 			log.WithError(err).Error("error initialize repository")
 			return ctrl.Result{}, errors.WithStack(err)
 		}
@@ -267,7 +266,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	switch backupRepo.Status.Phase {
 	case velerov1api.BackupRepositoryPhaseNotReady:
-		ready, err := r.checkNotReadyRepo(ctx, backupRepo, bsl, log)
+		ready, err := r.checkNotReadyRepo(ctx, backupRepo, log)
 		if err != nil {
 			return ctrl.Result{}, err
 		} else if !ready {
@@ -315,16 +314,7 @@ func (r *BackupRepoReconciler) getBSL(ctx context.Context, req *velerov1api.Back
 	return loc, nil
 }
 
-func (r *BackupRepoReconciler) getIdentifierByBSL(bsl *velerov1api.BackupStorageLocation, req *velerov1api.BackupRepository) (string, error) {
-	repoIdentifier, err := repoconfig.GetRepoIdentifier(bsl, req.Spec.VolumeNamespace)
-	if err != nil {
-		return "", errors.Wrapf(err, "error to get identifier for repo %s", req.Name)
-	}
-
-	return repoIdentifier, nil
-}
-
-func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1api.BackupRepository, bsl *velerov1api.BackupStorageLocation, log logrus.FieldLogger) error {
+func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
 	log.WithField("repoConfig", r.backupRepoConfig).Info("Initializing backup repository")
 
 	config, err := getBackupRepositoryConfig(ctx, r, r.backupRepoConfig, r.namespace, req.Name, req.Spec.RepositoryType, log)
@@ -558,7 +548,7 @@ func dueForMaintenance(req *velerov1api.BackupRepository, now time.Time) bool {
 	return req.Status.LastMaintenanceTime == nil || req.Status.LastMaintenanceTime.Add(req.Spec.MaintenanceFrequency.Duration).Before(now)
 }
 
-func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *velerov1api.BackupRepository, bsl *velerov1api.BackupStorageLocation, log logrus.FieldLogger) (bool, error) {
+func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) (bool, error) {
 	log.Info("Checking backup repository for readiness")
 
 	// we need to ensure it (first check, if check fails, attempt to init)

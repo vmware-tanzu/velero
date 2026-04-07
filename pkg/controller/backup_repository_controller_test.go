@@ -107,17 +107,8 @@ func TestCheckNotReadyRepo(t *testing.T) {
 		reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
 		err := reconciler.Client.Create(t.Context(), rr)
 		require.NoError(t, err)
-		location := velerov1api.BackupStorageLocation{
-			Spec: velerov1api.BackupStorageLocationSpec{
-				Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic"},
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: velerov1api.DefaultNamespace,
-				Name:      rr.Spec.BackupStorageLocation,
-			},
-		}
 
-		_, err = reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
+		_, err = reconciler.checkNotReadyRepo(t.Context(), rr, reconciler.logger)
 		require.NoError(t, err)
 		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 		// ResticIdentifier should remain empty for kopia
@@ -411,17 +402,8 @@ func TestInitializeRepo(t *testing.T) {
 	reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(t.Context(), rr)
 	require.NoError(t, err)
-	location := velerov1api.BackupStorageLocation{
-		Spec: velerov1api.BackupStorageLocationSpec{
-			Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic"},
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: velerov1api.DefaultNamespace,
-			Name:      rr.Spec.BackupStorageLocation,
-		},
-	}
 
-	err = reconciler.initializeRepo(t.Context(), rr, &location, reconciler.logger)
+	err = reconciler.initializeRepo(t.Context(), rr, reconciler.logger)
 	require.NoError(t, err)
 	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 }
@@ -1442,7 +1424,7 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 					MaintenanceFrequency:  metav1.Duration{Duration: testMaintenanceFrequency},
 					BackupStorageLocation: "default",
 					VolumeNamespace:       "test-ns",
-					RepositoryType:        "restic",
+					RepositoryType:        "kopia",
 				},
 				Status: velerov1api.BackupRepositoryStatus{
 					Phase: velerov1api.BackupRepositoryPhaseReady,
@@ -1479,7 +1461,7 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 					MaintenanceFrequency:  metav1.Duration{Duration: testMaintenanceFrequency},
 					BackupStorageLocation: "default",
 					VolumeNamespace:       "test-ns",
-					RepositoryType:        "restic",
+					RepositoryType:        "kopia",
 				},
 				Status: velerov1api.BackupRepositoryStatus{
 					Phase: velerov1api.BackupRepositoryPhaseReady,
@@ -1498,8 +1480,8 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 					Name:      "repo-maintenance-job-config",
 				},
 				Data: map[string]string{
-					"global":                 `{"keepLatestMaintenanceJobs": 5}`,
-					"test-ns-default-restic": `{"keepLatestMaintenanceJobs": 2}`,
+					"global":                `{"keepLatestMaintenanceJobs": 5}`,
+					"test-ns-default-kopia": `{"keepLatestMaintenanceJobs": 2}`,
 				},
 			},
 		},
@@ -1596,7 +1578,7 @@ func TestInitializeRepoWithRepositoryTypes(t *testing.T) {
 			nil,
 		)
 
-		err := reconciler.initializeRepo(t.Context(), rr, location, reconciler.logger)
+		err := reconciler.initializeRepo(t.Context(), rr, reconciler.logger)
 		require.NoError(t, err)
 
 		// Verify ResticIdentifier is NOT set for kopia
