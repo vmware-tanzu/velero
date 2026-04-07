@@ -98,32 +98,6 @@ func TestPatchBackupRepository(t *testing.T) {
 }
 
 func TestCheckNotReadyRepo(t *testing.T) {
-	// Test for restic repository
-	t.Run("restic repository", func(t *testing.T) {
-		rr := mockBackupRepositoryCR()
-		rr.Spec.BackupStorageLocation = "default"
-		rr.Spec.ResticIdentifier = "fake-identifier"
-		rr.Spec.VolumeNamespace = "volume-ns-1"
-		rr.Spec.RepositoryType = velerov1api.BackupRepositoryTypeRestic
-		reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
-		err := reconciler.Client.Create(t.Context(), rr)
-		require.NoError(t, err)
-		location := velerov1api.BackupStorageLocation{
-			Spec: velerov1api.BackupStorageLocationSpec{
-				Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic"},
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: velerov1api.DefaultNamespace,
-				Name:      rr.Spec.BackupStorageLocation,
-			},
-		}
-
-		_, err = reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
-		require.NoError(t, err)
-		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
-		assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
-	})
-
 	// Test for kopia repository
 	t.Run("kopia repository", func(t *testing.T) {
 		rr := mockBackupRepositoryCR()
@@ -148,32 +122,6 @@ func TestCheckNotReadyRepo(t *testing.T) {
 		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 		// ResticIdentifier should remain empty for kopia
 		assert.Empty(t, rr.Spec.ResticIdentifier)
-	})
-
-	// Test for empty repository type (defaults to restic)
-	t.Run("empty repository type", func(t *testing.T) {
-		rr := mockBackupRepositoryCR()
-		rr.Spec.BackupStorageLocation = "default"
-		rr.Spec.ResticIdentifier = "fake-identifier"
-		rr.Spec.VolumeNamespace = "volume-ns-1"
-		// Deliberately leave RepositoryType empty
-		reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
-		err := reconciler.Client.Create(t.Context(), rr)
-		require.NoError(t, err)
-		location := velerov1api.BackupStorageLocation{
-			Spec: velerov1api.BackupStorageLocationSpec{
-				Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic"},
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: velerov1api.DefaultNamespace,
-				Name:      rr.Spec.BackupStorageLocation,
-			},
-		}
-
-		_, err = reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
-		require.NoError(t, err)
-		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
-		assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
 	})
 }
 
@@ -1605,58 +1553,6 @@ func TestInitializeRepoWithRepositoryTypes(t *testing.T) {
 	corev1api.AddToScheme(scheme)
 	velerov1api.AddToScheme(scheme)
 
-	// Test for restic repository
-	t.Run("restic repository", func(t *testing.T) {
-		rr := mockBackupRepositoryCR()
-		rr.Spec.BackupStorageLocation = "default"
-		rr.Spec.VolumeNamespace = "volume-ns-1"
-		rr.Spec.RepositoryType = velerov1api.BackupRepositoryTypeRestic
-
-		location := &velerov1api.BackupStorageLocation{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: velerov1api.DefaultNamespace,
-				Name:      "default",
-			},
-			Spec: velerov1api.BackupStorageLocationSpec{
-				Provider: "aws",
-				StorageType: velerov1api.StorageType{
-					ObjectStorage: &velerov1api.ObjectStorageLocation{
-						Bucket: "test-bucket",
-						Prefix: "test-prefix",
-					},
-				},
-				Config: map[string]string{
-					"region": "us-east-1",
-				},
-			},
-		}
-
-		fakeClient := clientFake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(rr, location).Build()
-		mgr := &repomokes.Manager{}
-		mgr.On("PrepareRepo", rr).Return(nil)
-
-		reconciler := NewBackupRepoReconciler(
-			velerov1api.DefaultNamespace,
-			velerotest.NewLogger(),
-			fakeClient,
-			mgr,
-			testMaintenanceFrequency,
-			"",
-			"",
-			logrus.InfoLevel,
-			nil,
-			nil,
-		)
-
-		err := reconciler.initializeRepo(t.Context(), rr, location, reconciler.logger)
-		require.NoError(t, err)
-
-		// Verify ResticIdentifier is set for restic
-		assert.NotEmpty(t, rr.Spec.ResticIdentifier)
-		assert.Contains(t, rr.Spec.ResticIdentifier, "volume-ns-1")
-		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
-	})
-
 	// Test for kopia repository
 	t.Run("kopia repository", func(t *testing.T) {
 		rr := mockBackupRepositoryCR()
@@ -1705,58 +1601,6 @@ func TestInitializeRepoWithRepositoryTypes(t *testing.T) {
 
 		// Verify ResticIdentifier is NOT set for kopia
 		assert.Empty(t, rr.Spec.ResticIdentifier)
-		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
-	})
-
-	// Test for empty repository type (defaults to restic)
-	t.Run("empty repository type", func(t *testing.T) {
-		rr := mockBackupRepositoryCR()
-		rr.Spec.BackupStorageLocation = "default"
-		rr.Spec.VolumeNamespace = "volume-ns-1"
-		// Leave RepositoryType empty
-
-		location := &velerov1api.BackupStorageLocation{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: velerov1api.DefaultNamespace,
-				Name:      "default",
-			},
-			Spec: velerov1api.BackupStorageLocationSpec{
-				Provider: "aws",
-				StorageType: velerov1api.StorageType{
-					ObjectStorage: &velerov1api.ObjectStorageLocation{
-						Bucket: "test-bucket",
-						Prefix: "test-prefix",
-					},
-				},
-				Config: map[string]string{
-					"region": "us-east-1",
-				},
-			},
-		}
-
-		fakeClient := clientFake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(rr, location).Build()
-		mgr := &repomokes.Manager{}
-		mgr.On("PrepareRepo", rr).Return(nil)
-
-		reconciler := NewBackupRepoReconciler(
-			velerov1api.DefaultNamespace,
-			velerotest.NewLogger(),
-			fakeClient,
-			mgr,
-			testMaintenanceFrequency,
-			"",
-			"",
-			logrus.InfoLevel,
-			nil,
-			nil,
-		)
-
-		err := reconciler.initializeRepo(t.Context(), rr, location, reconciler.logger)
-		require.NoError(t, err)
-
-		// Verify ResticIdentifier is set when type is empty (defaults to restic)
-		assert.NotEmpty(t, rr.Spec.ResticIdentifier)
-		assert.Contains(t, rr.Spec.ResticIdentifier, "volume-ns-1")
 		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 	})
 }
