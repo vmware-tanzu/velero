@@ -580,7 +580,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			require.NoError(t, err)
 
 			if test.mockGetRepositoryType {
-				funcGetRepositoryType = func(string) string { return "" }
+				funcGetRepositoryType = func() string { return "" }
 			} else {
 				funcGetRepositoryType = getRepositoryType
 			}

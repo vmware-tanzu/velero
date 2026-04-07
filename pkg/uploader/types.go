@@ -22,7 +22,6 @@ import (
 )
 
 const (
-	ResticType           = "restic"
 	KopiaType            = "kopia"
 	SnapshotRequesterTag = "snapshot-requester"
 	SnapshotUploaderTag  = "snapshot-uploader"
