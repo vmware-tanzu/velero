@@ -90,7 +90,7 @@ func decodeStruct(r io.Reader, s any) error {
 func (a *Action) validate() error {
 	// validate Type
 	valid := false
-	if a.Type == Skip || a.Type == Snapshot || a.Type == FSBackup {
+	if a.Type == Skip || a.Type == Snapshot || a.Type == FSBackup || a.Type == Custom {
 		valid = true
 	}
 	if !valid {
