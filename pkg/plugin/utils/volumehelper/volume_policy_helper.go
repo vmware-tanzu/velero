@@ -26,6 +26,8 @@ import (
 	"github.com/vmware-tanzu/velero/internal/volumehelper"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	podvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
+	vhutil "github.com/vmware-tanzu/velero/pkg/util/volumehelper"
 )
 
 // ShouldPerformSnapshotWithBackup is used for third-party plugins.
@@ -66,7 +68,7 @@ func ShouldPerformSnapshotWithVolumeHelper(
 	backup velerov1api.Backup,
 	crClient crclient.Client,
 	logger logrus.FieldLogger,
-	vh volumehelper.VolumeHelper,
+	vh vhutil.VolumeHelper,
 ) (bool, error) {
 	// If a VolumeHelper is provided, use it directly
 	if vh != nil {
@@ -94,4 +96,46 @@ func ShouldPerformSnapshotWithVolumeHelper(
 	)
 
 	return volumeHelperImpl.ShouldPerformSnapshot(unstructured, groupResource)
+}
+
+// NewVolumeHelperWithNamespaces creates a VolumeHelper with a PVC-to-Pod cache for improved performance.
+// The cache is built internally from the provided namespaces list.
+// This avoids O(N*M) complexity when there are many PVCs and pods.
+// See issue #9179 for details.
+// Returns an error if cache building fails - callers should not proceed with backup in this case.
+func NewVolumeHelperWithNamespaces(
+	volumePolicy *resourcepolicies.Policies,
+	snapshotVolumes *bool,
+	logger logrus.FieldLogger,
+	client crclient.Client,
+	defaultVolumesToFSBackup bool,
+	backupExcludePVC bool,
+	namespaces []string,
+) (vhutil.VolumeHelper, error) {
+	return volumehelper.NewVolumeHelperImplWithNamespaces(
+		volumePolicy,
+		snapshotVolumes,
+		logger,
+		client,
+		defaultVolumesToFSBackup,
+		backupExcludePVC,
+		namespaces,
+	)
+}
+
+// NewVolumeHelperWithCache creates a VolumeHelper using an externally managed PVC-to-Pod cache.
+// This is used by plugins that build the cache lazily per-namespace (following the pattern from PR #9226).
+// The cache can be nil, in which case PVC-to-Pod lookups will fall back to direct API calls.
+func NewVolumeHelperWithCache(
+	backup velerov1api.Backup,
+	client crclient.Client,
+	logger logrus.FieldLogger,
+	pvcPodCache *podvolumeutil.PVCPodCache,
+) (vhutil.VolumeHelper, error) {
+	return volumehelper.NewVolumeHelperImplWithCache(
+		backup,
+		client,
+		logger,
+		pvcPodCache,
+	)
 }
