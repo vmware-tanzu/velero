@@ -644,6 +644,36 @@ func TestServiceActionExecute(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "If PreserveNodePorts is false and HealthCheckNodePort is null in last-applied-configuration, it should not crash and the port should be cleared.",
+			obj: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+					Annotations: map[string]string{
+						"kubectl.kubernetes.io/last-applied-configuration": `{"spec":{"healthCheckNodePort":null}}`,
+					},
+				},
+				Spec: corev1api.ServiceSpec{
+					HealthCheckNodePort:   8080,
+					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeLocal,
+					Type:                  corev1api.ServiceTypeLoadBalancer,
+				},
+			},
+			restore: builder.ForRestore(api.DefaultNamespace, "").PreserveNodePorts(false).Result(),
+			expectedRes: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+					Annotations: map[string]string{
+						"kubectl.kubernetes.io/last-applied-configuration": `{"spec":{"healthCheckNodePort":null}}`,
+					},
+				},
+				Spec: corev1api.ServiceSpec{
+					HealthCheckNodePort:   0,
+					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeLocal,
+					Type:                  corev1api.ServiceTypeLoadBalancer,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {

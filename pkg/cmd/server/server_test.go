@@ -204,9 +204,9 @@ func Test_newServer(t *testing.T) {
 	}, logger)
 	require.Error(t, err)
 
-	// invalid clientQPS Restic uploader
+	// invalid clientQPS Kopia uploader
 	_, err = newServer(factory, &config.Config{
-		UploaderType: uploader.ResticType,
+		UploaderType: uploader.KopiaType,
 		ClientQPS:    -1,
 	}, logger)
 	require.Error(t, err)

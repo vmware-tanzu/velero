@@ -294,6 +294,10 @@ func TestGetPassword(t *testing.T) {
 	}
 }
 
+type MockCredentialGetter struct {
+	mock.Mock
+}
+
 func (m *MockCredentialGetter) GetCredentials() (string, error) {
 	args := m.Called()
 	return args.String(0), args.Error(1)

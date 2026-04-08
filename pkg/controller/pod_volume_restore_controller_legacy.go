@@ -360,5 +360,5 @@ func (c *PodVolumeRestoreReconcilerLegacy) closeDataPath(ctx context.Context, pv
 }
 
 func IsLegacyPVR(pvr *velerov1api.PodVolumeRestore) bool {
-	return pvr.Spec.UploaderType == uploader.ResticType
+	return pvr.Spec.UploaderType == "restic"
 }

@@ -164,7 +164,7 @@ func getUploaderTypeOrDefault(uploaderType string) string {
 	if uploaderType != "" {
 		return uploaderType
 	}
-	return uploader.ResticType
+	return uploader.KopiaType
 }
 
 // getRepositoryType returns the hardcode repositoryType.
