@@ -301,37 +301,13 @@ func (p *volumeSnapshotBackupItemAction) Progress(
 			errorMessage = *vs.Status.Error.Message
 		}
 
-		now := time.Now()
-		firstObservedTime := now
-
-		if existingTime, ok := vs.Annotations[velerov1api.VSErrorFirstObservedTimeAnnotation]; ok {
-			if t, err := time.Parse(time.RFC3339, existingTime); err == nil {
-				firstObservedTime = t
-			} else {
-				p.log.Warnf("VolumeSnapshot %s/%s has an unparsable %s annotation value %q, resetting timer: %v",
-					vs.Namespace, vs.Name, velerov1api.VSErrorFirstObservedTimeAnnotation, existingTime, err)
-			}
-		} else {
-			// First time we observe this error — stamp the annotation onto the VS.
-			originVS := vs.DeepCopy()
-			kubeutil.AddAnnotations(&vs.ObjectMeta, map[string]string{
-				velerov1api.VSErrorFirstObservedTimeAnnotation: now.Format(time.RFC3339),
-			})
-			if patchErr := p.crClient.Patch(
-				context.Background(), vs, crclient.MergeFrom(originVS),
-			); patchErr != nil {
-				p.log.Warnf("Failed to patch VolumeSnapshot %s/%s with error first observed time: %v",
-					vs.Namespace, vs.Name, patchErr)
-			}
-		}
-
 		timeout := backup.Spec.CSISnapshotTimeout.Duration
-		if timeout > 0 && now.Sub(firstObservedTime) >= timeout {
+		if timeout > 0 && time.Since(progress.Started) >= timeout {
 			p.log.Errorf(
 				"VolumeSnapshot %s/%s has a persistent error beyond CSISnapshotTimeout (%s): %s",
 				vs.Namespace, vs.Name, timeout, errorMessage)
 			progress.Completed = true
-			progress.Updated = now
+			progress.Updated = time.Now()
 			progress.Err = fmt.Sprintf("VolumeSnapshot %s/%s has a persistent error: %s",
 				vs.Namespace, vs.Name, errorMessage)
 			return progress, nil
@@ -368,12 +344,24 @@ func (p *volumeSnapshotBackupItemAction) Progress(
 			progress.Completed = true
 			progress.Updated = now
 		} else if vsc.Status.Error != nil {
-			progress.Completed = true
-			progress.Updated = now
+			errorMessage := ""
 			if vsc.Status.Error.Message != nil {
-				progress.Err = *vsc.Status.Error.Message
+				errorMessage = *vsc.Status.Error.Message
 			}
-			p.log.Warnf("VolumeSnapshotContent meets an error %s.", progress.Err)
+
+			timeout := backup.Spec.CSISnapshotTimeout.Duration
+			if timeout > 0 && time.Since(progress.Started) >= timeout {
+				p.log.Errorf(
+					"VolumeSnapshotContent %s has a persistent error beyond CSISnapshotTimeout (%s): %s",
+					vsc.Name, timeout, errorMessage)
+				progress.Completed = true
+				progress.Updated = now
+				progress.Err = fmt.Sprintf("VolumeSnapshotContent %s has a persistent error: %s",
+					vsc.Name, errorMessage)
+			} else {
+				p.log.Warnf("VolumeSnapshotContent %s has an error within the CSISnapshotTimeout window: %s. Snapshot controller will retry later.",
+					vsc.Name, errorMessage)
+			}
 		}
 	}
 
