@@ -320,6 +320,34 @@ func TestBackupLocationLabel(t *testing.T) {
 	}
 }
 
+func TestPrepareBackupRequest_EmptyIncludedNamespacesNormalizedToWildcard(t *testing.T) {
+	formatFlag := logging.FormatText
+	logger := logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+
+	apiServer := velerotest.NewAPIServer(t)
+	discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+	require.NoError(t, err)
+
+	backupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Result()
+	fakeClient := velerotest.NewFakeControllerRuntimeClient(t, backupLocation)
+
+	c := &backupReconciler{
+		discoveryHelper:       discoveryHelper,
+		kbClient:              fakeClient,
+		defaultBackupLocation: backupLocation.Name,
+		clock:                 &clock.RealClock{},
+		formatFlag:            formatFlag,
+	}
+
+	backup := defaultBackup().Result()
+	backup.Spec.IncludedNamespaces = nil
+
+	res := c.prepareBackupRequest(ctx, backup, logger)
+	defer res.WorkerPool.Stop()
+
+	assert.Equal(t, []string{"*"}, res.Spec.IncludedNamespaces)
+}
+
 func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 	var (
 		defaultBackupTTL      = metav1.Duration{Duration: 24 * 30 * time.Hour}

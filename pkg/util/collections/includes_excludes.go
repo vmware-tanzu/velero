@@ -164,16 +164,6 @@ func (nie *NamespaceIncludesExcludes) ExpandIncludesExcludes() error {
 			return err
 		}
 
-		// Empty includes means "include all", so normalize to "*" to
-		// prevent the wildcardExpanded+empty guard from excluding
-		// everything, and to match the CLI path's behavior.
-		// Note: Namespace CRs for excluded namespaces will still be
-		// backed up — this is intentional Velero behavior (see
-		// item_backupper.go itemInclusionChecks).
-		if len(includes) == 0 {
-			expandedIncludes = []string{"*"}
-		}
-
 		nie.SetIncludes(expandedIncludes)
 		nie.SetExcludes(expandedExcludes)
 		nie.wildcardExpanded = true
