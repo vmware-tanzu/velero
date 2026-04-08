@@ -238,6 +238,8 @@ func TestRestoreReconcile(t *testing.T) {
 		expectedFinalPhase              string
 		addValidFinalizer               bool
 		emptyVolumeInfo                 bool
+		podVolumeBackups                []*velerov1api.PodVolumeBackup
+		expectedPVBCount                int
 	}{
 		{
 			name:                     "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
@@ -356,6 +358,22 @@ func TestRestoreReconcile(t *testing.T) {
 			expectedStartTime:     &timestamp,
 			expectedCompletedTime: &timestamp,
 			expectedRestorerCall:  NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseInProgress).Result(),
+		},
+		{
+			name:     "valid restore gets executed and only includes pod volume backups from restore namespace",
+			location: defaultStorageLocation,
+			restore:  NewRestore("foo", "bar2", "backup-1", "ns-1", "", velerov1api.RestorePhaseNew).Result(),
+			backup:   defaultBackup().StorageLocation("default").Result(),
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("foo", "pvb-1").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).Result(),
+				builder.ForPodVolumeBackup("other-ns", "pvb-2").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).Result(),
+			},
+			expectedPVBCount:      1,
+			expectedErr:           false,
+			expectedPhase:         string(velerov1api.RestorePhaseInProgress),
+			expectedStartTime:     &timestamp,
+			expectedCompletedTime: &timestamp,
+			expectedRestorerCall:  NewRestore("foo", "bar2", "backup-1", "ns-1", "", velerov1api.RestorePhaseInProgress).Result(),
 		},
 		{
 			name:          "restoration of nodes is not supported",
@@ -500,6 +518,13 @@ func TestRestoreReconcile(t *testing.T) {
 				// reset defaultStorageLocation resourceVersion
 				defaultStorageLocation.ObjectMeta.ResourceVersion = ""
 			}()
+
+			if test.podVolumeBackups != nil {
+				for _, pvb := range test.podVolumeBackups {
+					err := fakeClient.Create(t.Context(), pvb)
+					require.NoError(t, err)
+				}
+			}
 
 			r := NewRestoreReconciler(
 				t.Context(),
@@ -670,6 +695,10 @@ func TestRestoreReconcile(t *testing.T) {
 			// the mock stores the pointer, which gets modified after
 			assert.Equal(t, test.expectedRestorerCall.Spec, restorer.calledWithArg.Spec)
 			assert.Equal(t, test.expectedRestorerCall.Status.Phase, restorer.calledWithArg.Status.Phase)
+
+			if test.podVolumeBackups != nil {
+				assert.Len(t, restorer.calledWithPVBs, test.expectedPVBCount)
+			}
 		})
 	}
 }
@@ -1021,8 +1050,9 @@ func NewRestore(ns, name, backup, includeNS, includeResource string, phase veler
 
 type fakeRestorer struct {
 	mock.Mock
-	calledWithArg velerov1api.Restore
-	kbClient      client.Client
+	calledWithArg  velerov1api.Restore
+	calledWithPVBs []*velerov1api.PodVolumeBackup
+	kbClient       client.Client
 }
 
 func (r *fakeRestorer) Restore(
@@ -1045,6 +1075,7 @@ func (r *fakeRestorer) RestoreWithResolvers(req *pkgrestore.Request,
 		r.kbClient, volumeSnapshotterGetter)
 
 	r.calledWithArg = *req.Restore
+	r.calledWithPVBs = req.PodVolumeBackups
 
 	return res.Get(0).(results.Result), res.Get(1).(results.Result)
 }
