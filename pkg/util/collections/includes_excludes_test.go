@@ -1380,6 +1380,22 @@ func TestNamespaceIncludesExcludesShouldIncludeAfterWildcardExpansion(t *testing
 			testNamespace:    "default",
 			expectedResult:   true,
 		},
+		{
+			name:             "empty includes with wildcard excludes - should include non-matching namespace",
+			includes:         []string{},
+			excludes:         []string{"test-backup*"},
+			activeNamespaces: []string{"default", "kube-system", "test-backup-ns1", "test-backup-ns2"},
+			testNamespace:    "default",
+			expectedResult:   true,
+		},
+		{
+			name:             "empty includes with wildcard excludes - should exclude matching namespace",
+			includes:         []string{},
+			excludes:         []string{"test-backup*"},
+			activeNamespaces: []string{"default", "kube-system", "test-backup-ns1", "test-backup-ns2"},
+			testNamespace:    "test-backup-ns1",
+			expectedResult:   false,
+		},
 	}
 
 	for _, tc := range tests {
