@@ -139,6 +139,7 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 
 	// describe CSI snapshot timeout
 	backupSpecInfo["CSISnapshotTimeout"] = spec.CSISnapshotTimeout.Duration.String()
+	backupSpecInfo["CSISnapshotEarlyFrequentPolling"] = BoolPointerString(spec.CSISnapshotEarlyFrequentPolling, "false", "true", "auto")
 
 	// describe hooks
 	hooksInfo := make(map[string]any)

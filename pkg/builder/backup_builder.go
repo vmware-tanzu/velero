@@ -288,6 +288,12 @@ func (b *BackupBuilder) CSISnapshotTimeout(timeout time.Duration) *BackupBuilder
 	return b
 }
 
+// CSISnapshotEarlyFrequentPolling sets the Backup's CSISnapshotEarlyFrequentPolling flag.
+func (b *BackupBuilder) CSISnapshotEarlyFrequentPolling(val bool) *BackupBuilder {
+	b.object.Spec.CSISnapshotEarlyFrequentPolling = &val
+	return b
+}
+
 // ItemOperationTimeout sets the Backup's ItemOperationTimeout
 func (b *BackupBuilder) ItemOperationTimeout(timeout time.Duration) *BackupBuilder {
 	b.object.Spec.ItemOperationTimeout.Duration = timeout

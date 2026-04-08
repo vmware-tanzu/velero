@@ -162,6 +162,12 @@ type BackupSpec struct {
 	// +optional
 	CSISnapshotTimeout metav1.Duration `json:"csiSnapshotTimeout,omitempty"`
 
+	// CSISnapshotEarlyFrequentPolling specifies whether to use an early frequent polling for CSI VolumeSnapshot status turns to
+	// ReadyToUse during creation.
+	// +optional
+	// +nullable
+	CSISnapshotEarlyFrequentPolling *bool `json:"csiSnapshotEarlyFrequentPolling,omitempty"`
+
 	// ItemOperationTimeout specifies the time used to wait for asynchronous BackupItemAction operations
 	// The default value is 4 hour.
 	// +optional

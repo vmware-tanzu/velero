@@ -39,6 +39,7 @@ import (
 	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 func TestCreateOptions_BuildBackup(t *testing.T) {
@@ -48,6 +49,7 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 	o.OrderedResources = "pods=p1,p2;persistentvolumeclaims=pvc1,pvc2"
 	orders, err := ParseOrderedResources(o.OrderedResources)
 	o.CSISnapshotTimeout = 20 * time.Minute
+	o.CSISnapshotEarlyFrequentPolling.Value = boolptr.True()
 	o.ItemOperationTimeout = 20 * time.Minute
 	orLabelSelectors := []*metav1.LabelSelector{
 		{
@@ -64,14 +66,15 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, velerov1api.BackupSpec{
-		TTL:                     metav1.Duration{Duration: o.TTL},
-		IncludedNamespaces:      []string(o.IncludeNamespaces),
-		SnapshotVolumes:         o.SnapshotVolumes.Value,
-		IncludeClusterResources: o.IncludeClusterResources.Value,
-		OrderedResources:        orders,
-		OrLabelSelectors:        orLabelSelectors,
-		CSISnapshotTimeout:      metav1.Duration{Duration: o.CSISnapshotTimeout},
-		ItemOperationTimeout:    metav1.Duration{Duration: o.ItemOperationTimeout},
+		TTL:                             metav1.Duration{Duration: o.TTL},
+		IncludedNamespaces:              []string(o.IncludeNamespaces),
+		SnapshotVolumes:                 o.SnapshotVolumes.Value,
+		IncludeClusterResources:         o.IncludeClusterResources.Value,
+		OrderedResources:                orders,
+		OrLabelSelectors:                orLabelSelectors,
+		CSISnapshotTimeout:              metav1.Duration{Duration: o.CSISnapshotTimeout},
+		CSISnapshotEarlyFrequentPolling: o.CSISnapshotEarlyFrequentPolling.Value,
+		ItemOperationTimeout:            metav1.Duration{Duration: o.ItemOperationTimeout},
 	}, backup.Spec)
 
 	assert.Equal(t, map[string]string{
@@ -223,6 +226,7 @@ func TestCreateCommand(t *testing.T) {
 		selector := "a=pod"
 		orderedResources := "pod=pod1,pod2,pod3"
 		csiSnapshotTimeout := "8m30s"
+		csiSnapshotEarlyFrequentPolling := "true"
 		itemOperationTimeout := "99h1m6s"
 		snapshotVolumes := "false"
 		snapshotMoveData := "true"
@@ -252,6 +256,7 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--selector", selector})
 		flags.Parse([]string{"--ordered-resources", orderedResources})
 		flags.Parse([]string{"--csi-snapshot-timeout", csiSnapshotTimeout})
+		flags.Parse([]string{"--csi-snapshot-early-frequent-polling", csiSnapshotEarlyFrequentPolling})
 		flags.Parse([]string{"--item-operation-timeout", itemOperationTimeout})
 		flags.Parse([]string{fmt.Sprintf("--snapshot-volumes=%s", snapshotVolumes)})
 		flags.Parse([]string{fmt.Sprintf("--snapshot-move-data=%s", snapshotMoveData)})
@@ -302,6 +307,7 @@ func TestCreateCommand(t *testing.T) {
 		require.Equal(t, selector, o.Selector.String())
 		require.Equal(t, orderedResources, o.OrderedResources)
 		require.Equal(t, csiSnapshotTimeout, o.CSISnapshotTimeout.String())
+		require.Equal(t, csiSnapshotEarlyFrequentPolling, o.CSISnapshotEarlyFrequentPolling.String())
 		require.Equal(t, itemOperationTimeout, o.ItemOperationTimeout.String())
 		require.Equal(t, snapshotVolumes, o.SnapshotVolumes.String())
 		require.Equal(t, snapshotMoveData, o.SnapshotMoveData.String())

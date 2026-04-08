@@ -49,8 +49,9 @@ Backup Template:
   
   TTL:  0s
   
-  CSISnapshotTimeout:    0s
-  ItemOperationTimeout:  0s
+  CSISnapshotTimeout:               0s
+  CSISnapshotEarlyFrequentPolling:  auto
+  ItemOperationTimeout:             0s
   
   Hooks:  <none>
 
@@ -99,8 +100,9 @@ Backup Template:
   
   TTL:  0s
   
-  CSISnapshotTimeout:    0s
-  ItemOperationTimeout:  0s
+  CSISnapshotTimeout:               0s
+  CSISnapshotEarlyFrequentPolling:  auto
+  ItemOperationTimeout:             0s
   
   Hooks:  <none>
 
@@ -147,8 +149,9 @@ Backup Template:
   
   TTL:  0s
   
-  CSISnapshotTimeout:    0s
-  ItemOperationTimeout:  0s
+  CSISnapshotTimeout:               0s
+  CSISnapshotEarlyFrequentPolling:  auto
+  ItemOperationTimeout:             0s
   
   Hooks:  <none>
 
@@ -195,8 +198,9 @@ Backup Template:
   
   TTL:  0s
   
-  CSISnapshotTimeout:    0s
-  ItemOperationTimeout:  0s
+  CSISnapshotTimeout:               0s
+  CSISnapshotEarlyFrequentPolling:  auto
+  ItemOperationTimeout:             0s
   
   Hooks:  <none>
 

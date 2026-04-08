@@ -668,6 +668,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.credentialFileStore,
 			s.config.MaxConcurrentK8SConnections,
 			s.config.DefaultSnapshotMoveData,
+			s.config.CSISnapshotEarlyFrequentPolling,
 			s.config.ItemBlockWorkerCount,
 			s.config.ConcurrentBackups,
 			s.crClient,

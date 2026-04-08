@@ -406,6 +406,11 @@ func (in *BackupSpec) DeepCopyInto(out *BackupSpec) {
 		}
 	}
 	out.CSISnapshotTimeout = in.CSISnapshotTimeout
+	if in.CSISnapshotEarlyFrequentPolling != nil {
+		in, out := &in.CSISnapshotEarlyFrequentPolling, &out.CSISnapshotEarlyFrequentPolling
+		*out = new(bool)
+		**out = **in
+	}
 	out.ItemOperationTimeout = in.ItemOperationTimeout
 	if in.ResourcePolicy != nil {
 		in, out := &in.ResourcePolicy, &out.ResourcePolicy

@@ -156,6 +156,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				DefaultVolumesToFsBackup:         o.BackupOptions.DefaultVolumesToFsBackup.Value,
 				OrderedResources:                 orders,
 				CSISnapshotTimeout:               metav1.Duration{Duration: o.BackupOptions.CSISnapshotTimeout},
+				CSISnapshotEarlyFrequentPolling:  o.BackupOptions.CSISnapshotEarlyFrequentPolling.Value,
 				ItemOperationTimeout:             metav1.Duration{Duration: o.BackupOptions.ItemOperationTimeout},
 				DataMover:                        o.BackupOptions.DataMover,
 				SnapshotMoveData:                 o.BackupOptions.SnapshotMoveData.Value,

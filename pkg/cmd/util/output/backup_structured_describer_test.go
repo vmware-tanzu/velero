@@ -86,13 +86,14 @@ func TestDescribeBackupInSF(t *testing.T) {
 				"excluded":      "exc-res-1, exc-res-2",
 				"clusterScoped": "auto",
 			},
-			"dataMover":               "mover",
-			"labelSelector":           emptyDisplay,
-			"storageLocation":         "backup-location",
-			"veleroNativeSnapshotPVs": "auto",
-			"TTL":                     "72h0m0s",
-			"CSISnapshotTimeout":      "10m0s",
-			"veleroSnapshotMoveData":  "auto",
+			"dataMover":                       "mover",
+			"labelSelector":                   emptyDisplay,
+			"storageLocation":                 "backup-location",
+			"veleroNativeSnapshotPVs":         "auto",
+			"TTL":                             "72h0m0s",
+			"CSISnapshotTimeout":              "10m0s",
+			"CSISnapshotEarlyFrequentPolling": "auto",
+			"veleroSnapshotMoveData":          "auto",
 			"hooks": map[string]any{
 				"resources": map[string]any{
 					"hook-1": map[string]any{
@@ -171,13 +172,14 @@ func TestDescribeBackupInSF(t *testing.T) {
 				"excluded":      emptyDisplay,
 				"clusterScoped": "auto",
 			},
-			"dataMover":               emptyDisplay,
-			"labelSelector":           emptyDisplay,
-			"storageLocation":         "backup-location",
-			"veleroNativeSnapshotPVs": "auto",
-			"TTL":                     "0s",
-			"CSISnapshotTimeout":      "0s",
-			"veleroSnapshotMoveData":  "auto",
+			"dataMover":                       emptyDisplay,
+			"labelSelector":                   emptyDisplay,
+			"storageLocation":                 "backup-location",
+			"veleroNativeSnapshotPVs":         "auto",
+			"TTL":                             "0s",
+			"CSISnapshotTimeout":              "0s",
+			"CSISnapshotEarlyFrequentPolling": "auto",
+			"veleroSnapshotMoveData":          "auto",
 			"hooks": map[string]any{
 				"resources": map[string]any{
 					"hook-1": map[string]any{

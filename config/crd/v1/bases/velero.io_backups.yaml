@@ -41,6 +41,12 @@ spec:
           spec:
             description: BackupSpec defines the specification for a Velero backup.
             properties:
+              csiSnapshotEarlyFrequentPolling:
+                description: |-
+                  CSISnapshotEarlyFrequentPolling specifies whether to use an early frequent polling for CSI VolumeSnapshot status turns to
+                  ReadyToUse during creation.
+                nullable: true
+                type: boolean
               csiSnapshotTimeout:
                 description: |-
                   CSISnapshotTimeout specifies the time used to wait for CSI VolumeSnapshot status turns to

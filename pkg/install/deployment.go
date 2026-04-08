@@ -50,6 +50,7 @@ type podTemplateConfig struct {
 	serviceAccountName              string
 	uploaderType                    string
 	defaultSnapshotMoveData         bool
+	csiSnapshotEarlyFrequentPolling bool
 	privilegedNodeAgent             bool
 	disableInformerCache            bool
 	scheduleSkipImmediately         bool
@@ -163,6 +164,12 @@ func WithDefaultVolumesToFsBackup(b bool) podTemplateOption {
 func WithDefaultSnapshotMoveData(b bool) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.defaultSnapshotMoveData = b
+	}
+}
+
+func WithCSISnapshotEarlyFrequentPolling(b bool) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.csiSnapshotEarlyFrequentPolling = b
 	}
 }
 
@@ -282,6 +289,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1api.Deployme
 
 	if c.defaultSnapshotMoveData {
 		args = append(args, "--default-snapshot-move-data=true")
+	}
+
+	if c.csiSnapshotEarlyFrequentPolling {
+		args = append(args, "--csi-snapshot-early-frequent-polling=true")
 	}
 
 	if c.disableInformerCache {

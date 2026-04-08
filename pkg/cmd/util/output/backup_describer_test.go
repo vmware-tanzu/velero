@@ -130,8 +130,9 @@ Data Mover:                  mover
 
 TTL:  72h0m0s
 
-CSISnapshotTimeout:    10m0s
-ItemOperationTimeout:  0s
+CSISnapshotTimeout:               10m0s
+CSISnapshotEarlyFrequentPolling:  auto
+ItemOperationTimeout:             0s
 
 Hooks:
   Resources:
@@ -194,8 +195,9 @@ Data Mover:                  mover
 
 TTL:  72h0m0s
 
-CSISnapshotTimeout:    10m0s
-ItemOperationTimeout:  0s
+CSISnapshotTimeout:               10m0s
+CSISnapshotEarlyFrequentPolling:  auto
+ItemOperationTimeout:             0s
 
 Hooks:  <none>
 `
@@ -252,8 +254,9 @@ Data Mover:                  velero
 
 TTL:  0s
 
-CSISnapshotTimeout:    0s
-ItemOperationTimeout:  0s
+CSISnapshotTimeout:               0s
+CSISnapshotEarlyFrequentPolling:  auto
+ItemOperationTimeout:             0s
 
 Hooks:
   Resources:
@@ -311,8 +314,9 @@ Data Mover:                    velero
 
 TTL:  0s
 
-CSISnapshotTimeout:    0s
-ItemOperationTimeout:  0s
+CSISnapshotTimeout:               0s
+CSISnapshotEarlyFrequentPolling:  auto
+ItemOperationTimeout:             0s
 
 Hooks:  <none>
 `
@@ -345,8 +349,9 @@ Data Mover:                    velero
 
 TTL:  0s
 
-CSISnapshotTimeout:    0s
-ItemOperationTimeout:  0s
+CSISnapshotTimeout:               0s
+CSISnapshotEarlyFrequentPolling:  auto
+ItemOperationTimeout:             0s
 
 Hooks:  <none>
 `

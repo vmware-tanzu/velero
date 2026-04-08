@@ -1680,7 +1680,7 @@ func TestWaitUntilVSCHandleIsReady(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualVSC, actualError := WaitUntilVSCHandleIsReady(tc.volSnap, fakeClient, logrus.New().WithField("fake", "test"), 0)
+			actualVSC, actualError := WaitUntilVSCHandleIsReady(tc.volSnap, fakeClient, logrus.New().WithField("fake", "test"), 0, nil)
 			if tc.expectError && actualError == nil {
 				require.Error(t, actualError)
 				assert.Nil(t, actualVSC)
