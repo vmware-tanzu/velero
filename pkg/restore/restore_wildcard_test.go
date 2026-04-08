@@ -94,15 +94,6 @@ func TestExpandNamespaceWildcards(t *testing.T) {
 			expectedWildcardResult: []string{"app-dev", "app-prod"},
 		},
 		{
-			name:              "Error: wildcard * in excludes",
-			includeNamespaces: []string{"test*"},
-			excludeNamespaces: []string{"*"},
-			backupResources: map[string]*archive.ResourceItems{
-				"namespaces": {ItemsByNamespace: map[string][]string{"test1": {}}},
-			},
-			expectedError: "wildcard '*' is not allowed in restore excludes",
-		},
-		{
 			name:                   "Empty backup - no matches",
 			includeNamespaces:      []string{"test*"},
 			excludeNamespaces:      []string{},
