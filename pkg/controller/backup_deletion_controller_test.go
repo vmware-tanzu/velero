@@ -821,12 +821,12 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 					{
 						VolumeNamespace: "ns-1",
 						SnapshotID:      "snap-3",
-						RepositoryType:  "restic",
+						RepositoryType:  "kopia",
 					},
 					{
 						VolumeNamespace: "ns-1",
 						SnapshotID:      "snap-4",
-						RepositoryType:  "restic",
+						RepositoryType:  "kopia",
 					},
 				},
 			},
@@ -876,7 +876,7 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 					{
 						VolumeNamespace: "ns-1",
 						SnapshotID:      "snap-3",
-						RepositoryType:  "restic",
+						RepositoryType:  "kopia",
 					},
 				},
 			},

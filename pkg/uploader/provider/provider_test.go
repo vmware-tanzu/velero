@@ -75,7 +75,7 @@ func TestNewUploaderProvider(t *testing.T) {
 			UploaderType:  "restic",
 			RequestorType: "requester",
 			needFromFile:  true,
-			ExpectedError: "",
+			ExpectedError: "unsupported uploader type restic",
 		},
 	}
 
