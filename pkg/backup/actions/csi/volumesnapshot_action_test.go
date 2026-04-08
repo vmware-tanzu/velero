@@ -230,13 +230,9 @@ func TestVSProgress(t *testing.T) {
 			expectedErr: false,
 		},
 		{
-			name:        "VS status has error, annotation within CSISnapshotTimeout",
-			operationID: "ns/name/2024-04-11T18:49:00+08:00",
-			vs: builder.ForVolumeSnapshot("ns", "name").
-				ObjectMeta(builder.WithAnnotations(
-					velerov1api.VSErrorFirstObservedTimeAnnotation, time.Now().Format(time.RFC3339),
-				)).
-				Status().
+			name:        "VS status has error, within CSISnapshotTimeout (recent start time)",
+			operationID: "ns/name/" + time.Now().Format(time.RFC3339),
+			vs: builder.ForVolumeSnapshot("ns", "name").Status().
 				StatusError(snapshotv1api.VolumeSnapshotError{
 					Message: &errorStr,
 				}).Result(),
@@ -246,11 +242,7 @@ func TestVSProgress(t *testing.T) {
 		{
 			name:        "VS status has persistent error beyond CSISnapshotTimeout",
 			operationID: "ns/name/2024-04-11T18:49:00+08:00",
-			vs: builder.ForVolumeSnapshot("ns", "name").
-				ObjectMeta(builder.WithAnnotations(
-					velerov1api.VSErrorFirstObservedTimeAnnotation, "2024-04-11T18:49:00+08:00",
-				)).
-				Status().
+			vs: builder.ForVolumeSnapshot("ns", "name").Status().
 				StatusError(snapshotv1api.VolumeSnapshotError{
 					Message: &errorStr,
 				}).Result(),
@@ -292,7 +284,21 @@ func TestVSProgress(t *testing.T) {
 			expectedProgress: &velero.OperationProgress{Completed: true},
 		},
 		{
-			name:        "VSC status has error",
+			name:        "VSC status has error within CSISnapshotTimeout",
+			operationID: "ns/name/" + time.Now().Format(time.RFC3339),
+			vs: builder.ForVolumeSnapshot("ns", "name").Status().
+				ReadyToUse(true).BoundVolumeSnapshotContentName("vsc").Result(),
+			vsc: builder.ForVolumeSnapshotContent("vsc").
+				Status(&snapshotv1api.VolumeSnapshotContentStatus{
+					Error: &snapshotv1api.VolumeSnapshotError{
+						Message: &errorStr,
+					},
+				}).Result(),
+			backup:      builder.ForBackup("velero", "backup").CSISnapshotTimeout(10 * time.Minute).Result(),
+			expectedErr: false,
+		},
+		{
+			name:        "VSC status has persistent error beyond CSISnapshotTimeout",
 			operationID: "ns/name/2024-04-11T18:49:00+08:00",
 			vs: builder.ForVolumeSnapshot("ns", "name").Status().
 				ReadyToUse(true).BoundVolumeSnapshotContentName("vsc").Result(),
@@ -302,11 +308,11 @@ func TestVSProgress(t *testing.T) {
 						Message: &errorStr,
 					},
 				}).Result(),
-			backup:      builder.ForBackup("velero", "backup").Result(),
+			backup:      builder.ForBackup("velero", "backup").CSISnapshotTimeout(10 * time.Minute).Result(),
 			expectedErr: false,
 			expectedProgress: &velero.OperationProgress{
 				Completed: true,
-				Err:       "error",
+				Err:       fmt.Sprintf("VolumeSnapshotContent vsc has a persistent error: %s", errorStr),
 			},
 		},
 	}
