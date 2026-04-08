@@ -109,10 +109,6 @@ func NewManager(
 		log:        log,
 	}
 
-	mgr.providers[velerov1api.BackupRepositoryTypeRestic] = provider.NewResticRepositoryProvider(credentials.CredentialGetter{
-		FromFile:   credentialFileStore,
-		FromSecret: credentialSecretStore,
-	}, mgr.fileSystem, mgr.log)
 	mgr.providers[velerov1api.BackupRepositoryTypeKopia] = provider.NewUnifiedRepoProvider(credentials.CredentialGetter{
 		FromFile:   credentialFileStore,
 		FromSecret: credentialSecretStore,
@@ -275,8 +271,6 @@ func (m *manager) ClientSideCacheLimit(repo *velerov1api.BackupRepository) (int6
 
 func (m *manager) getRepositoryProvider(repo *velerov1api.BackupRepository) (provider.Provider, error) {
 	switch repo.Spec.RepositoryType {
-	case "", velerov1api.BackupRepositoryTypeRestic:
-		return m.providers[velerov1api.BackupRepositoryTypeRestic], nil
 	case velerov1api.BackupRepositoryTypeKopia:
 		return m.providers[velerov1api.BackupRepositoryTypeKopia], nil
 	default:

@@ -167,7 +167,7 @@ func getUploaderTypeOrDefault(uploaderType string) string {
 	return uploader.KopiaType
 }
 
-// getRepositoryType returns the hardcode repositoryType
+// getRepositoryType returns the hardcode repositoryType.
 // TODO: In future, when we have multiple implementations of Unified Repo (besides Kopia), we will add the repositoryType to BSL,
 // because by then, we are not able to hardcode the repositoryType to BackupRepositoryTypeKopia for Unified Repo.
 func getRepositoryType() string {

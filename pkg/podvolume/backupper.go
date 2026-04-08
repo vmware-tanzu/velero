@@ -305,11 +305,6 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 	}
 
-	repoIdentifier := ""
-	if repositoryType == velerov1api.BackupRepositoryTypeRestic {
-		repoIdentifier = repo.Spec.ResticIdentifier
-	}
-
 	for _, volumeName := range volumesToBackup {
 		volume, ok := podVolumes[volumeName]
 		if !ok {
@@ -366,7 +361,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			continue
 		}
 
-		volumeBackup := newPodVolumeBackup(backup, pod, volume, repoIdentifier, b.uploaderType, pvc)
+		volumeBackup := newPodVolumeBackup(backup, pod, volume, "", b.uploaderType, pvc)
 		// the PVB must be added into the indexer before creating it in API server otherwise unexpected behavior may happen:
 		// the PVB may be handled very quickly by the controller and the informer handler will insert the PVB before "b.pvbIndexer.Add(volumeBackup)" runs,
 		// this causes the PVB inserted by "b.pvbIndexer.Add(volumeBackup)" overrides the PVB in the indexer while the PVB inserted by "b.pvbIndexer.Add(volumeBackup)"
