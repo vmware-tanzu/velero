@@ -8,14 +8,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func ShouldExpandWildcards(includes []string, excludes []string) bool {
+func ShouldExpandWildcards(includes []string, excludes []string, fromBackup bool) bool {
+	// Only expand wildcards if this is being called from a backup request.
+	// We don't want to expand wildcard patterns in restore request,
+	// because restore needs the IncludeEverything function to
+	// determine whether to restore cluster-scoped resources.
+	// Expand wildcards causes the IncludeEverything function to return false,
+	// which will cause restore to skip cluster-scoped resources.
+	if !fromBackup {
+		return false
+	}
+
 	wildcardFound := false
 	for _, include := range includes {
-		// Special case: "*" alone means "match all" - don't expand
-		if include == "*" {
-			return false
-		}
-
 		if containsWildcardPattern(include) {
 			wildcardFound = true
 		}

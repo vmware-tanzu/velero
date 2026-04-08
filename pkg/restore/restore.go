@@ -2407,7 +2407,7 @@ func extractNamespacesFromBackup(backupResources map[string]*archive.ResourceIte
 // expandNamespaceWildcards expands wildcard patterns in namespace includes/excludes
 // and updates the restore context with the expanded patterns and status
 func (ctx *restoreContext) expandNamespaceWildcards(backupResources map[string]*archive.ResourceItems) error {
-	if !wildcard.ShouldExpandWildcards(ctx.restore.Spec.IncludedNamespaces, ctx.restore.Spec.ExcludedNamespaces) {
+	if !wildcard.ShouldExpandWildcards(ctx.restore.Spec.IncludedNamespaces, ctx.restore.Spec.ExcludedNamespaces, false) {
 		return nil
 	}
 

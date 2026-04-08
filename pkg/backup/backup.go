@@ -187,7 +187,7 @@ func getNamespaceIncludesExcludesAndArgoCDNamespaces(backup *velerov1api.Backup,
 		Excludes(backup.Spec.ExcludedNamespaces...)
 
 	// Expand wildcards if needed
-	if err := includesExcludes.ExpandIncludesExcludes(); err != nil {
+	if err := includesExcludes.ExpandIncludesExcludes(true); err != nil {
 		return nil, []string{}, err
 	}
 
@@ -286,7 +286,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		expandedExcludes := backupRequest.NamespaceIncludesExcludes.GetExcludes()
 
 		// Get the final namespace list after wildcard expansion
-		wildcardResult, err := backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList()
+		wildcardResult, err := backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList(true)
 		if err != nil {
 			log.WithError(err).Errorf("error resolving namespace list")
 			return err
@@ -410,7 +410,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 
 	// Resolve namespaces for PVC-to-Pod cache building in volumehelper.
 	// See issue #9179 for details.
-	namespaces, err := backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList()
+	namespaces, err := backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList(true)
 	if err != nil {
 		log.WithError(err).Error("Failed to resolve namespace list for PVC-to-Pod cache")
 		return err

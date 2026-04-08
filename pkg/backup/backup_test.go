@@ -36,6 +36,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -281,8 +282,8 @@ func TestBackupOldResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					builder.ForPod("foo", "bar").Result(),
-					builder.ForPod("zoo", "raz").Result(),
+					builder.ForPod("foo", "bar").Phase(corev1api.PodRunning).Result(),
+					builder.ForPod("zoo", "raz").Phase(corev1api.PodRunning).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("foo", "bar").Result(),
@@ -977,28 +978,6 @@ func TestCRDInclusion(t *testing.T) {
 				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/backups.velero.io.json",
 				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/volumesnapshotlocations.velero.io.json",
 				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/test.velero.io.json",
-				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/vsl-1.json",
-			},
-		},
-		{
-			name: "include cluster resources=auto includes CRDs with CRs when backing up selected namespaces",
-			backup: defaultBackup().
-				IncludedNamespaces("foo").
-				Result(),
-			apiResources: []*test.APIResource{
-				test.CRDs(
-					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
-					builder.ForCustomResourceDefinitionV1Beta1("volumesnapshotlocations.velero.io").Result(),
-					builder.ForCustomResourceDefinitionV1Beta1("test.velero.io").Result(),
-				),
-				test.VSLs(
-					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
-				),
-			},
-			want: []string{
-				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/volumesnapshotlocations.velero.io.json",
-				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
-				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/volumesnapshotlocations.velero.io.json",
 				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/vsl-1.json",
 			},
 		},
@@ -4296,6 +4275,12 @@ func (h *harness) addItems(t *testing.T, resource *test.APIResource) {
 		unstructuredObj := &unstructured.Unstructured{Object: obj}
 
 		if resource.Namespaced {
+			namespace := &corev1api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: item.GetNamespace()}}
+			err = h.backupper.kbClient.Create(t.Context(), namespace)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				require.NoError(t, err)
+			}
+
 			_, err = h.DynamicClient.Resource(resource.GVR()).Namespace(item.GetNamespace()).Create(t.Context(), unstructuredObj, metav1.CreateOptions{})
 		} else {
 			_, err = h.DynamicClient.Resource(resource.GVR()).Create(t.Context(), unstructuredObj, metav1.CreateOptions{})
@@ -4346,7 +4331,7 @@ func newSnapshotLocation(ns, name, provider string) *velerov1.VolumeSnapshotLoca
 }
 
 func defaultBackup() *builder.BackupBuilder {
-	return builder.ForBackup(velerov1.DefaultNamespace, "backup-1").DefaultVolumesToFsBackup(false)
+	return builder.ForBackup(velerov1.DefaultNamespace, "backup-1").DefaultVolumesToFsBackup(false).IncludedNamespaces("*")
 }
 
 func toUnstructuredOrFail(t *testing.T, obj any) map[string]any {
@@ -5422,8 +5407,6 @@ func TestBackupNamespaces(t *testing.T) {
 			want: []string{
 				"resources/namespaces/cluster/ns-1.json",
 				"resources/namespaces/v1-preferredversion/cluster/ns-1.json",
-				"resources/namespaces/cluster/ns-3.json",
-				"resources/namespaces/v1-preferredversion/cluster/ns-3.json",
 			},
 		},
 		{
@@ -5457,10 +5440,6 @@ func TestBackupNamespaces(t *testing.T) {
 			want: []string{
 				"resources/namespaces/cluster/ns-1.json",
 				"resources/namespaces/v1-preferredversion/cluster/ns-1.json",
-				"resources/namespaces/cluster/ns-2.json",
-				"resources/namespaces/v1-preferredversion/cluster/ns-2.json",
-				"resources/namespaces/cluster/ns-3.json",
-				"resources/namespaces/v1-preferredversion/cluster/ns-3.json",
 				"resources/deployments.apps/namespaces/ns-1/deploy-1.json",
 				"resources/deployments.apps/v1-preferredversion/namespaces/ns-1/deploy-1.json",
 			},

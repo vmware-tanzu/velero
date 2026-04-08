@@ -575,6 +575,14 @@ func (b *backupReconciler) prepareBackupRequest(ctx context.Context, backup *vel
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
+	// if included namespaces is empty, default to wildcard to include all namespaces
+	// This is useful for later wildcard expansion logic.
+	// This also align the behavior between backup creation from CLI and from API,
+	// as CLI will default to wildcard if included namespaces is not specified.
+	if request.Spec.IncludedNamespaces == nil {
+		request.Spec.IncludedNamespaces = []string{"*"}
+	}
+
 	// validate that only one exists orLabelSelector or just labelSelector (singular)
 	if request.Spec.OrLabelSelectors != nil && request.Spec.LabelSelector != nil {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, "encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified")

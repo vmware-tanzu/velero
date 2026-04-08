@@ -1049,6 +1049,7 @@ func TestExpandIncludesExcludes(t *testing.T) {
 		expectedExcludes         []string
 		expectedWildcardExpanded bool
 		expectError              bool
+		fromBackup               bool
 	}{
 		{
 			name:                     "no wildcards - should not expand",
@@ -1059,16 +1060,18 @@ func TestExpandIncludesExcludes(t *testing.T) {
 			expectedExcludes:         []string{"kube-public"},
 			expectedWildcardExpanded: false,
 			expectError:              false,
+			fromBackup:               true,
 		},
 		{
-			name:                     "asterisk alone - should not expand",
+			name:                     "asterisk alone - should expand",
 			includes:                 []string{"*"},
 			excludes:                 []string{},
 			activeNamespaces:         []string{"default", "kube-system", "test"},
-			expectedIncludes:         []string{"*"},
+			expectedIncludes:         []string{"default", "kube-system", "test"},
 			expectedExcludes:         []string{},
-			expectedWildcardExpanded: false,
+			expectedWildcardExpanded: true,
 			expectError:              false,
+			fromBackup:               true,
 		},
 		{
 			name:                     "wildcard in includes - should expand",
@@ -1079,6 +1082,7 @@ func TestExpandIncludesExcludes(t *testing.T) {
 			expectedExcludes:         []string{},
 			expectedWildcardExpanded: true,
 			expectError:              false,
+			fromBackup:               true,
 		},
 		{
 			name:                     "wildcard in excludes - should expand",
@@ -1089,6 +1093,7 @@ func TestExpandIncludesExcludes(t *testing.T) {
 			expectedExcludes:         []string{"kube-test", "app-test"},
 			expectedWildcardExpanded: true,
 			expectError:              false,
+			fromBackup:               true,
 		},
 		{
 			name:                     "wildcards in both includes and excludes",
@@ -1099,6 +1104,7 @@ func TestExpandIncludesExcludes(t *testing.T) {
 			expectedExcludes:         []string{"kube-test", "app-test"},
 			expectedWildcardExpanded: true,
 			expectError:              false,
+			fromBackup:               true,
 		},
 		{
 			name:                     "wildcard pattern matches nothing",
@@ -1109,6 +1115,7 @@ func TestExpandIncludesExcludes(t *testing.T) {
 			expectedExcludes:         []string{},
 			expectedWildcardExpanded: true,
 			expectError:              false,
+			fromBackup:               true,
 		},
 		{
 			name:                     "mix of wildcards and non-wildcards in includes",
@@ -1119,6 +1126,7 @@ func TestExpandIncludesExcludes(t *testing.T) {
 			expectedExcludes:         []string{},
 			expectedWildcardExpanded: true,
 			expectError:              false,
+			fromBackup:               true,
 		},
 		{
 			name:                     "question mark wildcard",
@@ -1129,6 +1137,7 @@ func TestExpandIncludesExcludes(t *testing.T) {
 			expectedExcludes:         []string{},
 			expectedWildcardExpanded: true,
 			expectError:              false,
+			fromBackup:               true,
 		},
 		{
 			name:                     "empty activeNamespaces with wildcards",
@@ -1139,6 +1148,7 @@ func TestExpandIncludesExcludes(t *testing.T) {
 			expectedExcludes:         []string{},
 			expectedWildcardExpanded: true,
 			expectError:              false,
+			fromBackup:               true,
 		},
 		{
 			name:                     "invalid wildcard pattern - consecutive asterisks",
@@ -1149,6 +1159,7 @@ func TestExpandIncludesExcludes(t *testing.T) {
 			expectedExcludes:         []string{},
 			expectedWildcardExpanded: false,
 			expectError:              true,
+			fromBackup:               true,
 		},
 	}
 
@@ -1159,7 +1170,7 @@ func TestExpandIncludesExcludes(t *testing.T) {
 				Includes(tc.includes...).
 				Excludes(tc.excludes...)
 
-			err := nie.ExpandIncludesExcludes()
+			err := nie.ExpandIncludesExcludes(tc.fromBackup)
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -1192,6 +1203,7 @@ func TestResolveNamespaceList(t *testing.T) {
 		activeNamespaces   []string
 		expectedNamespaces []string
 		preExpandWildcards bool
+		fromBackup         bool
 	}{
 		{
 			name:               "no includes/excludes - all active namespaces",
@@ -1199,6 +1211,7 @@ func TestResolveNamespaceList(t *testing.T) {
 			excludes:           []string{},
 			activeNamespaces:   []string{"default", "kube-system", "test"},
 			expectedNamespaces: []string{"default", "kube-system", "test"},
+			fromBackup:         true,
 		},
 		{
 			name:               "asterisk includes - all active namespaces",
@@ -1206,6 +1219,7 @@ func TestResolveNamespaceList(t *testing.T) {
 			excludes:           []string{},
 			activeNamespaces:   []string{"default", "kube-system", "test"},
 			expectedNamespaces: []string{"default", "kube-system", "test"},
+			fromBackup:         true,
 		},
 		{
 			name:               "specific includes - only those namespaces",
@@ -1213,6 +1227,7 @@ func TestResolveNamespaceList(t *testing.T) {
 			excludes:           []string{},
 			activeNamespaces:   []string{"default", "kube-system", "test"},
 			expectedNamespaces: []string{"default", "test"},
+			fromBackup:         true,
 		},
 		{
 			name:               "includes with excludes",
@@ -1220,6 +1235,7 @@ func TestResolveNamespaceList(t *testing.T) {
 			excludes:           []string{"kube-system"},
 			activeNamespaces:   []string{"default", "kube-system", "test"},
 			expectedNamespaces: []string{"default", "test"},
+			fromBackup:         true,
 		},
 		{
 			name:               "wildcard includes - expands and filters",
@@ -1227,6 +1243,7 @@ func TestResolveNamespaceList(t *testing.T) {
 			excludes:           []string{},
 			activeNamespaces:   []string{"default", "kube-system", "kube-public", "test"},
 			expectedNamespaces: []string{"kube-system", "kube-public"},
+			fromBackup:         true,
 		},
 		{
 			name:               "wildcard includes with wildcard excludes",
@@ -1234,6 +1251,7 @@ func TestResolveNamespaceList(t *testing.T) {
 			excludes:           []string{"*-test"},
 			activeNamespaces:   []string{"app-prod", "app-dev", "app-test", "default"},
 			expectedNamespaces: []string{"app-prod", "app-dev"},
+			fromBackup:         true,
 		},
 		{
 			name:               "wildcard matches nothing - empty result",
@@ -1241,6 +1259,7 @@ func TestResolveNamespaceList(t *testing.T) {
 			excludes:           []string{},
 			activeNamespaces:   []string{"default", "kube-system"},
 			expectedNamespaces: []string{},
+			fromBackup:         true,
 		},
 		{
 			name:               "empty active namespaces",
@@ -1248,6 +1267,7 @@ func TestResolveNamespaceList(t *testing.T) {
 			excludes:           []string{},
 			activeNamespaces:   []string{},
 			expectedNamespaces: []string{},
+			fromBackup:         true,
 		},
 		{
 			name:               "includes namespace not in active namespaces",
@@ -1255,6 +1275,7 @@ func TestResolveNamespaceList(t *testing.T) {
 			excludes:           []string{},
 			activeNamespaces:   []string{"default", "test"},
 			expectedNamespaces: []string{"default"},
+			fromBackup:         true,
 		},
 		{
 			name:               "excludes all namespaces from includes",
@@ -1262,6 +1283,7 @@ func TestResolveNamespaceList(t *testing.T) {
 			excludes:           []string{"default", "test"},
 			activeNamespaces:   []string{"default", "test", "prod"},
 			expectedNamespaces: []string{},
+			fromBackup:         true,
 		},
 		{
 			name:               "pre-expanded wildcards - should not expand again",
@@ -1270,6 +1292,7 @@ func TestResolveNamespaceList(t *testing.T) {
 			activeNamespaces:   []string{"default", "kube-system", "kube-public"},
 			expectedNamespaces: []string{"kube-system", "kube-public"},
 			preExpandWildcards: true,
+			fromBackup:         true,
 		},
 		{
 			name:               "question mark wildcard pattern",
@@ -1277,6 +1300,7 @@ func TestResolveNamespaceList(t *testing.T) {
 			excludes:           []string{},
 			activeNamespaces:   []string{"ns-1", "ns-2", "ns-10", "default"},
 			expectedNamespaces: []string{"ns-1", "ns-2"},
+			fromBackup:         true,
 		},
 	}
 
@@ -1289,11 +1313,11 @@ func TestResolveNamespaceList(t *testing.T) {
 
 			// Pre-expand wildcards if requested
 			if tc.preExpandWildcards {
-				err := nie.ExpandIncludesExcludes()
+				err := nie.ExpandIncludesExcludes(tc.fromBackup)
 				require.NoError(t, err)
 			}
 
-			namespaces, err := nie.ResolveNamespaceList()
+			namespaces, err := nie.ResolveNamespaceList(tc.fromBackup)
 			require.NoError(t, err)
 
 			// Convert to sets for order-independent comparison
@@ -1311,18 +1335,21 @@ func TestResolveNamespaceListError(t *testing.T) {
 		includes         []string
 		excludes         []string
 		activeNamespaces []string
+		fromBackup       bool
 	}{
 		{
 			name:             "invalid wildcard pattern in includes",
 			includes:         []string{"kube-**"},
 			excludes:         []string{},
 			activeNamespaces: []string{"default"},
+			fromBackup:       true,
 		},
 		{
 			name:             "invalid wildcard pattern in excludes",
 			includes:         []string{"default"},
 			excludes:         []string{"test-**"},
 			activeNamespaces: []string{"default"},
+			fromBackup:       true,
 		},
 	}
 
@@ -1333,7 +1360,7 @@ func TestResolveNamespaceListError(t *testing.T) {
 				Includes(tc.includes...).
 				Excludes(tc.excludes...)
 
-			_, err := nie.ResolveNamespaceList()
+			_, err := nie.ResolveNamespaceList(tc.fromBackup)
 			assert.Error(t, err)
 		})
 	}
@@ -1347,6 +1374,7 @@ func TestNamespaceIncludesExcludesShouldIncludeAfterWildcardExpansion(t *testing
 		activeNamespaces []string
 		testNamespace    string
 		expectedResult   bool
+		fromBackup       bool
 	}{
 		{
 			name:             "wildcard expanded to empty includes - should not include anything",
@@ -1355,6 +1383,7 @@ func TestNamespaceIncludesExcludesShouldIncludeAfterWildcardExpansion(t *testing
 			activeNamespaces: []string{"default", "kube-system"},
 			testNamespace:    "default",
 			expectedResult:   false,
+			fromBackup:       true,
 		},
 		{
 			name:             "wildcard expanded with matches - should include matched namespace",
@@ -1363,6 +1392,7 @@ func TestNamespaceIncludesExcludesShouldIncludeAfterWildcardExpansion(t *testing
 			activeNamespaces: []string{"default", "kube-system", "kube-public"},
 			testNamespace:    "kube-system",
 			expectedResult:   true,
+			fromBackup:       true,
 		},
 		{
 			name:             "wildcard expanded with matches - should not include unmatched namespace",
@@ -1371,6 +1401,7 @@ func TestNamespaceIncludesExcludesShouldIncludeAfterWildcardExpansion(t *testing
 			activeNamespaces: []string{"default", "kube-system", "kube-public"},
 			testNamespace:    "default",
 			expectedResult:   false,
+			fromBackup:       true,
 		},
 		{
 			name:             "no wildcard expansion - empty includes means include all",
@@ -1379,6 +1410,7 @@ func TestNamespaceIncludesExcludesShouldIncludeAfterWildcardExpansion(t *testing
 			activeNamespaces: []string{"default", "kube-system"},
 			testNamespace:    "default",
 			expectedResult:   true,
+			fromBackup:       true,
 		},
 	}
 
@@ -1389,7 +1421,7 @@ func TestNamespaceIncludesExcludesShouldIncludeAfterWildcardExpansion(t *testing
 				Includes(tc.includes...).
 				Excludes(tc.excludes...)
 
-			err := nie.ExpandIncludesExcludes()
+			err := nie.ExpandIncludesExcludes(tc.fromBackup)
 			require.NoError(t, err)
 
 			result := nie.ShouldInclude(tc.testNamespace)

@@ -9,106 +9,141 @@ import (
 
 func TestShouldExpandWildcards(t *testing.T) {
 	tests := []struct {
-		name     string
-		includes []string
-		excludes []string
-		expected bool
+		name       string
+		includes   []string
+		excludes   []string
+		fromBackup bool
+		expected   bool
 	}{
 		{
-			name:     "no wildcards",
-			includes: []string{"ns1", "ns2"},
-			excludes: []string{"ns3", "ns4"},
-			expected: false,
+			name:       "no wildcards",
+			includes:   []string{"ns1", "ns2"},
+			excludes:   []string{"ns3", "ns4"},
+			fromBackup: true,
+			expected:   false,
 		},
 		{
-			name:     "includes has star - should not expand",
-			includes: []string{"*"},
-			excludes: []string{"ns1"},
-			expected: false,
+			name:       "includes has star - should expand",
+			includes:   []string{"*"},
+			excludes:   []string{"ns1"},
+			fromBackup: true,
+			expected:   true,
 		},
 		{
-			name:     "includes has star after a wildcard pattern - should not expand",
-			includes: []string{"ns*", "*"},
-			excludes: []string{"ns1"},
-			expected: false,
+			excludes:   []string{"ns3", "ns4"},
+			fromBackup: true,
+			expected:   false,
 		},
 		{
-			name:     "includes has wildcard pattern",
-			includes: []string{"ns*"},
-			excludes: []string{"ns1"},
-			expected: true,
+			name:       "includes has star - should expand",
+			includes:   []string{"*"},
+			excludes:   []string{"ns1"},
+			fromBackup: true,
+			expected:   true,
 		},
 		{
-			name:     "excludes has wildcard pattern",
-			includes: []string{"ns1"},
-			excludes: []string{"ns*"},
-			expected: true,
+			name:       "includes has star after a wildcard pattern - should expand",
+			includes:   []string{"ns*", "*"},
+			excludes:   []string{"ns1"},
+			fromBackup: true,
+			expected:   true,
 		},
 		{
-			name:     "both have wildcard patterns",
-			includes: []string{"app-*"},
-			excludes: []string{"test-*"},
-			expected: true,
+			name:       "includes has wildcard pattern",
+			includes:   []string{"ns*"},
+			excludes:   []string{"ns1"},
+			fromBackup: true,
+			expected:   true,
 		},
 		{
-			name:     "includes has star and wildcard - star takes precedence",
-			includes: []string{"*", "ns*"},
-			excludes: []string{},
-			expected: false,
+			name:       "excludes has wildcard pattern",
+			includes:   []string{"ns1"},
+			excludes:   []string{"ns*"},
+			fromBackup: true,
+			expected:   true,
 		},
 		{
-			name:     "double asterisk should be detected as wildcard",
-			includes: []string{"**"},
-			excludes: []string{},
-			expected: true, // ** is a wildcard pattern (but will error during validation)
+			name:       "both have wildcard patterns",
+			includes:   []string{"app-*"},
+			excludes:   []string{"test-*"},
+			fromBackup: true,
+			expected:   true,
 		},
 		{
-			name:     "empty slices",
-			includes: []string{},
-			excludes: []string{},
-			expected: false,
+			name:       "includes has star and wildcard - should expand",
+			includes:   []string{"*", "ns*"},
+			excludes:   []string{},
+			fromBackup: true,
+			expected:   true,
 		},
 		{
-			name:     "complex wildcard patterns",
-			includes: []string{"*-prod"},
-			excludes: []string{"test-*-staging"},
-			expected: true,
+			name:       "double asterisk should be detected as wildcard",
+			includes:   []string{"**"},
+			excludes:   []string{},
+			fromBackup: true,
+			expected:   true, // ** is a wildcard pattern (but will error during validation)
 		},
 		{
-			name:     "question mark wildcard",
-			includes: []string{"ns?"},
-			excludes: []string{},
-			expected: true, // question mark is now considered a wildcard
+			name:       "empty slices",
+			includes:   []string{},
+			excludes:   []string{},
+			fromBackup: true,
+			expected:   false,
 		},
 		{
-			name:     "character class wildcard",
-			includes: []string{"ns[abc]"},
-			excludes: []string{},
-			expected: true, // character class is considered wildcard
+			name:       "complex wildcard patterns",
+			includes:   []string{"*-prod"},
+			excludes:   []string{"test-*-staging"},
+			fromBackup: true,
+			expected:   true,
 		},
 		{
-			name:     "brace alternatives wildcard",
-			includes: []string{"ns{prod,staging}"},
-			excludes: []string{},
-			expected: false, // brace alternatives are not supported
+			name:       "question mark wildcard",
+			includes:   []string{"ns?"},
+			excludes:   []string{},
+			fromBackup: true,
+			expected:   true, // question mark is now considered a wildcard
 		},
 		{
-			name:     "dot is literal - not wildcard",
-			includes: []string{"app.prod"},
-			excludes: []string{},
-			expected: false, // dot is literal, not wildcard
+			name:       "character class wildcard",
+			includes:   []string{"ns[abc]"},
+			excludes:   []string{},
+			fromBackup: true,
+			expected:   true, // character class is considered wildcard
 		},
 		{
-			name:     "plus is literal - not wildcard",
-			includes: []string{"app+"},
-			excludes: []string{},
-			expected: false, // plus is literal, not wildcard
+			name:       "brace alternatives wildcard",
+			includes:   []string{"ns{prod,staging}"},
+			excludes:   []string{},
+			fromBackup: true,
+			expected:   false, // brace alternatives are not supported
+		},
+		{
+			name:       "dot is literal - not wildcard",
+			includes:   []string{"app.prod"},
+			excludes:   []string{},
+			fromBackup: true,
+			expected:   false, // dot is literal, not wildcard
+		},
+		{
+			name:       "plus is literal - not wildcard",
+			includes:   []string{"app+"},
+			excludes:   []string{},
+			fromBackup: true,
+			expected:   false, // plus is literal, not wildcard
+		},
+		{
+			name:       "includes has a wildcard pattern from restore - should not expand",
+			includes:   []string{"ns*"},
+			excludes:   []string{"ns1"},
+			fromBackup: false,
+			expected:   false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ShouldExpandWildcards(tt.includes, tt.excludes)
+			result := ShouldExpandWildcards(tt.includes, tt.excludes, tt.fromBackup)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
