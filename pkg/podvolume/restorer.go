@@ -128,6 +128,13 @@ func (r *restorer) RestorePodVolumes(data RestoreData, tracker *volume.RestoreVo
 		return nil
 	}
 
+	// Intentional: one Restic volume fails the whole pod restore (we do not partially restore Kopia volumes).
+	for _, info := range volumesToRestore {
+		if info.repositoryType == velerov1api.BackupRepositoryTypeRestic {
+			return []error{ErrResticFileSystemBackupUnsupported}
+		}
+	}
+
 	if err := nodeagent.IsRunningOnLinux(r.ctx, r.kubeClient, data.Restore.Namespace); err != nil {
 		return []error{errors.Wrapf(err, "error to check node agent status")}
 	}
@@ -166,11 +173,6 @@ func (r *restorer) RestorePodVolumes(data RestoreData, tracker *volume.RestoreVo
 		podVolumes[podVolume.Name] = podVolume
 	}
 
-	repoIdentifier := ""
-	if repositoryType == velerov1api.BackupRepositoryTypeRestic {
-		repoIdentifier = repo.Spec.ResticIdentifier
-	}
-
 	for volume, backupInfo := range volumesToRestore {
 		volumeObj, ok := podVolumes[volume]
 		var pvc *corev1api.PersistentVolumeClaim
@@ -185,7 +187,7 @@ func (r *restorer) RestorePodVolumes(data RestoreData, tracker *volume.RestoreVo
 			}
 		}
 
-		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, backupInfo.snapshotSize, repoIdentifier, backupInfo.uploaderType, data.SourceNamespace, pvc)
+		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, backupInfo.snapshotSize, "", backupInfo.uploaderType, data.SourceNamespace, pvc)
 		if err := veleroclient.CreateRetryGenerateName(r.crClient, r.ctx, volumeRestore); err != nil {
 			errs = append(errs, errors.WithStack(err))
 			continue

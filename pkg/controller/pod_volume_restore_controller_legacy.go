@@ -359,6 +359,8 @@ func (c *PodVolumeRestoreReconcilerLegacy) closeDataPath(ctx context.Context, pv
 	c.dataPathMgr.RemoveAsyncBR(pvbName)
 }
 
-func IsLegacyPVR(pvr *velerov1api.PodVolumeRestore) bool {
-	return pvr.Spec.UploaderType == uploader.ResticType
+// IsLegacyPVR reports whether the PodVolumeRestore uses the legacy async reconcile path.
+// That path existed only for Restic; Restic file-system restore is no longer supported, so this always returns false.
+func IsLegacyPVR(_ *velerov1api.PodVolumeRestore) bool {
+	return false
 }
