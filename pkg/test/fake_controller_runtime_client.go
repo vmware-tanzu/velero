@@ -45,6 +45,7 @@ func NewFakeControllerRuntimeClientBuilder(t *testing.T) *k8sfake.ClientBuilder 
 	require.NoError(t, appsv1api.AddToScheme(scheme))
 	require.NoError(t, snapshotv1api.AddToScheme(scheme))
 	require.NoError(t, storagev1api.AddToScheme(scheme))
+	require.NoError(t, volumegroupsnapshotv1beta1.AddToScheme(scheme))
 
 	return k8sfake.NewClientBuilder().WithScheme(scheme)
 }
