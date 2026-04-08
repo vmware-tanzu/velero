@@ -175,6 +175,102 @@ func TestCheckNotReadyRepo(t *testing.T) {
 		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 		assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
 	})
+
+	// Test that repository invalidated by BSL changes on startup recovers and adopts new BSL config
+	t.Run("repository invalidated by BSL changes on startup recovers", func(t *testing.T) {
+		rr := mockBackupRepositoryCR()
+		rr.Spec.BackupStorageLocation = "default"
+		rr.Spec.VolumeNamespace = "volume-ns-1"
+		rr.Spec.RepositoryType = velerov1api.BackupRepositoryTypeKopia
+		rr.Status.Phase = velerov1api.BackupRepositoryPhaseNotReady
+		rr.Status.Message = msgBSLChangedOnStartup
+		// PrepareRepo SHOULD be called because we recover the repo with new BSL config
+		reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
+		err := reconciler.Client.Create(t.Context(), rr)
+		require.NoError(t, err)
+		location := velerov1api.BackupStorageLocation{
+			Spec: velerov1api.BackupStorageLocationSpec{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
+						Bucket: "new-bucket",
+						Prefix: "new-prefix",
+					},
+				},
+				Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic", "region": "us-west-2"},
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: velerov1api.DefaultNamespace,
+				Name:      rr.Spec.BackupStorageLocation,
+			},
+		}
+
+		ready, err := reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
+		require.NoError(t, err)
+		// Should return true (ready) after recovering the repository
+		assert.True(t, ready)
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
+		assert.Empty(t, rr.Status.Message)
+
+		// Verify the repository still exists and adopted new BSL config
+		recoveredRepo := &velerov1api.BackupRepository{}
+		err = reconciler.Client.Get(t.Context(), types.NamespacedName{
+			Namespace: rr.Namespace,
+			Name:      rr.Name,
+		}, recoveredRepo)
+		require.NoError(t, err, "repository should still exist")
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, recoveredRepo.Status.Phase)
+		assert.Equal(t, "new-bucket", recoveredRepo.Annotations[velerov1api.BSLBucketAnnotation])
+		assert.Equal(t, "new-prefix", recoveredRepo.Annotations[velerov1api.BSLPrefixAnnotation])
+		assert.Contains(t, recoveredRepo.Annotations[velerov1api.BSLConfigAnnotation], "us-west-2")
+	})
+
+	// Test that repository invalidated by BSL changes during runtime recovers and adopts new BSL config
+	t.Run("repository invalidated by BSL changes during runtime recovers", func(t *testing.T) {
+		rr := mockBackupRepositoryCR()
+		rr.Spec.BackupStorageLocation = "default"
+		rr.Spec.VolumeNamespace = "volume-ns-1"
+		rr.Spec.RepositoryType = velerov1api.BackupRepositoryTypeKopia
+		rr.Status.Phase = velerov1api.BackupRepositoryPhaseNotReady
+		rr.Status.Message = msgBSLChanged
+		// PrepareRepo SHOULD be called because we recover the repo with new BSL config
+		reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
+		err := reconciler.Client.Create(t.Context(), rr)
+		require.NoError(t, err)
+		location := velerov1api.BackupStorageLocation{
+			Spec: velerov1api.BackupStorageLocationSpec{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
+						Bucket: "updated-bucket",
+						Prefix: "updated-prefix",
+					},
+				},
+				Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic", "region": "eu-west-1"},
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: velerov1api.DefaultNamespace,
+				Name:      rr.Spec.BackupStorageLocation,
+			},
+		}
+
+		ready, err := reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
+		require.NoError(t, err)
+		// Should return true (ready) after recovering the repository
+		assert.True(t, ready)
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
+		assert.Empty(t, rr.Status.Message)
+
+		// Verify the repository still exists and adopted new BSL config
+		recoveredRepo := &velerov1api.BackupRepository{}
+		err = reconciler.Client.Get(t.Context(), types.NamespacedName{
+			Namespace: rr.Namespace,
+			Name:      rr.Name,
+		}, recoveredRepo)
+		require.NoError(t, err, "repository should still exist")
+		assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, recoveredRepo.Status.Phase)
+		assert.Equal(t, "updated-bucket", recoveredRepo.Annotations[velerov1api.BSLBucketAnnotation])
+		assert.Equal(t, "updated-prefix", recoveredRepo.Annotations[velerov1api.BSLPrefixAnnotation])
+		assert.Contains(t, recoveredRepo.Annotations[velerov1api.BSLConfigAnnotation], "eu-west-1")
+	})
 }
 
 func startMaintenanceJobFail(client.Client, context.Context, *velerov1api.BackupRepository, string, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
@@ -256,6 +352,11 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
+					Annotations: map[string]string{
+						velerov1api.BSLBucketAnnotation: "test-bucket",
+						velerov1api.BSLPrefixAnnotation: "",
+						velerov1api.BSLConfigAnnotation: "{}",
+					},
 				},
 				Spec: velerov1api.BackupRepositorySpec{
 					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
@@ -286,6 +387,11 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
+					Annotations: map[string]string{
+						velerov1api.BSLBucketAnnotation: "test-bucket",
+						velerov1api.BSLPrefixAnnotation: "",
+						velerov1api.BSLConfigAnnotation: "{}",
+					},
 				},
 				Spec: velerov1api.BackupRepositorySpec{
 					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
@@ -322,6 +428,11 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
+					Annotations: map[string]string{
+						velerov1api.BSLBucketAnnotation: "test-bucket",
+						velerov1api.BSLPrefixAnnotation: "",
+						velerov1api.BSLConfigAnnotation: "{}",
+					},
 				},
 				Spec: velerov1api.BackupRepositorySpec{
 					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
@@ -355,6 +466,11 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
+					Annotations: map[string]string{
+						velerov1api.BSLBucketAnnotation: "test-bucket",
+						velerov1api.BSLPrefixAnnotation: "",
+						velerov1api.BSLConfigAnnotation: "{}",
+					},
 				},
 				Spec: velerov1api.BackupRepositorySpec{
 					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
@@ -392,6 +508,11 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
+					Annotations: map[string]string{
+						velerov1api.BSLBucketAnnotation: "test-bucket",
+						velerov1api.BSLPrefixAnnotation: "",
+						velerov1api.BSLConfigAnnotation: "{}",
+					},
 				},
 				Spec: velerov1api.BackupRepositorySpec{
 					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
@@ -503,6 +624,11 @@ func TestBackupRepoReconcile(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
+					Annotations: map[string]string{
+						velerov1api.BSLBucketAnnotation: "test-bucket",
+						velerov1api.BSLPrefixAnnotation: "",
+						velerov1api.BSLConfigAnnotation: "{}",
+					},
 				},
 				Spec: velerov1api.BackupRepositorySpec{
 					MaintenanceFrequency: metav1.Duration{Duration: testMaintenanceFrequency},
@@ -516,6 +642,11 @@ func TestBackupRepoReconcile(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
+					Annotations: map[string]string{
+						velerov1api.BSLBucketAnnotation: "test-bucket",
+						velerov1api.BSLPrefixAnnotation: "",
+						velerov1api.BSLConfigAnnotation: "{}",
+					},
 				},
 				Spec: velerov1api.BackupRepositorySpec{
 					MaintenanceFrequency: metav1.Duration{Duration: testMaintenanceFrequency},
@@ -1489,6 +1620,11 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
+					Annotations: map[string]string{
+						velerov1api.BSLBucketAnnotation: "test-bucket",
+						velerov1api.BSLPrefixAnnotation: "",
+						velerov1api.BSLConfigAnnotation: "{}",
+					},
 				},
 				Spec: velerov1api.BackupRepositorySpec{
 					MaintenanceFrequency:  metav1.Duration{Duration: testMaintenanceFrequency},
@@ -1497,7 +1633,8 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 					RepositoryType:        "restic",
 				},
 				Status: velerov1api.BackupRepositoryStatus{
-					Phase: velerov1api.BackupRepositoryPhaseReady,
+					Phase:               velerov1api.BackupRepositoryPhaseReady,
+					LastMaintenanceTime: &metav1.Time{Time: time.Now()},
 				},
 			},
 			expectedKeptJobs: 5,
@@ -1509,7 +1646,7 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 				*builder.ForJob("velero", "job-05").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
 				*builder.ForJob("velero", "job-06").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
 			},
-			bsl: builder.ForBackupStorageLocation("velero", "default").Result(),
+			bsl: builder.ForBackupStorageLocation("velero", "default").Provider("aws").Bucket("test-bucket").Result(),
 			repoMaintenanceJob: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
@@ -1526,6 +1663,11 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
+					Annotations: map[string]string{
+						velerov1api.BSLBucketAnnotation: "test-bucket",
+						velerov1api.BSLPrefixAnnotation: "",
+						velerov1api.BSLConfigAnnotation: "{}",
+					},
 				},
 				Spec: velerov1api.BackupRepositorySpec{
 					MaintenanceFrequency:  metav1.Duration{Duration: testMaintenanceFrequency},
@@ -1534,7 +1676,8 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 					RepositoryType:        "restic",
 				},
 				Status: velerov1api.BackupRepositoryStatus{
-					Phase: velerov1api.BackupRepositoryPhaseReady,
+					Phase:               velerov1api.BackupRepositoryPhaseReady,
+					LastMaintenanceTime: &metav1.Time{Time: time.Now()},
 				},
 			},
 			expectedKeptJobs: 2,
@@ -1543,7 +1686,7 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 				*builder.ForJob("velero", "job-02").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
 				*builder.ForJob("velero", "job-03").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
 			},
-			bsl: builder.ForBackupStorageLocation("velero", "default").Result(),
+			bsl: builder.ForBackupStorageLocation("velero", "default").Provider("aws").Bucket("test-bucket").Result(),
 			repoMaintenanceJob: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
@@ -1590,7 +1733,21 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 				nil,
 			)
 
+			// First reconciliation will run startup validation and may invalidate the repo
 			_, err := reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: "repo"}})
+			require.NoError(t, err)
+
+			// Get the updated repo and clear any invalidation message
+			updatedRepo := &velerov1api.BackupRepository{}
+			require.NoError(t, reconciler.Client.Get(t.Context(), types.NamespacedName{Namespace: test.repo.Namespace, Name: "repo"}, updatedRepo))
+			if updatedRepo.Status.Message != "" {
+				updatedRepo.Status.Phase = velerov1api.BackupRepositoryPhaseReady
+				updatedRepo.Status.Message = ""
+				require.NoError(t, reconciler.Client.Update(t.Context(), updatedRepo))
+			}
+
+			// Second reconciliation should now process the Ready repo and delete old jobs
+			_, err = reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: "repo"}})
 			require.NoError(t, err)
 
 			jobList := new(batchv1api.JobList)
@@ -1945,4 +2102,333 @@ func getMaintenanceDurationCount(t *testing.T, m *metrics.ServerMetrics, repoNam
 		}
 	}
 	return 0
+}
+
+// TestValidateBackupRepositoriesOnStartup tests the validation logic that
+// checks BSL configurations on startup
+func TestValidateBackupRepositoriesOnStartup(t *testing.T) {
+	tests := []struct {
+		name            string
+		repos           []*velerov1api.BackupRepository
+		bsls            []*velerov1api.BackupStorageLocation
+		expectedInvalid int
+	}{
+		{
+			name: "repository with matching annotations is not invalidated",
+			repos: []*velerov1api.BackupRepository{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "repo-1",
+						Namespace: velerov1api.DefaultNamespace,
+						Annotations: map[string]string{
+							velerov1api.BSLBucketAnnotation: "test-bucket",
+							velerov1api.BSLPrefixAnnotation: "test-prefix",
+							velerov1api.BSLConfigAnnotation: "{}",
+						},
+					},
+					Spec: velerov1api.BackupRepositorySpec{
+						BackupStorageLocation: "bsl-1",
+						RepositoryType:        velerov1api.BackupRepositoryTypeKopia,
+						VolumeNamespace:       "repo-1",
+					},
+					Status: velerov1api.BackupRepositoryStatus{
+						Phase: velerov1api.BackupRepositoryPhaseReady,
+					},
+				},
+			},
+			bsls: []*velerov1api.BackupStorageLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bsl-1",
+						Namespace: velerov1api.DefaultNamespace,
+					},
+					Spec: velerov1api.BackupStorageLocationSpec{
+						Provider: "aws",
+						StorageType: velerov1api.StorageType{
+							ObjectStorage: &velerov1api.ObjectStorageLocation{
+								Bucket: "test-bucket",
+								Prefix: "test-prefix",
+							},
+						},
+					},
+				},
+			},
+			expectedInvalid: 0,
+		},
+		{
+			name: "repository with different bucket is invalidated",
+			repos: []*velerov1api.BackupRepository{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "repo-1",
+						Namespace: velerov1api.DefaultNamespace,
+						Annotations: map[string]string{
+							velerov1api.BSLBucketAnnotation: "old-bucket",
+							velerov1api.BSLPrefixAnnotation: "test-prefix",
+							velerov1api.BSLConfigAnnotation: "{}",
+						},
+					},
+					Spec: velerov1api.BackupRepositorySpec{
+						BackupStorageLocation: "bsl-1",
+					},
+					Status: velerov1api.BackupRepositoryStatus{
+						Phase: velerov1api.BackupRepositoryPhaseReady,
+					},
+				},
+			},
+			bsls: []*velerov1api.BackupStorageLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bsl-1",
+						Namespace: velerov1api.DefaultNamespace,
+					},
+					Spec: velerov1api.BackupStorageLocationSpec{
+						Provider: "aws",
+						StorageType: velerov1api.StorageType{
+							ObjectStorage: &velerov1api.ObjectStorageLocation{
+								Bucket: "new-bucket",
+								Prefix: "test-prefix",
+							},
+						},
+					},
+				},
+			},
+			expectedInvalid: 1,
+		},
+		{
+			name: "repository with missing annotations is invalidated",
+			repos: []*velerov1api.BackupRepository{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "repo-1",
+						Namespace: velerov1api.DefaultNamespace,
+					},
+					Spec: velerov1api.BackupRepositorySpec{
+						BackupStorageLocation: "bsl-1",
+					},
+					Status: velerov1api.BackupRepositoryStatus{
+						Phase: velerov1api.BackupRepositoryPhaseReady,
+					},
+				},
+			},
+			bsls: []*velerov1api.BackupStorageLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bsl-1",
+						Namespace: velerov1api.DefaultNamespace,
+					},
+					Spec: velerov1api.BackupStorageLocationSpec{
+						Provider: "aws",
+						StorageType: velerov1api.StorageType{
+							ObjectStorage: &velerov1api.ObjectStorageLocation{
+								Bucket: "test-bucket",
+							},
+						},
+					},
+				},
+			},
+			expectedInvalid: 1,
+		},
+		{
+			name: "new repository is not invalidated",
+			repos: []*velerov1api.BackupRepository{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "repo-1",
+						Namespace: velerov1api.DefaultNamespace,
+					},
+					Spec: velerov1api.BackupRepositorySpec{
+						BackupStorageLocation: "bsl-1",
+					},
+					Status: velerov1api.BackupRepositoryStatus{
+						Phase: velerov1api.BackupRepositoryPhaseNew,
+					},
+				},
+			},
+			bsls: []*velerov1api.BackupStorageLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bsl-1",
+						Namespace: velerov1api.DefaultNamespace,
+					},
+				},
+			},
+			expectedInvalid: 0,
+		},
+		{
+			name: "repository with changed config is invalidated",
+			repos: []*velerov1api.BackupRepository{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "repo-1",
+						Namespace: velerov1api.DefaultNamespace,
+						Annotations: map[string]string{
+							velerov1api.BSLBucketAnnotation: "test-bucket",
+							velerov1api.BSLPrefixAnnotation: "test-prefix",
+							velerov1api.BSLConfigAnnotation: `{"key1":"value1"}`,
+						},
+					},
+					Spec: velerov1api.BackupRepositorySpec{
+						BackupStorageLocation: "bsl-1",
+					},
+					Status: velerov1api.BackupRepositoryStatus{
+						Phase: velerov1api.BackupRepositoryPhaseReady,
+					},
+				},
+			},
+			bsls: []*velerov1api.BackupStorageLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bsl-1",
+						Namespace: velerov1api.DefaultNamespace,
+					},
+					Spec: velerov1api.BackupStorageLocationSpec{
+						Provider: "aws",
+						StorageType: velerov1api.StorageType{
+							ObjectStorage: &velerov1api.ObjectStorageLocation{
+								Bucket: "test-bucket",
+								Prefix: "test-prefix",
+							},
+						},
+						Config: map[string]string{
+							"key1": "value2", // Different value
+						},
+					},
+				},
+			},
+			expectedInvalid: 1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var objs []client.Object
+			for _, repo := range test.repos {
+				objs = append(objs, repo)
+			}
+			for _, bsl := range test.bsls {
+				objs = append(objs, bsl)
+			}
+
+			fakeClient := velerotest.NewFakeControllerRuntimeClientBuilder(t).
+				WithObjects(objs...).
+				Build()
+
+			reconciler := &BackupRepoReconciler{
+				Client: fakeClient,
+				logger: velerotest.NewLogger(),
+			}
+
+			err := reconciler.validateBackupRepositoriesOnStartup(t.Context())
+			require.NoError(t, err)
+
+			// Check if the expected number of repositories were invalidated
+			invalidCount := 0
+			for _, repo := range test.repos {
+				updatedRepo := &velerov1api.BackupRepository{}
+				err := fakeClient.Get(t.Context(), types.NamespacedName{
+					Namespace: repo.Namespace,
+					Name:      repo.Name,
+				}, updatedRepo)
+				require.NoError(t, err)
+
+				if updatedRepo.Status.Phase == velerov1api.BackupRepositoryPhaseNotReady &&
+					updatedRepo.Status.Message == msgBSLChangedOnStartup {
+					invalidCount++
+				}
+			}
+			assert.Equal(t, test.expectedInvalid, invalidCount)
+		})
+	}
+}
+
+// TestNeedInvalidBackupRepoOnStartup tests the helper function that checks
+// if a repository needs invalidation based on BSL changes
+func TestNeedInvalidBackupRepoOnStartup(t *testing.T) {
+	tests := []struct {
+		name     string
+		repo     *velerov1api.BackupRepository
+		bsl      *velerov1api.BackupStorageLocation
+		expected bool
+	}{
+		{
+			name: "matching annotations returns false",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						velerov1api.BSLBucketAnnotation: "test-bucket",
+						velerov1api.BSLPrefixAnnotation: "test-prefix",
+						velerov1api.BSLConfigAnnotation: "{}",
+					},
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					RepositoryType: velerov1api.BackupRepositoryTypeKopia,
+				},
+			},
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "test-bucket",
+							Prefix: "test-prefix",
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "different bucket returns true",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						velerov1api.BSLBucketAnnotation: "old-bucket",
+					},
+				},
+			},
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "new-bucket",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "different CACert returns true",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						velerov1api.BSLBucketAnnotation: "test-bucket",
+						velerov1api.BSLCACertAnnotation: "old-cert",
+					},
+				},
+			},
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "test-bucket",
+							CACert: []byte("new-cert"),
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			reconciler := &BackupRepoReconciler{
+				logger: velerotest.NewLogger(),
+			}
+
+			result := reconciler.needInvalidBackupRepoOnStartup(test.repo, test.bsl)
+			assert.Equal(t, test.expected, result)
+		})
+	}
 }
