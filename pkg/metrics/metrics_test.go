@@ -259,6 +259,90 @@ func TestMultipleAdhocBackupsShareMetrics(t *testing.T) {
 	assert.Equal(t, float64(1), validationFailureMetric, "All adhoc validation failures should be counted together")
 }
 
+// TestSetScheduleExpectedIntervalSeconds verifies that the expected interval metric
+// is properly recorded for schedules.
+func TestSetScheduleExpectedIntervalSeconds(t *testing.T) {
+	tests := []struct {
+		name            string
+		scheduleName    string
+		intervalSeconds float64
+		description     string
+	}{
+		{
+			name:            "every 5 minutes schedule",
+			scheduleName:    "frequent-backup",
+			intervalSeconds: 300,
+			description:     "Expected interval should be 5m in seconds",
+		},
+		{
+			name:            "daily schedule",
+			scheduleName:    "daily-backup",
+			intervalSeconds: 86400,
+			description:     "Expected interval should be 24h in seconds",
+		},
+		{
+			name:            "monthly schedule",
+			scheduleName:    "monthly-backup",
+			intervalSeconds: 2678400, // 31 days in seconds
+			description:     "Expected interval should be 31 days in seconds",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := NewServerMetrics()
+			m.SetScheduleExpectedIntervalSeconds(tc.scheduleName, tc.intervalSeconds)
+
+			metric := getMetricValue(t, m.metrics[scheduleExpectedIntervalSeconds].(*prometheus.GaugeVec), tc.scheduleName)
+			assert.Equal(t, tc.intervalSeconds, metric, tc.description)
+		})
+	}
+}
+
+// TestScheduleExpectedIntervalNotInitializedByDefault verifies that the expected
+// interval metric is not initialized by InitSchedule, so it only appears for
+// schedules with a valid cron expression.
+func TestScheduleExpectedIntervalNotInitializedByDefault(t *testing.T) {
+	m := NewServerMetrics()
+	m.InitSchedule("test-schedule")
+
+	// The metric should not have any values after InitSchedule
+	ch := make(chan prometheus.Metric, 1)
+	m.metrics[scheduleExpectedIntervalSeconds].(*prometheus.GaugeVec).Collect(ch)
+	close(ch)
+
+	count := 0
+	for range ch {
+		count++
+	}
+	assert.Equal(t, 0, count, "scheduleExpectedIntervalSeconds should not be initialized by InitSchedule")
+}
+
+// TestRemoveScheduleCleansUpExpectedInterval verifies that RemoveSchedule
+// cleans up the expected interval metric.
+func TestRemoveScheduleCleansUpExpectedInterval(t *testing.T) {
+	m := NewServerMetrics()
+	m.InitSchedule("test-schedule")
+	m.SetScheduleExpectedIntervalSeconds("test-schedule", 3600)
+
+	// Verify metric exists
+	metric := getMetricValue(t, m.metrics[scheduleExpectedIntervalSeconds].(*prometheus.GaugeVec), "test-schedule")
+	assert.Equal(t, float64(3600), metric)
+
+	// Remove schedule and verify metric is cleaned up
+	m.RemoveSchedule("test-schedule")
+
+	ch := make(chan prometheus.Metric, 1)
+	m.metrics[scheduleExpectedIntervalSeconds].(*prometheus.GaugeVec).Collect(ch)
+	close(ch)
+
+	count := 0
+	for range ch {
+		count++
+	}
+	assert.Equal(t, 0, count, "scheduleExpectedIntervalSeconds should be removed after RemoveSchedule")
+}
+
 // TestInitScheduleWithEmptyName verifies that InitSchedule works correctly
 // with an empty schedule name (for adhoc backups).
 func TestInitScheduleWithEmptyName(t *testing.T) {

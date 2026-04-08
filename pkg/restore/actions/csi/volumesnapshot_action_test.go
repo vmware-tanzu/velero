@@ -17,9 +17,11 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
+	volumegroupsnapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumegroupsnapshot/v1beta1"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -27,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -218,4 +221,245 @@ func TestNewVolumeSnapshotRestoreItemAction(t *testing.T) {
 	plugin1 := NewVolumeSnapshotRestoreItemAction(f1)
 	_, err1 := plugin1(logger)
 	require.NoError(t, err1)
+}
+
+func TestEnsureStubVGSCExists(t *testing.T) {
+	testDriver := "rbd.csi.ceph.com"
+	testVGSHandle := "vgs-handle-123"
+	testSnapshotHandle := "snap-handle-456"
+
+	tests := []struct {
+		name           string
+		vs             *snapshotv1api.VolumeSnapshot
+		restore        *velerov1api.Restore
+		existingVGSC   *volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent
+		expectVGSC     bool
+		expectErr      bool
+		expectedHandle string
+	}{
+		{
+			name: "VS without VolumeGroupSnapshotHandle annotation - no VGSC created",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-vs",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						velerov1api.VolumeSnapshotHandleAnnotation: testSnapshotHandle,
+						velerov1api.DriverNameAnnotation:           testDriver,
+					},
+				},
+			},
+			restore:    builder.ForRestore("velero", "restore").ObjectMeta(builder.WithUID("restore-uid")).Result(),
+			expectVGSC: false,
+			expectErr:  false,
+		},
+		{
+			name: "VS with VolumeGroupSnapshotHandle but no SnapshotHandle - no VGSC created",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-vs",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						velerov1api.VolumeGroupSnapshotHandleAnnotation: testVGSHandle,
+						velerov1api.DriverNameAnnotation:                testDriver,
+					},
+				},
+			},
+			restore:    builder.ForRestore("velero", "restore").ObjectMeta(builder.WithUID("restore-uid")).Result(),
+			expectVGSC: false,
+			expectErr:  false,
+		},
+		{
+			name: "VS with VolumeGroupSnapshotHandle but no Driver annotation - no VGSC created",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-vs",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						velerov1api.VolumeGroupSnapshotHandleAnnotation: testVGSHandle,
+						velerov1api.VolumeSnapshotHandleAnnotation:      testSnapshotHandle,
+					},
+				},
+			},
+			restore:    builder.ForRestore("velero", "restore").ObjectMeta(builder.WithUID("restore-uid")).Result(),
+			expectVGSC: false,
+			expectErr:  false,
+		},
+		{
+			name: "VS with all required annotations - VGSC should be created",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-vs",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						velerov1api.VolumeGroupSnapshotHandleAnnotation: testVGSHandle,
+						velerov1api.VolumeSnapshotHandleAnnotation:      testSnapshotHandle,
+						velerov1api.DriverNameAnnotation:                testDriver,
+					},
+				},
+			},
+			restore:        builder.ForRestore("velero", "restore").ObjectMeta(builder.WithUID("restore-uid")).Result(),
+			expectVGSC:     true,
+			expectErr:      false,
+			expectedHandle: testSnapshotHandle,
+		},
+		{
+			name: "VGSC already exists - should add snapshot handle",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-vs-2",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						velerov1api.VolumeGroupSnapshotHandleAnnotation: testVGSHandle,
+						velerov1api.VolumeSnapshotHandleAnnotation:      "snap-handle-789",
+						velerov1api.DriverNameAnnotation:                testDriver,
+					},
+				},
+			},
+			restore: builder.ForRestore("velero", "restore").ObjectMeta(builder.WithUID("restore-uid")).Result(),
+			existingVGSC: &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: util.GenerateSha256FromRestoreUIDAndVsName("restore-uid", testVGSHandle),
+				},
+				Spec: volumegroupsnapshotv1beta1.VolumeGroupSnapshotContentSpec{
+					Driver:         testDriver,
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+					Source: volumegroupsnapshotv1beta1.VolumeGroupSnapshotContentSource{
+						GroupSnapshotHandles: &volumegroupsnapshotv1beta1.GroupSnapshotHandles{
+							VolumeGroupSnapshotHandle: testVGSHandle,
+							VolumeSnapshotHandles:     []string{testSnapshotHandle},
+						},
+					},
+				},
+			},
+			expectVGSC:     true,
+			expectErr:      false,
+			expectedHandle: "snap-handle-789",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			crClient := velerotest.NewFakeControllerRuntimeClient(t)
+
+			// Create existing VGSC if provided
+			if tc.existingVGSC != nil {
+				require.NoError(t, crClient.Create(context.Background(), tc.existingVGSC))
+			}
+
+			p := &volumeSnapshotRestoreItemAction{
+				log:      logrus.StandardLogger(),
+				crClient: crClient,
+			}
+
+			err := p.ensureStubVGSCExists(context.Background(), tc.vs, tc.restore)
+
+			if tc.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			// Check if VGSC was created/updated
+			vgscName := util.GenerateSha256FromRestoreUIDAndVsName(string(tc.restore.UID), tc.vs.Annotations[velerov1api.VolumeGroupSnapshotHandleAnnotation])
+			vgsc := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent{}
+			getErr := crClient.Get(context.Background(), crclient.ObjectKey{Name: vgscName}, vgsc)
+
+			if tc.expectVGSC {
+				require.NoError(t, getErr)
+				require.NotNil(t, vgsc.Spec.Source.GroupSnapshotHandles)
+				require.Contains(t, vgsc.Spec.Source.GroupSnapshotHandles.VolumeSnapshotHandles, tc.expectedHandle)
+			} else {
+				// If no VGSC expected, it's okay if Get returns not found or if vgscName is empty
+				if tc.vs.Annotations[velerov1api.VolumeGroupSnapshotHandleAnnotation] != "" {
+					require.Error(t, getErr)
+				}
+			}
+		})
+	}
+}
+
+func TestAddSnapshotHandleToVGSC(t *testing.T) {
+	testDriver := "rbd.csi.ceph.com"
+	testVGSHandle := "vgs-handle-123"
+
+	tests := []struct {
+		name                    string
+		existingHandles         []string
+		nilGroupSnapshotHandles bool
+		newHandle               string
+		expectedHandles         []string
+	}{
+		{
+			name:            "Add new handle to empty list",
+			existingHandles: []string{},
+			newHandle:       "snap-1",
+			expectedHandles: []string{"snap-1"},
+		},
+		{
+			name:            "Add new handle to existing list",
+			existingHandles: []string{"snap-1"},
+			newHandle:       "snap-2",
+			expectedHandles: []string{"snap-1", "snap-2"},
+		},
+		{
+			name:            "Handle already exists - no change",
+			existingHandles: []string{"snap-1", "snap-2"},
+			newHandle:       "snap-1",
+			expectedHandles: []string{"snap-1", "snap-2"},
+		},
+		{
+			name:                    "Nil GroupSnapshotHandles - should initialize and add",
+			nilGroupSnapshotHandles: true,
+			newHandle:               "snap-1",
+			expectedHandles:         []string{"snap-1"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			crClient := velerotest.NewFakeControllerRuntimeClient(t)
+
+			var source volumegroupsnapshotv1beta1.VolumeGroupSnapshotContentSource
+			if tc.nilGroupSnapshotHandles {
+				source = volumegroupsnapshotv1beta1.VolumeGroupSnapshotContentSource{}
+			} else {
+				source = volumegroupsnapshotv1beta1.VolumeGroupSnapshotContentSource{
+					GroupSnapshotHandles: &volumegroupsnapshotv1beta1.GroupSnapshotHandles{
+						VolumeGroupSnapshotHandle: testVGSHandle,
+						VolumeSnapshotHandles:     tc.existingHandles,
+					},
+				}
+			}
+
+			existingVGSC := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-vgsc",
+				},
+				Spec: volumegroupsnapshotv1beta1.VolumeGroupSnapshotContentSpec{
+					Driver:         testDriver,
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+					Source:         source,
+				},
+			}
+			require.NoError(t, crClient.Create(context.Background(), existingVGSC))
+
+			// Re-fetch to get the created object with proper metadata
+			fetchedVGSC := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent{}
+			require.NoError(t, crClient.Get(context.Background(), crclient.ObjectKey{Name: "test-vgsc"}, fetchedVGSC))
+
+			p := &volumeSnapshotRestoreItemAction{
+				log:      logrus.StandardLogger(),
+				crClient: crClient,
+			}
+
+			err := p.addSnapshotHandleToVGSC(context.Background(), fetchedVGSC, tc.newHandle)
+			require.NoError(t, err)
+
+			// Verify the VGSC has expected handles
+			updatedVGSC := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent{}
+			require.NoError(t, crClient.Get(context.Background(), crclient.ObjectKey{Name: "test-vgsc"}, updatedVGSC))
+			require.ElementsMatch(t, tc.expectedHandles, updatedVGSC.Spec.Source.GroupSnapshotHandles.VolumeSnapshotHandles)
+		})
+	}
 }

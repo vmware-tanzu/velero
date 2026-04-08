@@ -441,6 +441,12 @@ var _ = Describe(
 )
 
 var _ = Describe(
+	"Restore phase does not block at Finalizing when a container has multiple exec hooks",
+	Label("Basic", "Hooks"),
+	RestoreExecHooksTest,
+)
+
+var _ = Describe(
 	"Backup/restore of 2500 namespaces",
 	Label("Scale", "LongTime"),
 	MultiNSBackupRestore,
@@ -493,6 +499,11 @@ var _ = Describe(
 	"Velero test on include namespace from the cluster restore",
 	Label("ResourceFiltering", "IncludeNamespaces", "Restore"),
 	RestoreWithIncludeNamespaces,
+)
+var _ = Describe(
+	"Velero test on backup/restore with wildcard namespaces",
+	Label("ResourceFiltering", "WildcardNamespaces"),
+	WildcardNamespacesTest,
 )
 var _ = Describe(
 	"Velero test on include resources from the cluster backup",

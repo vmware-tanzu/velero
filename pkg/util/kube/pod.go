@@ -40,10 +40,12 @@ type LoadAffinity struct {
 }
 
 type PodResources struct {
-	CPURequest    string `json:"cpuRequest,omitempty"`
-	MemoryRequest string `json:"memoryRequest,omitempty"`
-	CPULimit      string `json:"cpuLimit,omitempty"`
-	MemoryLimit   string `json:"memoryLimit,omitempty"`
+	CPURequest              string `json:"cpuRequest,omitempty"`
+	CPULimit                string `json:"cpuLimit,omitempty"`
+	MemoryRequest           string `json:"memoryRequest,omitempty"`
+	MemoryLimit             string `json:"memoryLimit,omitempty"`
+	EphemeralStorageRequest string `json:"ephemeralStorageRequest,omitempty"`
+	EphemeralStorageLimit   string `json:"ephemeralStorageLimit,omitempty"`
 }
 
 // IsPodRunning does a well-rounded check to make sure the specified pod is running stably.

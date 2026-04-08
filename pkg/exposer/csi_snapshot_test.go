@@ -467,6 +467,23 @@ func TestExpose(t *testing.T) {
 				daemonSet,
 				scObj,
 			},
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"windows"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			name:        "success-with-labels",
@@ -487,6 +504,23 @@ func TestExpose(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				daemonSet,
 				scObj,
+			},
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"windows"},
+									},
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 		{
@@ -511,6 +545,23 @@ func TestExpose(t *testing.T) {
 				scObj,
 			},
 			expectedVolumeSize: resource.NewQuantity(567890, ""),
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"windows"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			name:        "backupPod mounts read only backupPVC",
@@ -539,6 +590,23 @@ func TestExpose(t *testing.T) {
 				scObj,
 			},
 			expectedReadOnlyPVC: true,
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"windows"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			name:        "backupPod mounts read only backupPVC and storageClass specified in backupPVC config",
@@ -568,6 +636,23 @@ func TestExpose(t *testing.T) {
 			},
 			expectedReadOnlyPVC:           true,
 			expectedBackupPVCStorageClass: "fake-sc-read-only",
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"windows"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			name:        "backupPod mounts backupPVC with storageClass specified in backupPVC config",
@@ -595,6 +680,23 @@ func TestExpose(t *testing.T) {
 				scObj,
 			},
 			expectedBackupPVCStorageClass: "fake-sc-read-only",
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"windows"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			name:        "Affinity per StorageClass",
@@ -640,6 +742,11 @@ func TestExpose(t *testing.T) {
 										Key:      "kubernetes.io/os",
 										Operator: corev1api.NodeSelectorOpIn,
 										Values:   []string{"Linux"},
+									},
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"windows"},
 									},
 								},
 							},
@@ -699,6 +806,11 @@ func TestExpose(t *testing.T) {
 										Operator: corev1api.NodeSelectorOpIn,
 										Values:   []string{"amd64"},
 									},
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"windows"},
+									},
 								},
 							},
 						},
@@ -733,7 +845,23 @@ func TestExpose(t *testing.T) {
 				scObj,
 			},
 			expectedBackupPVCStorageClass: "fake-sc-read-only",
-			expectedAffinity:              nil,
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"windows"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			name:        "IntolerateSourceNode, get source node fail",
@@ -770,7 +898,23 @@ func TestExpose(t *testing.T) {
 					},
 				},
 			},
-			expectedAffinity:      nil,
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"windows"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 			expectedPVCAnnotation: nil,
 		},
 		{
@@ -799,7 +943,23 @@ func TestExpose(t *testing.T) {
 				daemonSet,
 				scObj,
 			},
-			expectedAffinity:      nil,
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"windows"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 			expectedPVCAnnotation: map[string]string{util.VSphereCNSFastCloneAnno: "true"},
 		},
 		{
@@ -836,6 +996,11 @@ func TestExpose(t *testing.T) {
 						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
 							{
 								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"windows"},
+									},
 									{
 										Key:      "kubernetes.io/hostname",
 										Operator: corev1api.NodeSelectorOpNotIn,
@@ -929,6 +1094,8 @@ func TestExpose(t *testing.T) {
 
 				if test.expectedAffinity != nil {
 					assert.Equal(t, test.expectedAffinity, backupPod.Spec.Affinity)
+				} else {
+					assert.Nil(t, backupPod.Spec.Affinity)
 				}
 
 				if test.expectedPVCAnnotation != nil {

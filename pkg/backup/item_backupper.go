@@ -40,7 +40,6 @@ import (
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/volume"
-	"github.com/vmware-tanzu/velero/internal/volumehelper"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -54,6 +53,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	csiutil "github.com/vmware-tanzu/velero/pkg/util/csi"
+	"github.com/vmware-tanzu/velero/pkg/util/volumehelper"
 )
 
 const (
@@ -244,6 +244,14 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		return false, itemFiles, kubeerrs.NewAggregate(backupErrs)
 	}
 
+	// If err is nil and updatedObj is nil, it means the item is skipped by plugin action,
+	// we should return here to avoid backing up the item, and avoid potential NPE in the following code.
+	if updatedObj == nil {
+		log.Infof("Remove item from the backup's backupItems list and totalItems list because it's skipped by plugin action.")
+		ib.backupRequest.BackedUpItems.DeleteItem(key)
+		return false, itemFiles, nil
+	}
+
 	itemFiles = append(itemFiles, additionalItemFiles...)
 	obj = updatedObj
 	if metadata, err = meta.Accessor(obj); err != nil {
@@ -398,6 +406,13 @@ func (ib *itemBackupper) executeActions(
 		}
 
 		u := &unstructured.Unstructured{Object: updatedItem.UnstructuredContent()}
+
+		if _, ok := u.GetAnnotations()[velerov1api.SkipFromBackupAnnotation]; ok {
+			log.Infof("Resource (groupResource=%s, namespace=%s, name=%s) is skipped from backup by action %s.",
+				groupResource.String(), namespace, name, actionName)
+			return nil, itemFiles, nil
+		}
+
 		if actionName == csiBIAPluginName {
 			if additionalItemIdentifiers == nil && u.GetAnnotations()[velerov1api.SkippedNoCSIPVAnnotation] == "true" {
 				// snapshot was skipped by CSI plugin

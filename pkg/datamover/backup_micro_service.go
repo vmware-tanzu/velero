@@ -310,6 +310,7 @@ func (r *BackupMicroService) cancelDataUpload(du *velerov2alpha1api.DataUpload) 
 	fsBackup := r.dataPathMgr.GetAsyncBR(du.Name)
 	if fsBackup == nil {
 		r.OnDataUploadCancelled(r.ctx, du.GetNamespace(), du.GetName())
+		r.eventRecorder.EndingEvent(du, false, datapath.EventReasonStopped, "Data path for %s exited without start", du.Name)
 	} else {
 		fsBackup.Cancel()
 	}

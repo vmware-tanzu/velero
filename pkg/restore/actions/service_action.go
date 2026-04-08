@@ -94,21 +94,18 @@ func deleteHealthCheckNodePort(service *corev1api.Service) error {
 
 	// Search HealthCheckNodePort from server's last-applied-configuration
 	// annotation(HealthCheckNodePort is specified by `kubectl apply` command)
-	lastAppliedConfig, ok := service.Annotations[annotationLastAppliedConfig]
-	if ok {
-		appliedServiceUnstructured := new(map[string]any)
-		if err := json.Unmarshal([]byte(lastAppliedConfig), appliedServiceUnstructured); err != nil {
+	if lastAppliedConfig, ok := service.Annotations[annotationLastAppliedConfig]; ok {
+		var appliedConfig struct {
+			Spec struct {
+				HealthCheckNodePort *int32 `json:"healthCheckNodePort"`
+			} `json:"spec"`
+		}
+
+		if err := json.Unmarshal([]byte(lastAppliedConfig), &appliedConfig); err != nil {
 			return errors.WithStack(err)
 		}
 
-		healthCheckNodePort, exist, err := unstructured.NestedFloat64(*appliedServiceUnstructured, "spec", "healthCheckNodePort")
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		// Found healthCheckNodePort in lastAppliedConfig annotation,
-		// and the value is not 0. No need to delete, return.
-		if exist && healthCheckNodePort != 0 {
+		if appliedConfig.Spec.HealthCheckNodePort != nil && *appliedConfig.Spec.HealthCheckNodePort != 0 {
 			return nil
 		}
 	}

@@ -35,6 +35,7 @@ type BlockOutput struct {
 	*restore.FilesystemOutput
 
 	targetFileName string
+	targetFile     *os.File
 }
 
 var _ restore.Output = &BlockOutput{}
@@ -52,7 +53,7 @@ func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remote
 	if err != nil {
 		return errors.Wrapf(err, "failed to open file %s", o.targetFileName)
 	}
-	defer targetFile.Close()
+	o.targetFile = targetFile
 
 	buffer := make([]byte, bufferSize)
 
@@ -97,6 +98,26 @@ func (o *BlockOutput) BeginDirectory(ctx context.Context, relativePath string, e
 
 	if (fileInfo.Sys().(*syscall.Stat_t).Mode & syscall.S_IFMT) != syscall.S_IFBLK {
 		return errors.Errorf("target file %s is not a block device", o.TargetPath)
+	}
+
+	return nil
+}
+
+func (o *BlockOutput) Flush() error {
+	if o.targetFile != nil {
+		if err := o.targetFile.Sync(); err != nil {
+			return errors.Wrapf(err, "error syncing block dev %v", o.targetFileName)
+		}
+	}
+
+	return nil
+}
+
+func (o *BlockOutput) Terminate() error {
+	if o.targetFile != nil {
+		if err := o.targetFile.Close(); err != nil {
+			return errors.Wrapf(err, "error closing block dev %v", o.targetFileName)
+		}
 	}
 
 	return nil

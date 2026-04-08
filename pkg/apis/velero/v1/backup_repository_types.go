@@ -35,8 +35,7 @@ type BackupRepositorySpec struct {
 	// +optional
 	RepositoryType string `json:"repositoryType"`
 
-	// ResticIdentifier is the full restic-compatible string for identifying
-	// this repository. This field is only used when RepositoryType is "restic".
+	// Deprecated
 	// +optional
 	ResticIdentifier string `json:"resticIdentifier,omitempty"`
 
@@ -58,8 +57,7 @@ const (
 	BackupRepositoryPhaseReady    BackupRepositoryPhase = "Ready"
 	BackupRepositoryPhaseNotReady BackupRepositoryPhase = "NotReady"
 
-	BackupRepositoryTypeRestic string = "restic"
-	BackupRepositoryTypeKopia  string = "kopia"
+	BackupRepositoryTypeKopia string = "kopia"
 )
 
 // BackupRepositoryStatus is the current status of a BackupRepository.

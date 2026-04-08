@@ -40,3 +40,11 @@ func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remote
 func (o *BlockOutput) BeginDirectory(ctx context.Context, relativePath string, e fs.Directory) error {
 	return fmt.Errorf("block mode is not supported for Windows")
 }
+
+func (o *BlockOutput) Flush() error {
+	return flushVolume(o.targetFileName)
+}
+
+func (o *BlockOutput) Terminate() error {
+	return nil
+}

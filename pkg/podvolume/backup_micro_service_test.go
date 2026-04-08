@@ -258,8 +258,8 @@ func TestCancelPodVolumeBackup(t *testing.T) {
 	}{
 		{
 			name:                "no fs backup",
-			expectedEventReason: datapath.EventReasonCancelled,
-			expectedEventMsg:    "Data path for PVB fake-pvb canceled",
+			expectedEventReason: datapath.EventReasonStopped,
+			expectedEventMsg:    "Data path for fake-pvb exited without start",
 			expectedErr:         datapath.ErrCancelled,
 		},
 	}
