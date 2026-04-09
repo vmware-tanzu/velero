@@ -350,6 +350,28 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).
 						Command([]string{"/velero-restore-helper"}).Result()).Result(),
 		},
+		{
+			name: "pod volume backups in a different namespace are ignored when looking for matches due to namespace scoping",
+			pod: builder.ForPod("ns-1", "my-pod").
+				Volumes(
+					builder.ForVolume("myvol").PersistentVolumeClaimSource("pvc-1").Result(),
+				).
+				Result(),
+			podVolumeBackups: []runtime.Object{
+				builder.ForPodVolumeBackup("other-ns", "pvb-1").
+					PodName("my-pod").
+					PodNamespace("ns-1").
+					Volume("myvol").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					SnapshotID("foo").
+					Result(),
+			},
+			want: builder.ForPod("ns-1", "my-pod").
+				Volumes(
+					builder.ForVolume("myvol").PersistentVolumeClaimSource("pvc-1").Result(),
+				).
+				Result(),
+		},
 	}
 
 	veleroDeployment := &appsv1api.Deployment{
