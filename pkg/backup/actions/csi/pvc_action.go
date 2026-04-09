@@ -49,6 +49,7 @@ import (
 	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/utils/volumehelper"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -383,6 +384,12 @@ func (p *pvcBackupItemAction) Execute(
 		})
 
 		dataUploadLog.Info("Starting data upload of backup")
+
+		if err := nodeagent.HasRunningPods(context.Background(), backup.Namespace, p.crClient); err != nil {
+			dataUploadLog.WithError(err).Error("failed to check for running node-agent pods")
+			csi.CleanupVolumeSnapshot(vs, p.crClient, p.log)
+			return nil, nil, "", nil, errors.Wrap(err, "snapshot data movement requires a running node-agent daemonset; ensure node-agent is deployed and running")
+		}
 
 		dataUpload, err := createDataUpload(
 			context.Background(),

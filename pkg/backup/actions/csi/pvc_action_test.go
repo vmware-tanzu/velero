@@ -94,6 +94,7 @@ func TestExecute(t *testing.T) {
 		expectedDataUpload *velerov2alpha1.DataUpload
 		expectedPVC        *corev1api.PersistentVolumeClaim
 		resourcePolicy     *corev1api.ConfigMap
+		extraObjects       []runtime.Object
 		failVSCreate       bool
 		skipVSReadyUpdate  bool // New flag to control VS readiness
 	}{
@@ -122,12 +123,24 @@ func TestExecute(t *testing.T) {
 			expectErr:         true, // Expect an error, but the exact message can vary
 		},
 		{
-			name:        "Test SnapshotMoveData",
+			name:        "Fail SnapshotMoveData when no node-agent pods",
 			backup:      builder.ForBackup("velero", "test").SnapshotMoveData(true).CSISnapshotTimeout(1 * time.Minute).Result(),
 			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
 			pv:          builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
 			sc:          builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
 			vsClass:     builder.ForVolumeSnapshotClass("testVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
+			expectedErr: errors.New("snapshot data movement requires a running node-agent daemonset; ensure node-agent is deployed and running: no running node-agent pods found"),
+		},
+		{
+			name:    "Test SnapshotMoveData",
+			backup:  builder.ForBackup("velero", "test").SnapshotMoveData(true).CSISnapshotTimeout(1 * time.Minute).Result(),
+			pvc:     builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
+			pv:      builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
+			sc:      builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
+			vsClass: builder.ForVolumeSnapshotClass("testVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
+			extraObjects: []runtime.Object{
+				builder.ForPod("velero", "node-agent-pod").Labels(map[string]string{"role": "node-agent"}).Phase(corev1api.PodRunning).NodeName("test-node").Result(),
+			},
 			operationID: ".",
 			expectedDataUpload: &velerov2alpha1.DataUpload{
 				TypeMeta: metav1.TypeMeta{
@@ -167,12 +180,15 @@ func TestExecute(t *testing.T) {
 			},
 		},
 		{
-			name:        "Verify PVC is modified as expected",
-			backup:      builder.ForBackup("velero", "test").SnapshotMoveData(true).CSISnapshotTimeout(1 * time.Minute).Result(),
-			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
-			pv:          builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
-			sc:          builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
-			vsClass:     builder.ForVolumeSnapshotClass("tescVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
+			name:    "Verify PVC is modified as expected",
+			backup:  builder.ForBackup("velero", "test").SnapshotMoveData(true).CSISnapshotTimeout(1 * time.Minute).Result(),
+			pvc:     builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
+			pv:      builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
+			sc:      builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
+			vsClass: builder.ForVolumeSnapshotClass("tescVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
+			extraObjects: []runtime.Object{
+				builder.ForPod("velero", "node-agent-pod").Labels(map[string]string{"role": "node-agent"}).Phase(corev1api.PodRunning).NodeName("test-node").Result(),
+			},
 			operationID: ".",
 			expectedPVC: builder.ForPersistentVolumeClaim("velero", "testPVC").
 				ObjectMeta(builder.WithAnnotations(velerov1api.MustIncludeAdditionalItemAnnotation, "true", velerov1api.DataUploadNameAnnotation, "velero/"),
@@ -210,6 +226,7 @@ func TestExecute(t *testing.T) {
 			if tc.resourcePolicy != nil {
 				objects = append(objects, tc.resourcePolicy)
 			}
+			objects = append(objects, tc.extraObjects...)
 
 			var crClient crclient.Client
 			if tc.failVSCreate {
