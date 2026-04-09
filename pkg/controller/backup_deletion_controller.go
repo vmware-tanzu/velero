@@ -268,15 +268,12 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 		if err != nil {
 			log.WithError(err).Errorf("Unable to download tarball for backup %s, skipping associated DeleteItemAction plugins", backup.Name)
-			// Best-effort fallback for pre-v1.15 backups where VS/VSC may still exist in cluster
-			log.Info("Cleaning up CSI volumesnapshots")
-			r.deleteCSIVolumeSnapshotsIfAny(ctx, backup, log)
 			// If the tarball simply does not exist (HTTP 404 / not found), the download
 			// failure is permanent and not retryable, so we let deletion proceed.
 			// For transient errors (throttling, auth failures, network issues), record
 			// the error to fail the deletion so it can be retried later.
 			if !isTarballNotFoundError(err) {
-				errs = append(errs, errors.Wrapf(err, "error downloading backup tarball").Error())
+				errs = append(errs, errors.Wrapf(err, "error downloading backup tarball, CSI snapshot cleanup was skipped").Error())
 			}
 		} else {
 			defer closeAndRemoveFile(backupFile, r.logger)
@@ -529,37 +526,6 @@ func (r *backupDeletionReconciler) deleteCSIVolumeSnapshotsIfAny(ctx context.Con
 	for _, item := range vsList.Items {
 		vs := item
 		csi.CleanupVolumeSnapshot(&vs, r.Client, log)
-	}
-}
-
-// deleteCSIVolumeSnapshotContentsIfAny cleans up VolumeSnapshotContent objects labeled with the backup name.
-// This is a best-effort fallback for pre-v1.15 backups where VSC objects may still exist in the cluster
-// even when the backup tarball cannot be downloaded (e.g. due to a transient storage error or velero pod restart).
-func (r *backupDeletionReconciler) deleteCSIVolumeSnapshotContentsIfAny(ctx context.Context, backup *velerov1api.Backup, log logrus.FieldLogger) {
-	vscList := snapshotv1api.VolumeSnapshotContentList{}
-	if err := r.Client.List(ctx, &vscList, &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
-		}),
-	}); err != nil {
-		log.WithError(err).Warnf("Could not list volume snapshot contents, abort")
-		return
-	}
-	for i := range vscList.Items {
-		vsc := &vscList.Items[i]
-		// Set DeletionPolicy to Delete so that the underlying cloud snapshot is also removed.
-		if _, err := csi.SetVolumeSnapshotContentDeletionPolicy(vsc.Name, r.Client, snapshotv1api.VolumeSnapshotContentDelete); err != nil {
-			log.WithError(err).Warnf("Failed to set DeletionPolicy to Delete for VolumeSnapshotContent %s, will still attempt deletion", vsc.Name)
-		}
-		if err := r.Client.Delete(ctx, vsc); err != nil {
-			if apierrors.IsNotFound(err) {
-				log.Debugf("VolumeSnapshotContent %s not found, skipping deletion", vsc.Name)
-			} else {
-				log.WithError(err).Warnf("Failed to delete VolumeSnapshotContent %s", vsc.Name)
-			}
-		} else {
-			log.Infof("Deleted VolumeSnapshotContent %s", vsc.Name)
-		}
 	}
 }
 
