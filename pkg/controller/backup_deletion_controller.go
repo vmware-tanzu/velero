@@ -271,14 +271,12 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			// Best-effort fallback for pre-v1.15 backups where VS/VSC may still exist in cluster
 			log.Info("Cleaning up CSI volumesnapshots")
 			r.deleteCSIVolumeSnapshotsIfAny(ctx, backup, log)
-			log.Info("Cleaning up CSI volumesnapshotcontents")
-			r.deleteCSIVolumeSnapshotContentsIfAny(ctx, backup, log)
 			// If the tarball simply does not exist (HTTP 404 / not found), the download
 			// failure is permanent and not retryable, so we let deletion proceed.
 			// For transient errors (throttling, auth failures, network issues), record
 			// the error to fail the deletion so it can be retried later.
 			if !isTarballNotFoundError(err) {
-				errs = append(errs, errors.Wrapf(err, "error downloading backup tarball, CSI snapshot cleanup was skipped").Error())
+				errs = append(errs, errors.Wrapf(err, "error downloading backup tarball").Error())
 			}
 		} else {
 			defer closeAndRemoveFile(backupFile, r.logger)
