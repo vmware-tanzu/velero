@@ -132,12 +132,12 @@ func TestExecute(t *testing.T) {
 			expectedErr: errors.New("snapshot data movement requires a running node-agent daemonset; ensure node-agent is deployed and running: no running node-agent pods found"),
 		},
 		{
-			name:    "Skip node-agent check for custom data mover",
-			backup:  builder.ForBackup("velero", "test").SnapshotMoveData(true).DataMover("custom-mover").CSISnapshotTimeout(1 * time.Minute).Result(),
-			pvc:     builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
-			pv:      builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
-			sc:      builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
-			vsClass: builder.ForVolumeSnapshotClass("testVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
+			name:        "Skip node-agent check for custom data mover",
+			backup:      builder.ForBackup("velero", "test").SnapshotMoveData(true).DataMover("custom-mover").CSISnapshotTimeout(1 * time.Minute).Result(),
+			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
+			pv:          builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
+			sc:          builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
+			vsClass:     builder.ForVolumeSnapshotClass("testVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
 			operationID: ".",
 			expectedDataUpload: &velerov2alpha1.DataUpload{
 				TypeMeta: metav1.TypeMeta{
