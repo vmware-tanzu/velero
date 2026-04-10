@@ -47,6 +47,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/datamover"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
@@ -385,10 +386,12 @@ func (p *pvcBackupItemAction) Execute(
 
 		dataUploadLog.Info("Starting data upload of backup")
 
-		if err := nodeagent.HasRunningPods(context.Background(), backup.Namespace, p.crClient); err != nil {
-			dataUploadLog.WithError(err).Error("failed to check for running node-agent pods")
-			csi.CleanupVolumeSnapshot(vs, p.crClient, p.log)
-			return nil, nil, "", nil, errors.Wrap(err, "snapshot data movement requires a running node-agent daemonset; ensure node-agent is deployed and running")
+		if datamover.IsBuiltInUploader(backup.Spec.DataMover) {
+			if err := nodeagent.HasRunningPods(context.Background(), backup.Namespace, p.crClient); err != nil {
+				dataUploadLog.WithError(err).Error("cannot perform snapshot data movement without running node-agent pods")
+				csi.CleanupVolumeSnapshot(vs, p.crClient, p.log)
+				return nil, nil, "", nil, errors.Wrap(err, "snapshot data movement requires a running node-agent daemonset; ensure node-agent is deployed and running")
+			}
 		}
 
 		dataUpload, err := createDataUpload(
