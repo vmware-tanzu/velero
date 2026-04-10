@@ -467,7 +467,7 @@ func (p *pvcBackupItemAction) Progress(
 		return progress, biav2.InvalidOperationIDError(operationID)
 	}
 
-	dataUpload, err := getDataUpload(context.Background(), p.crClient, operationID)
+	dataUpload, err := getDataUpload(context.Background(), p.crClient, backup.Namespace, operationID)
 	if err != nil {
 		p.log.Errorf(
 			"fail to get DataUpload for backup %s/%s by operation ID %s: %s",
@@ -512,7 +512,7 @@ func (p *pvcBackupItemAction) Cancel(operationID string, backup *velerov1api.Bac
 		return biav2.InvalidOperationIDError(operationID)
 	}
 
-	dataUpload, err := getDataUpload(context.Background(), p.crClient, operationID)
+	dataUpload, err := getDataUpload(context.Background(), p.crClient, backup.Namespace, operationID)
 	if err != nil {
 		p.log.Errorf(
 			"fail to get DataUpload for backup %s/%s: %s",
@@ -605,10 +605,12 @@ func createDataUpload(
 func getDataUpload(
 	ctx context.Context,
 	crClient crclient.Client,
+	namespace string,
 	operationID string,
 ) (*velerov2alpha1.DataUpload, error) {
 	dataUploadList := new(velerov2alpha1.DataUploadList)
 	err := crClient.List(ctx, dataUploadList, &crclient.ListOptions{
+		Namespace: namespace,
 		LabelSelector: labels.SelectorFromSet(
 			map[string]string{velerov1api.AsyncOperationIDLabel: operationID},
 		),

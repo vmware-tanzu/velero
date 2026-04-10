@@ -308,6 +308,28 @@ func TestProgress(t *testing.T) {
 			expectedErr: "not found DataUpload for operationID testing",
 		},
 		{
+			name:   "DataUpload in different namespace is not found",
+			backup: builder.ForBackup("velero", "test").Result(),
+			dataUpload: &velerov2alpha1.DataUpload{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "DataUpload",
+					APIVersion: "v2alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "other-namespace",
+					Name:      "testing",
+					Labels: map[string]string{
+						velerov1api.AsyncOperationIDLabel: "testing",
+					},
+				},
+				Status: velerov2alpha1.DataUploadStatus{
+					Phase: velerov2alpha1.DataUploadPhaseFailed,
+				},
+			},
+			operationID: "testing",
+			expectedErr: "not found DataUpload for operationID testing",
+		},
+		{
 			name:   "DataUpload is found",
 			backup: builder.ForBackup("velero", "test").Result(),
 			dataUpload: &velerov2alpha1.DataUpload{
@@ -375,15 +397,15 @@ func TestCancel(t *testing.T) {
 	tests := []struct {
 		name               string
 		backup             *velerov1api.Backup
-		dataUpload         velerov2alpha1.DataUpload
+		dataUpload         *velerov2alpha1.DataUpload
 		operationID        string
-		expectedErr        error
+		expectedErr        string
 		expectedDataUpload velerov2alpha1.DataUpload
 	}{
 		{
 			name:   "Cancel DataUpload",
 			backup: builder.ForBackup("velero", "test").Result(),
-			dataUpload: velerov2alpha1.DataUpload{
+			dataUpload: &velerov2alpha1.DataUpload{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "DataUpload",
 					APIVersion: velerov2alpha1.SchemeGroupVersion.String(),
@@ -414,6 +436,31 @@ func TestCancel(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:        "DataUpload cannot be found",
+			backup:      builder.ForBackup("velero", "test").Result(),
+			operationID: "testing",
+			expectedErr: "not found DataUpload for operationID testing",
+		},
+		{
+			name:   "DataUpload in different namespace is not found",
+			backup: builder.ForBackup("velero", "test").Result(),
+			dataUpload: &velerov2alpha1.DataUpload{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "DataUpload",
+					APIVersion: velerov2alpha1.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "other-namespace",
+					Name:      "testing",
+					Labels: map[string]string{
+						velerov1api.AsyncOperationIDLabel: "testing",
+					},
+				},
+			},
+			operationID: "testing",
+			expectedErr: "not found DataUpload for operationID testing",
+		},
 	}
 
 	for _, tc := range tests {
@@ -426,17 +473,23 @@ func TestCancel(t *testing.T) {
 				crClient: crClient,
 			}
 
-			err := crClient.Create(t.Context(), &tc.dataUpload)
-			require.NoError(t, err)
+			if tc.dataUpload != nil {
+				err := crClient.Create(t.Context(), tc.dataUpload)
+				require.NoError(t, err)
+			}
 
-			err = pvcBIA.Cancel(tc.operationID, tc.backup)
-			require.NoError(t, err)
+			err := pvcBIA.Cancel(tc.operationID, tc.backup)
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
 
-			du := new(velerov2alpha1.DataUpload)
-			err = crClient.Get(t.Context(), crclient.ObjectKey{Namespace: tc.dataUpload.Namespace, Name: tc.dataUpload.Name}, du)
-			require.NoError(t, err)
+				du := new(velerov2alpha1.DataUpload)
+				err = crClient.Get(t.Context(), crclient.ObjectKey{Namespace: tc.dataUpload.Namespace, Name: tc.dataUpload.Name}, du)
+				require.NoError(t, err)
 
-			require.True(t, cmp.Equal(tc.expectedDataUpload, *du, cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "ResourceVersion")))
+				require.True(t, cmp.Equal(tc.expectedDataUpload, *du, cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "ResourceVersion")))
+			}
 		})
 	}
 }
