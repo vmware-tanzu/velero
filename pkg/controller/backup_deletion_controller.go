@@ -268,6 +268,10 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 		if err != nil {
 			log.WithError(err).Errorf("Unable to download tarball for backup %s, skipping associated DeleteItemAction plugins", backup.Name)
+			// for backups which failed before tarball object could be uploaded we do offline cleanup
+			log.Info("Cleaning up CSI volumesnapshots")
+			r.deleteCSIVolumeSnapshotsIfAny(ctx, backup, log)
+
 			// If the tarball simply does not exist (HTTP 404 / not found), the download
 			// failure is permanent and not retryable, so we let deletion proceed.
 			// For transient errors (throttling, auth failures, network issues), record
@@ -357,7 +361,7 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	if backupStore != nil {
+	if backupStore != nil && len(errs) == 0 {
 		log.Info("Removing backup from backup storage")
 		if err := backupStore.DeleteBackup(backup.Name); err != nil {
 			errs = append(errs, err.Error())

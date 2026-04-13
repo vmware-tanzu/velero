@@ -670,15 +670,14 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 		td.backupStore.On("GetBackupVolumeSnapshots", input.Spec.BackupName).Return(snapshots, nil)
 		td.backupStore.On("GetBackupContents", input.Spec.BackupName).Return(nil, fmt.Errorf("error downloading tarball"))
-		td.backupStore.On("DeleteBackup", input.Spec.BackupName).Return(nil)
 
 		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		td.backupStore.AssertCalled(t, "GetBackupContents", input.Spec.BackupName)
-		// DeleteBackup (removing backup data from object storage) is still called because
-		// that step is not gated by the errs slice; only the Kubernetes Backup CR deletion is.
-		td.backupStore.AssertCalled(t, "DeleteBackup", input.Spec.BackupName)
+		// DeleteBackup (removing backup data from object storage) must NOT be called
+		// when there are errors, so that the deletion can be retried later.
+		td.backupStore.AssertNotCalled(t, "DeleteBackup", input.Spec.BackupName)
 
 		// the dbr should still exist and be marked Processed with errors
 		res := &velerov1api.DeleteBackupRequest{}
