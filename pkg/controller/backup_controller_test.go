@@ -740,6 +740,15 @@ func TestProcessBackupCompletions(t *testing.T) {
 	now = now.Local()
 	timestamp := metav1.NewTime(now)
 
+	// Node-agent pod is needed for all test cases so that the node-agent
+	// validation in prepareBackupRequest does not reject backups that use
+	// snapshot data movement.
+	nodeAgentPod := builder.ForPod(velerov1api.DefaultNamespace, "node-agent-abc").
+		Labels(map[string]string{"role": "node-agent"}).
+		NodeName("worker-1").
+		Phase(corev1api.PodRunning).
+		Result()
+
 	tests := []struct {
 		name                     string
 		backup                   *velerov1api.Backup
@@ -1584,6 +1593,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					builder.ForVolumeSnapshotContent("testVSC").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).VolumeSnapshotClassName("testClass").Status(&snapshotv1api.VolumeSnapshotContentStatus{
 						SnapshotHandle: &snapshotHandle,
 					}).Result(),
+					nodeAgentPod,
 				)
 			} else {
 				fakeClient = velerotest.NewFakeControllerRuntimeClient(t,
@@ -1591,6 +1601,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					builder.ForVolumeSnapshotContent("testVSC").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).VolumeSnapshotClassName("testClass").Status(&snapshotv1api.VolumeSnapshotContentStatus{
 						SnapshotHandle: &snapshotHandle,
 					}).Result(),
+					nodeAgentPod,
 				)
 			}
 
