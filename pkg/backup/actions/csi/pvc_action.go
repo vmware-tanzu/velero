@@ -337,6 +337,15 @@ func (p *pvcBackupItemAction) Execute(
 		return nil, nil, "", nil, err
 	}
 
+	// Fast-fail before creating the snapshot if snapshot data movement is
+	// requested with the built-in data mover but no node-agent pods are running.
+	if boolptr.IsSetToTrue(backup.Spec.SnapshotMoveData) && datamover.IsBuiltInUploader(backup.Spec.DataMover) {
+		if err := nodeagent.HasRunningPods(context.Background(), backup.Namespace, p.crClient); err != nil {
+			p.log.WithError(err).Error("cannot perform snapshot data movement without running node-agent pods")
+			return nil, nil, "", nil, errors.Wrap(err, "snapshot data movement requires a running node-agent daemonset; ensure node-agent is deployed and running")
+		}
+	}
+
 	vs, err := p.getVolumeSnapshotReference(context.TODO(), pvc, backup)
 	if err != nil {
 		return nil, nil, "", nil, err
@@ -385,14 +394,6 @@ func (p *pvcBackupItemAction) Execute(
 		})
 
 		dataUploadLog.Info("Starting data upload of backup")
-
-		if datamover.IsBuiltInUploader(backup.Spec.DataMover) {
-			if err := nodeagent.HasRunningPods(context.Background(), backup.Namespace, p.crClient); err != nil {
-				dataUploadLog.WithError(err).Error("cannot perform snapshot data movement without running node-agent pods")
-				csi.CleanupVolumeSnapshot(vs, p.crClient, p.log)
-				return nil, nil, "", nil, errors.Wrap(err, "snapshot data movement requires a running node-agent daemonset; ensure node-agent is deployed and running")
-			}
-		}
 
 		dataUpload, err := createDataUpload(
 			context.Background(),
