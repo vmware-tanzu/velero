@@ -123,62 +123,6 @@ func TestExecute(t *testing.T) {
 			expectErr:         true, // Expect an error, but the exact message can vary
 		},
 		{
-			name:              "Fail SnapshotMoveData when no node-agent pods",
-			backup:            builder.ForBackup("velero", "test").SnapshotMoveData(true).CSISnapshotTimeout(1 * time.Minute).Result(),
-			pvc:               builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
-			pv:                builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
-			sc:                builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
-			vsClass:           builder.ForVolumeSnapshotClass("testVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
-			skipVSReadyUpdate: true,
-			expectedErr:       errors.New("snapshot data movement requires a running node-agent daemonset; ensure node-agent is deployed and running: no running node-agent pods found"),
-		},
-		{
-			name:        "Skip node-agent check for custom data mover",
-			backup:      builder.ForBackup("velero", "test").SnapshotMoveData(true).DataMover("custom-mover").CSISnapshotTimeout(1 * time.Minute).Result(),
-			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
-			pv:          builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
-			sc:          builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
-			vsClass:     builder.ForVolumeSnapshotClass("testVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
-			operationID: ".",
-			expectedDataUpload: &velerov2alpha1.DataUpload{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "DataUpload",
-					APIVersion: velerov2alpha1.SchemeGroupVersion.String(),
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-",
-					Namespace:    "velero",
-					Labels: map[string]string{
-						velerov1api.BackupNameLabel:       "test",
-						velerov1api.BackupUIDLabel:        "",
-						velerov1api.PVCUIDLabel:           "",
-						velerov1api.AsyncOperationIDLabel: "du-.",
-					},
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion: "velero.io/v1",
-							Kind:       "Backup",
-							Name:       "test",
-							UID:        "",
-							Controller: &boolTrue,
-						},
-					},
-				},
-				Spec: velerov2alpha1.DataUploadSpec{
-					SnapshotType: velerov2alpha1.SnapshotTypeCSI,
-					CSISnapshot: &velerov2alpha1.CSISnapshotSpec{
-						VolumeSnapshot: "",
-						StorageClass:   "testSC",
-						SnapshotClass:  "testVSClass",
-					},
-					SourcePVC:        "testPVC",
-					DataMover:        "custom-mover",
-					SourceNamespace:  "velero",
-					OperationTimeout: metav1.Duration{Duration: 1 * time.Minute},
-				},
-			},
-		},
-		{
 			name:    "Test SnapshotMoveData",
 			backup:  builder.ForBackup("velero", "test").SnapshotMoveData(true).CSISnapshotTimeout(1 * time.Minute).Result(),
 			pvc:     builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),

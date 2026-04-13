@@ -47,10 +47,8 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/datamover"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
-	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/utils/volumehelper"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -335,15 +333,6 @@ func (p *pvcBackupItemAction) Execute(
 		p.log.Debugf("CSI plugin skip snapshot for PVC %s according to the VolumeHelper setting.",
 			pvc.Namespace+"/"+pvc.Name)
 		return nil, nil, "", nil, err
-	}
-
-	// Fast-fail before creating the snapshot if snapshot data movement is
-	// requested with the built-in data mover but no node-agent pods are running.
-	if boolptr.IsSetToTrue(backup.Spec.SnapshotMoveData) && datamover.IsBuiltInUploader(backup.Spec.DataMover) {
-		if err := nodeagent.HasRunningPods(context.Background(), backup.Namespace, p.crClient); err != nil {
-			p.log.WithError(err).Error("cannot perform snapshot data movement without running node-agent pods")
-			return nil, nil, "", nil, errors.Wrap(err, "snapshot data movement requires a running node-agent daemonset; ensure node-agent is deployed and running")
-		}
 	}
 
 	vs, err := p.getVolumeSnapshotReference(context.TODO(), pvc, backup)

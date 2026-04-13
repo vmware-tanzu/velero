@@ -1,1 +1,1 @@
-Add node-agent pod check to DataMover backup path
+Fail backup validation when built-in data mover is requested but no node-agent pods are running
