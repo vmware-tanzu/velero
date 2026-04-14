@@ -23,6 +23,15 @@ type Bitmap interface {
 	// Set sets bits within the provided range
 	Set(cbtservice.Range)
 
+	// SetFull sets all bits to the bitmap
+	SetFull()
+
+	// Snapshot returns snapshot of the bitmap
+	SourceID() string
+
+	// ChangeID returns the changeID of the bitmap
+	ChangeID() string
+
 	// Iterator returns the iterator for the CBT Bitmap
 	Iterator() Iterator
 }
@@ -32,8 +41,8 @@ type Iterator interface {
 	// ChangeID returns the changeID of the bitmap
 	ChangeID() string
 
-	// SnapshotID returns snapshotID of the bitmap
-	SnapshotID() string
+	// Snapshot returns snapshot of the bitmap
+	Snapshot() string
 
 	// BlockSize returns the granularity of the bitmap
 	BlockSize() int

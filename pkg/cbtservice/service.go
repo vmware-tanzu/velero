@@ -24,6 +24,18 @@ type Range struct {
 	Length int64
 }
 
+// SourceInfo is the information provided to the uploader, the uploader calls CBT service with this information
+type SourceInfo struct {
+	// Snapshot is the identifier of the current snapshot
+	Snapshot string
+
+	// ChangeID is the identifier associated to the current snapshot that is used as changeID for following backups
+	ChangeID string
+
+	// VolumeID is the identifier uniquely identifier a volume in the storage to which the CBT is associated
+	VolumeID string
+}
+
 // Service defines the methods for CBT service which could be implemented by Kubernetes SnapshotMetadataService or other customized services
 type Service interface {
 	// GetAllocatedBlocks enumerates the allocated blocks of the snapshot and call the record callback
