@@ -274,11 +274,11 @@ func TestProcessBackupVeleroNamespaceValidation(t *testing.T) {
 	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
 
 	tests := []struct {
-		name                        string
-		backup                      *velerov1api.Backup
-		expectedIncludedNamespaces  []string
-		expectedExcludedNamespaces  []string
-		expectValidationError       bool
+		name                       string
+		backup                     *velerov1api.Backup
+		expectedIncludedNamespaces []string
+		expectedExcludedNamespaces []string
+		expectValidationError      bool
 	}{
 		{
 			name:                       "velero namespace explicitly as only IncludedNamespace returns validation error",
@@ -323,10 +323,10 @@ func TestProcessBackupVeleroNamespaceValidation(t *testing.T) {
 			expectValidationError:      true,
 		},
 		{
-			name:                        "velero plus other namespaces in includes removes velero and backs up the others",
-			backup:                      builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").Phase(velerov1api.BackupPhaseReadyToStart).IncludedNamespaces("velero", "default", "kube-system").Result(),
-			expectedIncludedNamespaces:  []string{"default", "kube-system"},
-			expectedExcludedNamespaces:  []string{"velero"},
+			name:                       "velero plus other namespaces in includes removes velero and backs up the others",
+			backup:                     builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").Phase(velerov1api.BackupPhaseReadyToStart).IncludedNamespaces("velero", "default", "kube-system").Result(),
+			expectedIncludedNamespaces: []string{"default", "kube-system"},
+			expectedExcludedNamespaces: []string{"velero"},
 		},
 	}
 

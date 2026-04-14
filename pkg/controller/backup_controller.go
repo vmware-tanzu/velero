@@ -600,7 +600,17 @@ func (b *backupReconciler) prepareBackupRequest(ctx context.Context, backup *vel
 				fmt.Sprintf("Velero namespace %q is the only included namespace, but Velero does not support backing up its own namespace", veleroNs))
 		} else {
 			logger.Warnf("Velero namespace %q is being excluded from this backup because Velero does not support backing up its own namespace.", veleroNs)
-			request.Spec.ExcludedNamespaces = append(request.Spec.ExcludedNamespaces, veleroNs)
+			// Only append if not already present (e.g. from the exclude-from-backup label logic).
+			alreadyExcluded := false
+			for _, ns := range request.Spec.ExcludedNamespaces {
+				if ns == veleroNs {
+					alreadyExcluded = true
+					break
+				}
+			}
+			if !alreadyExcluded {
+				request.Spec.ExcludedNamespaces = append(request.Spec.ExcludedNamespaces, veleroNs)
+			}
 		}
 	}
 
