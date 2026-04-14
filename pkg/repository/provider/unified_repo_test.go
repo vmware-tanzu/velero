@@ -613,7 +613,7 @@ func TestPrepareRepo(t *testing.T) {
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
 		retFuncCreate   func(context.Context, udmrepo.RepoOptions) error
-		retFuncCheck    func(context.Context, udmrepo.RepoOptions) (bool, error)
+		retFuncCheck    func(context.Context, udmrepo.RepoOptions, bool) (bool, error)
 		credStoreReturn string
 		credStoreError  error
 		readOnlyBSL     bool
@@ -656,7 +656,7 @@ func TestPrepareRepo(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
+			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions, readOnly bool) (bool, error) {
 				return false, errors.New("fake-error")
 			},
 			expectedErr: "error to check backup repo: fake-error",
@@ -674,7 +674,7 @@ func TestPrepareRepo(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
+			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions, readOnly bool) (bool, error) {
 				return true, nil
 			},
 			retFuncCreate: func(ctx context.Context, repoOption udmrepo.RepoOptions) error {
@@ -695,7 +695,7 @@ func TestPrepareRepo(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
+			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions, readOnly bool) (bool, error) {
 				return false, nil
 			},
 			retFuncCreate: func(ctx context.Context, repoOption udmrepo.RepoOptions) error {
@@ -716,7 +716,7 @@ func TestPrepareRepo(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
+			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions, readOnly bool) (bool, error) {
 				return false, nil
 			},
 			retFuncCreate: func(ctx context.Context, repoOption udmrepo.RepoOptions) error {
@@ -737,7 +737,7 @@ func TestPrepareRepo(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
+			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions, readOnly bool) (bool, error) {
 				return false, nil
 			},
 			retFuncCreate: func(ctx context.Context, repoOption udmrepo.RepoOptions) error {
@@ -758,7 +758,7 @@ func TestPrepareRepo(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
+			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions, readOnly bool) (bool, error) {
 				return false, nil
 			},
 			retFuncCreate: func(ctx context.Context, repoOption udmrepo.RepoOptions) error {
@@ -785,7 +785,7 @@ func TestPrepareRepo(t *testing.T) {
 				log:         velerotest.NewLogger(),
 			}
 
-			tc.repoService.On("IsCreated", mock.Anything, mock.Anything).Return(tc.retFuncCheck)
+			tc.repoService.On("IsReady", mock.Anything, mock.Anything, mock.Anything).Return(tc.retFuncCheck)
 			tc.repoService.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(tc.retFuncCreate)
 
 			if tc.readOnlyBSL {

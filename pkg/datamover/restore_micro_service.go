@@ -288,6 +288,7 @@ func (r *RestoreMicroService) cancelDataDownload(dd *velerov2alpha1api.DataDownl
 	fsBackup := r.dataPathMgr.GetAsyncBR(dd.Name)
 	if fsBackup == nil {
 		r.OnDataDownloadCancelled(r.ctx, dd.GetNamespace(), dd.GetName())
+		r.eventRecorder.EndingEvent(dd, false, datapath.EventReasonStopped, "Data path for %s exited without start", dd.Name)
 	} else {
 		fsBackup.Cancel()
 	}

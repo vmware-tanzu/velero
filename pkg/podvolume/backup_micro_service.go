@@ -307,6 +307,7 @@ func (r *BackupMicroService) cancelPodVolumeBackup(pvb *velerov1api.PodVolumeBac
 	fsBackup := r.dataPathMgr.GetAsyncBR(pvb.Name)
 	if fsBackup == nil {
 		r.OnDataPathCancelled(r.ctx, pvb.GetNamespace(), pvb.GetName())
+		r.eventRecorder.EndingEvent(pvb, false, datapath.EventReasonStopped, "Data path for %s exited without start", pvb.Name)
 	} else {
 		fsBackup.Cancel()
 	}

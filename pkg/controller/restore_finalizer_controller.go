@@ -22,6 +22,8 @@ import (
 	"sync"
 	"time"
 
+	volumegroupsnapshotv1beta2 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumegroupsnapshot/v1beta2"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -43,6 +45,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
@@ -291,12 +294,15 @@ type finalizerContext struct {
 	resourceTimeout          time.Duration
 }
 
-func (ctx *finalizerContext) execute() (results.Result, results.Result) { //nolint:unparam //temporarily ignore the lint report: result 0 is always nil (unparam)
+func (ctx *finalizerContext) execute() (results.Result, results.Result) {
 	warnings, errs := results.Result{}, results.Result{}
 
 	// implement finalization tasks
 	pdpErrs := ctx.patchDynamicPVWithVolumeInfo()
 	errs.Merge(&pdpErrs)
+
+	vgscWarnings := ctx.cleanupStubVGSC()
+	warnings.Merge(&vgscWarnings)
 
 	rehErrs := ctx.WaitRestoreExecHook()
 	errs.Merge(&rehErrs)
@@ -441,6 +447,93 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 	ctx.logger.Info("patching newly dynamically provisioned PV ends")
 
 	return errs
+}
+
+// cleanupStubVGSC deletes stub VolumeGroupSnapshotContent objects that were
+// created during restore to satisfy CSI controller validation. These stubs are
+// labeled with velero.io/restore-name for identification.
+// Before deleting each VGSC, it waits for all related VolumeSnapshotContents
+// to become ReadyToUse, since the CSI controller needs the VGSC during VSC reconciliation.
+func (ctx *finalizerContext) cleanupStubVGSC() (warnings results.Result) {
+	ctx.logger.Info("cleaning up stub VolumeGroupSnapshotContents")
+
+	vgscList := &volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentList{}
+	err := ctx.crClient.List(
+		context.Background(),
+		vgscList,
+		client.MatchingLabels{velerov1api.RestoreNameLabel: ctx.restore.Name},
+	)
+	if err != nil {
+		// If the CRD is not installed, listing will fail. This is expected
+		// on clusters without VolumeGroupSnapshot support, so treat as warning.
+		ctx.logger.WithError(err).Warn("failed to list stub VolumeGroupSnapshotContents, skipping cleanup")
+		warnings.Add("cluster", errors.Wrap(err, "failed to list stub VolumeGroupSnapshotContents"))
+		return warnings
+	}
+
+	if len(vgscList.Items) == 0 {
+		ctx.logger.Info("no stub VolumeGroupSnapshotContents to clean up")
+		return warnings
+	}
+
+	for i := range vgscList.Items {
+		vgsc := &vgscList.Items[i]
+		log := ctx.logger.WithField("vgsc", vgsc.Name)
+
+		// Collect the snapshot handles associated with this VGSC
+		snapshotHandles := map[string]bool{}
+		if vgsc.Spec.Source.GroupSnapshotHandles != nil {
+			for _, h := range vgsc.Spec.Source.GroupSnapshotHandles.VolumeSnapshotHandles {
+				snapshotHandles[h] = true
+			}
+		}
+
+		if len(snapshotHandles) > 0 {
+			// Wait for related VSCs to become ReadyToUse before deleting the VGSC
+			log.Infof("waiting for %d related VolumeSnapshotContents to become ReadyToUse", len(snapshotHandles))
+			err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, ctx.resourceTimeout, true, func(context.Context) (bool, error) {
+				vscList := &snapshotv1api.VolumeSnapshotContentList{}
+				if err := ctx.crClient.List(context.Background(), vscList, client.MatchingLabels{velerov1api.RestoreNameLabel: ctx.restore.Name}); err != nil {
+					log.WithError(err).Warn("failed to list VolumeSnapshotContents")
+					return false, nil
+				}
+
+				for j := range vscList.Items {
+					vsc := &vscList.Items[j]
+					if vsc.Spec.Source.SnapshotHandle == nil {
+						continue
+					}
+					if !snapshotHandles[*vsc.Spec.Source.SnapshotHandle] {
+						continue
+					}
+					// This VSC is related to our VGSC
+					if vsc.Status == nil || !boolptr.IsSetToTrue(vsc.Status.ReadyToUse) {
+						log.Debugf("VolumeSnapshotContent %s not yet ReadyToUse", vsc.Name)
+						return false, nil
+					}
+				}
+				return true, nil
+			})
+			if err != nil {
+				log.WithError(err).Warn("timed out waiting for related VolumeSnapshotContents to become ReadyToUse, proceeding with VGSC deletion")
+				warnings.Add("cluster", errors.Wrapf(err, "timed out waiting for VSCs related to VGSC %s", vgsc.Name))
+			}
+		}
+
+		log.Info("deleting stub VolumeGroupSnapshotContent")
+		if err := ctx.crClient.Delete(context.Background(), vgsc); err != nil {
+			if apierrors.IsNotFound(err) {
+				log.Info("stub VolumeGroupSnapshotContent already deleted")
+				continue
+			}
+			log.WithError(err).Warn("failed to delete stub VolumeGroupSnapshotContent")
+			warnings.Add("cluster", errors.Wrapf(err, "failed to delete stub VolumeGroupSnapshotContent %s", vgsc.Name))
+		} else {
+			log.Info("deleted stub VolumeGroupSnapshotContent")
+		}
+	}
+
+	return warnings
 }
 
 func needPatch(newPV *corev1api.PersistentVolume, pvInfo *volume.PVInfo) bool {
