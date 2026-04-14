@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
@@ -36,6 +37,50 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
+
+// fakeClientWithErrors wraps a real client and injects errors for specific operations.
+type fakeClientWithErrors struct {
+	crclient.Client
+	getError    error
+	patchError  error
+	deleteError error
+}
+
+type fakeClientWithCallTracking struct {
+	crclient.Client
+	events *[]string
+}
+
+func (c *fakeClientWithCallTracking) Create(ctx context.Context, obj crclient.Object, opts ...crclient.CreateOption) error {
+	*c.events = append(*c.events, "create")
+	return c.Client.Create(ctx, obj, opts...)
+}
+
+func (c *fakeClientWithCallTracking) Delete(ctx context.Context, obj crclient.Object, opts ...crclient.DeleteOption) error {
+	*c.events = append(*c.events, "delete")
+	return c.Client.Delete(ctx, obj, opts...)
+}
+
+func (c *fakeClientWithErrors) Get(ctx context.Context, key crclient.ObjectKey, obj crclient.Object, opts ...crclient.GetOption) error {
+	if c.getError != nil {
+		return c.getError
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
+}
+
+func (c *fakeClientWithErrors) Patch(ctx context.Context, obj crclient.Object, patch crclient.Patch, opts ...crclient.PatchOption) error {
+	if c.patchError != nil {
+		return c.patchError
+	}
+	return c.Client.Patch(ctx, obj, patch, opts...)
+}
+
+func (c *fakeClientWithErrors) Delete(ctx context.Context, obj crclient.Object, opts ...crclient.DeleteOption) error {
+	if c.deleteError != nil {
+		return c.deleteError
+	}
+	return c.Client.Delete(ctx, obj, opts...)
+}
 
 func TestVSCExecute(t *testing.T) {
 	snapshotHandleStr := "test"
@@ -206,4 +251,106 @@ func TestCheckVSCReadiness(t *testing.T) {
 			}
 		})
 	}
+
+	// Error injection tests for tryDeleteOriginalVSC
+	t.Run("Get returns non-NotFound error, returns false", func(t *testing.T) {
+		errClient := &fakeClientWithErrors{
+			Client:   velerotest.NewFakeControllerRuntimeClient(t),
+			getError: fmt.Errorf("connection refused"),
+		}
+		p := &volumeSnapshotContentDeleteItemAction{
+			log:      logrus.StandardLogger(),
+			crClient: errClient,
+		}
+		require.False(t, p.tryDeleteOriginalVSC(t.Context(), "some-vsc"))
+	})
+
+	t.Run("Patch fails, returns false", func(t *testing.T) {
+		realClient := velerotest.NewFakeControllerRuntimeClient(t)
+		vsc := &snapshotv1api.VolumeSnapshotContent{
+			ObjectMeta: metav1.ObjectMeta{Name: "patch-fail-vsc"},
+			Spec: snapshotv1api.VolumeSnapshotContentSpec{
+				DeletionPolicy:    snapshotv1api.VolumeSnapshotContentRetain,
+				Driver:            "disk.csi.azure.com",
+				Source:            snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: stringPtr("snap-789")},
+				VolumeSnapshotRef: corev1api.ObjectReference{Name: "vs-3", Namespace: "default"},
+			},
+		}
+		require.NoError(t, realClient.Create(t.Context(), vsc))
+
+		errClient := &fakeClientWithErrors{
+			Client:     realClient,
+			patchError: fmt.Errorf("patch forbidden"),
+		}
+		p := &volumeSnapshotContentDeleteItemAction{
+			log:      logrus.StandardLogger(),
+			crClient: errClient,
+		}
+		require.False(t, p.tryDeleteOriginalVSC(t.Context(), "patch-fail-vsc"))
+	})
+
+	t.Run("Delete fails, returns false", func(t *testing.T) {
+		realClient := velerotest.NewFakeControllerRuntimeClient(t)
+		vsc := &snapshotv1api.VolumeSnapshotContent{
+			ObjectMeta: metav1.ObjectMeta{Name: "delete-fail-vsc"},
+			Spec: snapshotv1api.VolumeSnapshotContentSpec{
+				DeletionPolicy:    snapshotv1api.VolumeSnapshotContentDelete,
+				Driver:            "disk.csi.azure.com",
+				Source:            snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: stringPtr("snap-999")},
+				VolumeSnapshotRef: corev1api.ObjectReference{Name: "vs-4", Namespace: "default"},
+			},
+		}
+		require.NoError(t, realClient.Create(t.Context(), vsc))
+
+		errClient := &fakeClientWithErrors{
+			Client:      realClient,
+			deleteError: fmt.Errorf("delete forbidden"),
+		}
+		p := &volumeSnapshotContentDeleteItemAction{
+			log:      logrus.StandardLogger(),
+			crClient: errClient,
+		}
+		require.False(t, p.tryDeleteOriginalVSC(t.Context(), "delete-fail-vsc"))
+	})
+}
+
+func TestVSCExecute_CreateSleepDeleteOrder(t *testing.T) {
+	snapshotHandleStr := "test"
+	vsc := builder.ForVolumeSnapshotContent("bar").
+		ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).
+		Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).
+		Result()
+
+	vscMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(vsc)
+	require.NoError(t, err)
+
+	events := make([]string, 0, 3)
+	realClient := velerotest.NewFakeControllerRuntimeClient(t)
+	trackingClient := &fakeClientWithCallTracking{Client: realClient, events: &events}
+
+	originalSleep := sleepBetweenTempVSCCreateAndDelete
+	t.Cleanup(func() {
+		sleepBetweenTempVSCCreateAndDelete = originalSleep
+	})
+
+	sleepBetweenTempVSCCreateAndDelete = func(d time.Duration) {
+		require.Equal(t, tempVSCCreateDeleteGap, d)
+		events = append(events, "sleep")
+	}
+
+	p := volumeSnapshotContentDeleteItemAction{log: logrus.StandardLogger(), crClient: trackingClient}
+	err = p.Execute(&velero.DeleteItemActionExecuteInput{
+		Item:   &unstructured.Unstructured{Object: vscMap},
+		Backup: builder.ForBackup("velero", "backup").Result(),
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"create", "sleep", "delete"}, events)
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func stringPtr(s string) *string {
+	return &s
 }
