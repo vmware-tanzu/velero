@@ -366,6 +366,8 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if err := backupStore.DeleteBackup(backup.Name); err != nil {
 			errs = append(errs, err.Error())
 		}
+	} else if len(errs) > 0 {
+		log.Info("Skipping removal of backup from backup storage due to previous errors")
 	}
 
 	log.Info("Removing restores")
