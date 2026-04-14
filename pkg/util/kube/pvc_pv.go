@@ -417,19 +417,19 @@ func MakePodPVCAttachment(volumeName string, volumeMode *corev1api.PersistentVol
 	return volumeMounts, volumeDevices, volumePath
 }
 
+// GetPVForPVC returns the PersistentVolume backing a PVC
+// returns PV, error.
+// PV will be nil on error
 func GetPVForPVC(
 	pvc *corev1api.PersistentVolumeClaim,
 	crClient crclient.Client,
 ) (*corev1api.PersistentVolume, error) {
 	if pvc.Spec.VolumeName == "" {
-		return nil, errors.Errorf("PVC %s/%s has no volume backing this claim",
-			pvc.Namespace, pvc.Name)
+		return nil, errors.Errorf("PVC %s/%s has no volume backing this claim", pvc.Namespace, pvc.Name)
 	}
 	if pvc.Status.Phase != corev1api.ClaimBound {
-		// TODO: confirm if this PVC should be snapshotted if it has no PV bound
-		return nil,
-			errors.Errorf("PVC %s/%s is in phase %v and is not bound to a volume",
-				pvc.Namespace, pvc.Name, pvc.Status.Phase)
+		return nil, errors.Errorf("PVC %s/%s is in phase %v and is not bound to a volume",
+			pvc.Namespace, pvc.Name, pvc.Status.Phase)
 	}
 
 	pv := &corev1api.PersistentVolume{}
@@ -579,4 +579,30 @@ func GetPVAttachedNodes(ctx context.Context, pv string, storageClient storagev1.
 	}
 
 	return nodes, nil
+}
+
+func GetVolumeTopology(ctx context.Context, volumeClient corev1client.CoreV1Interface, storageClient storagev1.StorageV1Interface, pvName string, scName string) (*corev1api.NodeSelector, error) {
+	if pvName == "" || scName == "" {
+		return nil, errors.Errorf("invalid parameter, pv %s, sc %s", pvName, scName)
+	}
+
+	sc, err := storageClient.StorageClasses().Get(ctx, scName, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting storage class %s", scName)
+	}
+
+	if sc.VolumeBindingMode == nil || *sc.VolumeBindingMode != storagev1api.VolumeBindingWaitForFirstConsumer {
+		return nil, nil
+	}
+
+	pv, err := volumeClient.PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting PV %s", pvName)
+	}
+
+	if pv.Spec.NodeAffinity == nil {
+		return nil, nil
+	}
+
+	return pv.Spec.NodeAffinity.Required, nil
 }

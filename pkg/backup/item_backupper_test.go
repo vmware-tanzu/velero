@@ -17,12 +17,15 @@ limitations under the License.
 package backup
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	ctrlfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 
 	"github.com/stretchr/testify/assert"
@@ -266,6 +269,228 @@ func TestAddVolumeInfo(t *testing.T) {
 
 			err = ib.addVolumeInfo(&unstructured.Unstructured{Object: pvObj}, logger)
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestGetMatchAction_PendingLostPVC(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1api.AddToScheme(scheme))
+
+	// Create resource policies that skip Pending/Lost PVCs
+	resPolicies := &resourcepolicies.ResourcePolicies{
+		Version: "v1",
+		VolumePolicies: []resourcepolicies.VolumePolicy{
+			{
+				Conditions: map[string]any{
+					"pvcPhase": []string{"Pending", "Lost"},
+				},
+				Action: resourcepolicies.Action{
+					Type: resourcepolicies.Skip,
+				},
+			},
+		},
+	}
+	policies := &resourcepolicies.Policies{}
+	err := policies.BuildPolicy(resPolicies)
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name           string
+		pvc            *corev1api.PersistentVolumeClaim
+		pv             *corev1api.PersistentVolume
+		expectedAction *resourcepolicies.Action
+		expectError    bool
+	}{
+		{
+			name: "Pending PVC with no VolumeName should match pvcPhase policy",
+			pvc: builder.ForPersistentVolumeClaim("ns", "pending-pvc").
+				StorageClass("test-sc").
+				Phase(corev1api.ClaimPending).
+				Result(),
+			pv:             nil,
+			expectedAction: &resourcepolicies.Action{Type: resourcepolicies.Skip},
+			expectError:    false,
+		},
+		{
+			name: "Lost PVC with no VolumeName should match pvcPhase policy",
+			pvc: builder.ForPersistentVolumeClaim("ns", "lost-pvc").
+				StorageClass("test-sc").
+				Phase(corev1api.ClaimLost).
+				Result(),
+			pv:             nil,
+			expectedAction: &resourcepolicies.Action{Type: resourcepolicies.Skip},
+			expectError:    false,
+		},
+		{
+			name: "Bound PVC with VolumeName and matching PV should not match pvcPhase policy",
+			pvc: builder.ForPersistentVolumeClaim("ns", "bound-pvc").
+				StorageClass("test-sc").
+				VolumeName("test-pv").
+				Phase(corev1api.ClaimBound).
+				Result(),
+			pv:             builder.ForPersistentVolume("test-pv").StorageClass("test-sc").Result(),
+			expectedAction: nil,
+			expectError:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Build fake client with PV if present
+			clientBuilder := ctrlfake.NewClientBuilder().WithScheme(scheme)
+			if tc.pv != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.pv)
+			}
+			fakeClient := clientBuilder.Build()
+
+			ib := &itemBackupper{
+				kbClient: fakeClient,
+				backupRequest: &Request{
+					ResPolicies: policies,
+				},
+			}
+
+			// Convert PVC to unstructured
+			pvcData, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pvc)
+			require.NoError(t, err)
+			obj := &unstructured.Unstructured{Object: pvcData}
+
+			action, err := ib.getMatchAction(obj, kuberesource.PersistentVolumeClaims, csiBIAPluginName)
+			if tc.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tc.expectedAction == nil {
+				assert.Nil(t, action)
+			} else {
+				require.NotNil(t, action)
+				assert.Equal(t, tc.expectedAction.Type, action.Type)
+			}
+		})
+	}
+}
+
+func TestTrackSkippedPV_PendingLostPVC(t *testing.T) {
+	testCases := []struct {
+		name string
+		pvc  *corev1api.PersistentVolumeClaim
+	}{
+		{
+			name: "Pending PVC should log at info level",
+			pvc: builder.ForPersistentVolumeClaim("ns", "pending-pvc").
+				Phase(corev1api.ClaimPending).
+				Result(),
+		},
+		{
+			name: "Lost PVC should log at info level",
+			pvc: builder.ForPersistentVolumeClaim("ns", "lost-pvc").
+				Phase(corev1api.ClaimLost).
+				Result(),
+		},
+		{
+			name: "Bound PVC without VolumeName should log at info level",
+			pvc: builder.ForPersistentVolumeClaim("ns", "bound-pvc").
+				Phase(corev1api.ClaimBound).
+				Result(),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ib := &itemBackupper{
+				backupRequest: &Request{
+					SkippedPVTracker: NewSkipPVTracker(),
+				},
+			}
+
+			// Set up log capture
+			logOutput := &bytes.Buffer{}
+			logger := logrus.New()
+			logger.SetOutput(logOutput)
+			logger.SetLevel(logrus.DebugLevel)
+
+			// Convert PVC to unstructured
+			pvcData, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pvc)
+			require.NoError(t, err)
+			obj := &unstructured.Unstructured{Object: pvcData}
+
+			ib.trackSkippedPV(obj, kuberesource.PersistentVolumeClaims, "", "test reason", logger)
+
+			logStr := logOutput.String()
+			assert.Contains(t, logStr, "level=info")
+			assert.Contains(t, logStr, "unable to get PV name, skip tracking.")
+		})
+	}
+}
+
+func TestUnTrackSkippedPV_PendingLostPVC(t *testing.T) {
+	testCases := []struct {
+		name               string
+		pvc                *corev1api.PersistentVolumeClaim
+		expectWarningLog   bool
+		expectDebugMessage string
+	}{
+		{
+			name: "Pending PVC should log at debug level, not warning",
+			pvc: builder.ForPersistentVolumeClaim("ns", "pending-pvc").
+				Phase(corev1api.ClaimPending).
+				Result(),
+			expectWarningLog:   false,
+			expectDebugMessage: "unable to get PV name for Pending PVC, skip untracking.",
+		},
+		{
+			name: "Lost PVC should log at debug level, not warning",
+			pvc: builder.ForPersistentVolumeClaim("ns", "lost-pvc").
+				Phase(corev1api.ClaimLost).
+				Result(),
+			expectWarningLog:   false,
+			expectDebugMessage: "unable to get PV name for Lost PVC, skip untracking.",
+		},
+		{
+			name: "Bound PVC without VolumeName should log warning",
+			pvc: builder.ForPersistentVolumeClaim("ns", "bound-pvc").
+				Phase(corev1api.ClaimBound).
+				Result(),
+			expectWarningLog:   true,
+			expectDebugMessage: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ib := &itemBackupper{
+				backupRequest: &Request{
+					SkippedPVTracker: NewSkipPVTracker(),
+				},
+			}
+
+			// Set up log capture
+			logOutput := &bytes.Buffer{}
+			logger := logrus.New()
+			logger.SetOutput(logOutput)
+			logger.SetLevel(logrus.DebugLevel)
+
+			// Convert PVC to unstructured
+			pvcData, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pvc)
+			require.NoError(t, err)
+			obj := &unstructured.Unstructured{Object: pvcData}
+
+			ib.unTrackSkippedPV(obj, kuberesource.PersistentVolumeClaims, logger)
+
+			logStr := logOutput.String()
+			if tc.expectWarningLog {
+				assert.Contains(t, logStr, "level=warning")
+				assert.Contains(t, logStr, "unable to get PV name, skip untracking.")
+			} else {
+				assert.NotContains(t, logStr, "level=warning")
+				if tc.expectDebugMessage != "" {
+					assert.Contains(t, logStr, "level=debug")
+					assert.Contains(t, logStr, tc.expectDebugMessage)
+				}
+			}
 		})
 	}
 }

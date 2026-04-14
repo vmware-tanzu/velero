@@ -100,8 +100,23 @@ func TestDeployment(t *testing.T) {
 	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
 	assert.Equal(t, "--repo-maintenance-job-configmap=test-repo-maintenance-config", deploy.Spec.Template.Spec.Containers[0].Args[1])
 
-	assert.Equal(t, "linux", deploy.Spec.Template.Spec.NodeSelector["kubernetes.io/os"])
-	assert.Equal(t, "linux", string(deploy.Spec.Template.Spec.OS.Name))
+	assert.Equal(t, &corev1api.Affinity{
+		NodeAffinity: &corev1api.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+				NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1api.NodeSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Values:   []string{"windows"},
+								Operator: corev1api.NodeSelectorOpNotIn,
+							},
+						},
+					},
+				},
+			},
+		},
+	}, deploy.Spec.Template.Spec.Affinity)
 }
 
 func TestDeploymentWithPriorityClassName(t *testing.T) {

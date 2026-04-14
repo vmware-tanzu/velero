@@ -1,13 +1,13 @@
 ---
-title: "Upgrading to Velero 1.17"
+title: "Upgrading to Velero 1.18"
 layout: docs
 ---
 
 ## Prerequisites
 
-- Velero [v1.16.x][9] installed.
+- Velero [v1.17.x][9] installed.
 
-If you're not yet running at least Velero v1.16, see the following:
+If you're not yet running at least Velero v1.17, see the following:
 
 - [Upgrading to v1.8][1]
 - [Upgrading to v1.9][2]
@@ -18,13 +18,14 @@ If you're not yet running at least Velero v1.16, see the following:
 - [Upgrading to v1.14][7]
 - [Upgrading to v1.15][8]
 - [Upgrading to v1.16][9]
+- [Upgrading to v1.17][10]
 
 Before upgrading, check the [Velero compatibility matrix](https://github.com/vmware-tanzu/velero#velero-compatibility-matrix) to make sure your version of Kubernetes is supported by the new version of Velero.
 
 ## Instructions
 
-### Upgrade from v1.16
-1. Install the Velero v1.17 command-line interface (CLI) by following the [instructions here][0].
+### Upgrade from v1.17
+1. Install the Velero v1.18 command-line interface (CLI) by following the [instructions here][0].
 
     Verify that you've properly installed it by running:
 
@@ -36,7 +37,7 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 
     ```bash
     Client:
-        Version: v1.17.0
+        Version: v1.18.0
         Git commit: <git SHA>
     ```
 
@@ -46,28 +47,21 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
     velero install --crds-only --dry-run -o yaml | kubectl apply -f -
     ```
 
-3. (optional) Update the `uploader-type` to `kopia` if you are using `restic`:  
-    ```bash
-    kubectl get deploy -n velero -ojson \
-    | sed "s/\"--uploader-type=restic\"/\"--uploader-type=kopia\"/g" \
-    | kubectl apply -f -
-    ```
-
-4. Update the container image used by the Velero deployment, plugin and (optionally) the node agent daemon set:
+3. Update the container image used by the Velero deployment, plugin and (optionally) the node agent daemon set:
     ```bash
    # set the container and image of the init container for plugin accordingly,
    # if you are using other plugin
     kubectl set image deployment/velero \
-        velero=velero/velero:v1.17.0 \
-        velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.13.0 \
+        velero=velero/velero:v1.18.0 \
+        velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.14.0 \
         --namespace velero
 
     # optional, if using the node agent daemonset
     kubectl set image daemonset/node-agent \
-        node-agent=velero/velero:v1.17.0 \
+        node-agent=velero/velero:v1.18.0 \
         --namespace velero
     ```
-5. Confirm that the deployment is up and running with the correct version by running:
+4. Confirm that the deployment is up and running with the correct version by running:
 
     ```bash
     velero version
@@ -77,11 +71,11 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 
     ```bash
     Client:
-        Version: v1.17.0
+        Version: v1.18.0
         Git commit: <git SHA>
 
     Server:
-        Version: v1.17.0
+        Version: v1.18.0
     ```
 
 [0]: basic-install.md#install-the-cli
@@ -94,3 +88,4 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 [7]: https://velero.io/docs/v1.14/upgrade-to-1.14
 [8]: https://velero.io/docs/v1.15/upgrade-to-1.15
 [9]: https://velero.io/docs/v1.16/upgrade-to-1.16
+[10]: https://velero.io/docs/v1.17/upgrade-to-1.17

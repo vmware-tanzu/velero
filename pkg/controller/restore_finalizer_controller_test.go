@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	volumegroupsnapshotv1beta2 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumegroupsnapshot/v1beta2"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -45,6 +47,7 @@ import (
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	pkgUtilKubeMocks "github.com/vmware-tanzu/velero/pkg/util/kube/mocks"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
@@ -736,6 +739,256 @@ func TestRestoreOperationList(t *testing.T) {
 				items: tt.items,
 			}
 			assert.Equal(t, tt.expected, l.SelectByPVC(tt.inputPVCNS, tt.inputPVCName))
+		})
+	}
+}
+
+func TestCleanupStubVGSC(t *testing.T) {
+	snapshotHandle1 := "snap-handle-1"
+	snapshotHandle2 := "snap-handle-2"
+
+	tests := []struct {
+		name              string
+		restore           *velerov1api.Restore
+		existingVGSCs     []*volumegroupsnapshotv1beta2.VolumeGroupSnapshotContent
+		existingVSCs      []*snapshotv1api.VolumeSnapshotContent
+		expectedRemaining int
+		expectedWarnings  bool
+	}{
+		{
+			name:              "no stub VGSCs to clean up",
+			restore:           builder.ForRestore(velerov1api.DefaultNamespace, "restore-1").Result(),
+			existingVGSCs:     nil,
+			expectedRemaining: 0,
+			expectedWarnings:  false,
+		},
+		{
+			name:    "single stub VGSC deleted after VSCs are ready",
+			restore: builder.ForRestore(velerov1api.DefaultNamespace, "restore-1").Result(),
+			existingVGSCs: []*volumegroupsnapshotv1beta2.VolumeGroupSnapshotContent{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vgsc-stub-1",
+						Labels: map[string]string{
+							velerov1api.RestoreNameLabel: "restore-1",
+						},
+					},
+					Spec: volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentSpec{
+						Driver: "rbd.csi.ceph.com",
+						Source: volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentSource{
+							GroupSnapshotHandles: &volumegroupsnapshotv1beta2.GroupSnapshotHandles{
+								VolumeGroupSnapshotHandle: "vgs-handle-1",
+								VolumeSnapshotHandles:     []string{snapshotHandle1},
+							},
+						},
+					},
+				},
+			},
+			existingVSCs: []*snapshotv1api.VolumeSnapshotContent{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vsc-1",
+						Labels: map[string]string{
+							velerov1api.RestoreNameLabel: "restore-1",
+						},
+					},
+					Spec: snapshotv1api.VolumeSnapshotContentSpec{
+						Driver:         "rbd.csi.ceph.com",
+						DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+						Source: snapshotv1api.VolumeSnapshotContentSource{
+							SnapshotHandle: &snapshotHandle1,
+						},
+						VolumeSnapshotRef: corev1api.ObjectReference{
+							Name:      "vs-1",
+							Namespace: "ns-1",
+						},
+					},
+					Status: &snapshotv1api.VolumeSnapshotContentStatus{
+						ReadyToUse: boolptr.True(),
+					},
+				},
+			},
+			expectedRemaining: 0,
+			expectedWarnings:  false,
+		},
+		{
+			name:    "multiple stub VGSCs deleted",
+			restore: builder.ForRestore(velerov1api.DefaultNamespace, "restore-1").Result(),
+			existingVGSCs: []*volumegroupsnapshotv1beta2.VolumeGroupSnapshotContent{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vgsc-stub-1",
+						Labels: map[string]string{
+							velerov1api.RestoreNameLabel: "restore-1",
+						},
+					},
+					Spec: volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentSpec{
+						Driver: "rbd.csi.ceph.com",
+						Source: volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentSource{
+							GroupSnapshotHandles: &volumegroupsnapshotv1beta2.GroupSnapshotHandles{
+								VolumeGroupSnapshotHandle: "vgs-handle-1",
+								VolumeSnapshotHandles:     []string{snapshotHandle1},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vgsc-stub-2",
+						Labels: map[string]string{
+							velerov1api.RestoreNameLabel: "restore-1",
+						},
+					},
+					Spec: volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentSpec{
+						Driver: "rbd.csi.ceph.com",
+						Source: volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentSource{
+							GroupSnapshotHandles: &volumegroupsnapshotv1beta2.GroupSnapshotHandles{
+								VolumeGroupSnapshotHandle: "vgs-handle-2",
+								VolumeSnapshotHandles:     []string{snapshotHandle2},
+							},
+						},
+					},
+				},
+			},
+			existingVSCs: []*snapshotv1api.VolumeSnapshotContent{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vsc-1",
+						Labels: map[string]string{
+							velerov1api.RestoreNameLabel: "restore-1",
+						},
+					},
+					Spec: snapshotv1api.VolumeSnapshotContentSpec{
+						Driver:         "rbd.csi.ceph.com",
+						DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+						Source: snapshotv1api.VolumeSnapshotContentSource{
+							SnapshotHandle: &snapshotHandle1,
+						},
+						VolumeSnapshotRef: corev1api.ObjectReference{
+							Name:      "vs-1",
+							Namespace: "ns-1",
+						},
+					},
+					Status: &snapshotv1api.VolumeSnapshotContentStatus{
+						ReadyToUse: boolptr.True(),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vsc-2",
+						Labels: map[string]string{
+							velerov1api.RestoreNameLabel: "restore-1",
+						},
+					},
+					Spec: snapshotv1api.VolumeSnapshotContentSpec{
+						Driver:         "rbd.csi.ceph.com",
+						DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+						Source: snapshotv1api.VolumeSnapshotContentSource{
+							SnapshotHandle: &snapshotHandle2,
+						},
+						VolumeSnapshotRef: corev1api.ObjectReference{
+							Name:      "vs-2",
+							Namespace: "ns-1",
+						},
+					},
+					Status: &snapshotv1api.VolumeSnapshotContentStatus{
+						ReadyToUse: boolptr.True(),
+					},
+				},
+			},
+			expectedRemaining: 0,
+			expectedWarnings:  false,
+		},
+		{
+			name:    "VGSCs from different restore are not deleted",
+			restore: builder.ForRestore(velerov1api.DefaultNamespace, "restore-1").Result(),
+			existingVGSCs: []*volumegroupsnapshotv1beta2.VolumeGroupSnapshotContent{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vgsc-stub-mine",
+						Labels: map[string]string{
+							velerov1api.RestoreNameLabel: "restore-1",
+						},
+					},
+					Spec: volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentSpec{
+						Driver: "rbd.csi.ceph.com",
+						Source: volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentSource{},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vgsc-stub-other",
+						Labels: map[string]string{
+							velerov1api.RestoreNameLabel: "restore-2",
+						},
+					},
+					Spec: volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentSpec{
+						Driver: "rbd.csi.ceph.com",
+						Source: volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentSource{},
+					},
+				},
+			},
+			expectedRemaining: 1,
+			expectedWarnings:  false,
+		},
+		{
+			name:    "VGSC deleted even when no snapshot handles in spec",
+			restore: builder.ForRestore(velerov1api.DefaultNamespace, "restore-1").Result(),
+			existingVGSCs: []*volumegroupsnapshotv1beta2.VolumeGroupSnapshotContent{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vgsc-stub-empty",
+						Labels: map[string]string{
+							velerov1api.RestoreNameLabel: "restore-1",
+						},
+					},
+					Spec: volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentSpec{
+						Driver: "rbd.csi.ceph.com",
+						Source: volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentSource{},
+					},
+				},
+			},
+			expectedRemaining: 0,
+			expectedWarnings:  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := velerotest.NewFakeControllerRuntimeClientBuilder(t).Build()
+			logger := velerotest.NewLogger()
+
+			ctx := &finalizerContext{
+				logger:          logger,
+				crClient:        fakeClient,
+				restore:         tc.restore,
+				resourceTimeout: 10 * time.Second,
+			}
+
+			for _, vgsc := range tc.existingVGSCs {
+				require.NoError(t, fakeClient.Create(t.Context(), vgsc))
+			}
+			for _, vsc := range tc.existingVSCs {
+				require.NoError(t, fakeClient.Create(t.Context(), vsc))
+			}
+
+			warnings := ctx.cleanupStubVGSC()
+
+			if tc.expectedWarnings {
+				assert.False(t, warnings.IsEmpty())
+			} else {
+				assert.True(t, warnings.IsEmpty(), "expected no warnings")
+			}
+
+			remainingList := &volumegroupsnapshotv1beta2.VolumeGroupSnapshotContentList{}
+			require.NoError(t, fakeClient.List(t.Context(), remainingList))
+			assert.Len(t, remainingList.Items, tc.expectedRemaining)
+
+			// Verify remaining VGSCs don't belong to this restore
+			for _, remaining := range remainingList.Items {
+				assert.NotEqual(t, tc.restore.Name, remaining.Labels[velerov1api.RestoreNameLabel],
+					"VGSC %s should have been deleted", remaining.Name)
+			}
 		})
 	}
 }

@@ -251,11 +251,9 @@ func (fs *fileSystemBR) boostRepoConnect(ctx context.Context, repositoryType str
 		if err := repoProvider.NewUnifiedRepoProvider(*credentialGetter, repositoryType, fs.log).BoostRepoConnect(ctx, repoProvider.RepoParam{BackupLocation: fs.backupLocation, BackupRepo: fs.backupRepo, CacheDir: cacheDir}); err != nil {
 			return err
 		}
-	} else {
-		if err := repoProvider.NewResticRepositoryProvider(*credentialGetter, filesystem.NewFileSystem(), fs.log).BoostRepoConnect(ctx, repoProvider.RepoParam{BackupLocation: fs.backupLocation, BackupRepo: fs.backupRepo}); err != nil {
-			return err
-		}
+
+		return nil
 	}
 
-	return nil
+	return errors.Errorf("error getting provider for repo %s", repositoryType)
 }

@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	velerolabel "github.com/vmware-tanzu/velero/pkg/label"
 	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util"
@@ -574,15 +575,32 @@ func buildJob(
 	// Set resource limits and requests
 	cpuRequest := DefaultMaintenanceJobCPURequest
 	memRequest := DefaultMaintenanceJobMemRequest
+	ephemeralStorageRequest := constant.DefaultEphemeralStorageRequest
 	cpuLimit := DefaultMaintenanceJobCPULimit
 	memLimit := DefaultMaintenanceJobMemLimit
+	ephemeralStorageLimit := constant.DefaultEphemeralStorageLimit
 	if config != nil && config.PodResources != nil {
 		cpuRequest = config.PodResources.CPURequest
 		memRequest = config.PodResources.MemoryRequest
 		cpuLimit = config.PodResources.CPULimit
 		memLimit = config.PodResources.MemoryLimit
+		// To make the PodResources ConfigMap without ephemeral storage request/limit backward compatible,
+		// need to avoid set value as empty, because empty string will cause parsing error.
+		if config.PodResources.EphemeralStorageRequest != "" {
+			ephemeralStorageRequest = config.PodResources.EphemeralStorageRequest
+		}
+		if config.PodResources.EphemeralStorageLimit != "" {
+			ephemeralStorageLimit = config.PodResources.EphemeralStorageLimit
+		}
 	}
-	resources, err := kube.ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit)
+	resources, err := kube.ParseResourceRequirements(
+		cpuRequest,
+		memRequest,
+		ephemeralStorageRequest,
+		cpuLimit,
+		memLimit,
+		ephemeralStorageLimit,
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse resource requirements for maintenance job")
 	}
@@ -671,8 +689,7 @@ func buildJob(
 	}
 
 	if config != nil && len(config.LoadAffinities) > 0 {
-		// Maintenance job only takes the first loadAffinity.
-		affinity := kube.ToSystemAffinity([]*kube.LoadAffinity{config.LoadAffinities[0]})
+		affinity := kube.ToSystemAffinity(config.LoadAffinities[0], nil)
 		job.Spec.Template.Spec.Affinity = affinity
 	}
 

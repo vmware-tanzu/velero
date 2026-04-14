@@ -129,6 +129,13 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	} else {
 		schedule.Status.Phase = velerov1.SchedulePhaseEnabled
 		schedule.Status.ValidationErrors = nil
+
+		// Compute expected interval between consecutive scheduled backup runs.
+		// Only meaningful when the cron expression is valid.
+		now := c.clock.Now()
+		nextRun := cronSchedule.Next(now)
+		nextNextRun := cronSchedule.Next(nextRun)
+		c.metrics.SetScheduleExpectedIntervalSeconds(schedule.Name, nextNextRun.Sub(nextRun).Seconds())
 	}
 
 	scheduleNeedsPatch := false

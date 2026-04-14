@@ -80,6 +80,9 @@ const (
 	DataDownloadFailureTotal = "data_download_failure_total"
 	DataDownloadCancelTotal  = "data_download_cancel_total"
 
+	// schedule metrics
+	scheduleExpectedIntervalSeconds = "schedule_expected_interval_seconds"
+
 	// repo maintenance metrics
 	repoMaintenanceSuccessTotal = "repo_maintenance_success_total"
 	repoMaintenanceFailureTotal = "repo_maintenance_failure_total"
@@ -346,6 +349,14 @@ func NewServerMetrics() *ServerMetrics {
 					Help:      "Total number of CSI failed volume snapshots",
 				},
 				[]string{scheduleLabel, backupNameLabel},
+			),
+			scheduleExpectedIntervalSeconds: prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      scheduleExpectedIntervalSeconds,
+					Help:      "Expected interval between consecutive scheduled backups, in seconds",
+				},
+				[]string{scheduleLabel},
 			),
 			repoMaintenanceSuccessTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
@@ -644,6 +655,9 @@ func (m *ServerMetrics) RemoveSchedule(scheduleName string) {
 	if c, ok := m.metrics[csiSnapshotFailureTotal].(*prometheus.CounterVec); ok {
 		c.DeleteLabelValues(scheduleName, "")
 	}
+	if g, ok := m.metrics[scheduleExpectedIntervalSeconds].(*prometheus.GaugeVec); ok {
+		g.DeleteLabelValues(scheduleName)
+	}
 }
 
 // InitMetricsForNode initializes counter metrics for a node.
@@ -755,6 +769,14 @@ func (m *ServerMetrics) SetBackupTarballSizeBytesGauge(backupSchedule string, si
 func (m *ServerMetrics) SetBackupLastSuccessfulTimestamp(backupSchedule string, time time.Time) {
 	if g, ok := m.metrics[backupLastSuccessfulTimestamp].(*prometheus.GaugeVec); ok {
 		g.WithLabelValues(backupSchedule).Set(float64(time.Unix()))
+	}
+}
+
+// SetScheduleExpectedIntervalSeconds records the expected interval in seconds,
+// between consecutive backups for a schedule.
+func (m *ServerMetrics) SetScheduleExpectedIntervalSeconds(scheduleName string, seconds float64) {
+	if g, ok := m.metrics[scheduleExpectedIntervalSeconds].(*prometheus.GaugeVec); ok {
+		g.WithLabelValues(scheduleName).Set(seconds)
 	}
 }
 

@@ -87,6 +87,6 @@ func NewUploaderProvider(
 	if uploaderType == uploader.KopiaType {
 		return NewKopiaUploaderProvider(requesterType, ctx, credGetter, backupRepo, log)
 	} else {
-		return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
+		return nil, errors.Errorf("unsupported uploader type %v", uploaderType)
 	}
 }

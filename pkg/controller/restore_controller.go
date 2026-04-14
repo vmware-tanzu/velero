@@ -529,6 +529,7 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		LabelSelector: labels.Set(map[string]string{
 			api.BackupNameLabel: label.GetValidName(restore.Spec.BackupName),
 		}).AsSelector(),
+		Namespace: restore.Namespace,
 	}
 
 	podVolumeBackupList := &api.PodVolumeBackupList{}

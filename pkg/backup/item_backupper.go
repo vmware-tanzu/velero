@@ -40,7 +40,6 @@ import (
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/volume"
-	"github.com/vmware-tanzu/velero/internal/volumehelper"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -54,6 +53,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	csiutil "github.com/vmware-tanzu/velero/pkg/util/csi"
+	"github.com/vmware-tanzu/velero/pkg/util/volumehelper"
 )
 
 const (
@@ -244,6 +244,14 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		return false, itemFiles, kubeerrs.NewAggregate(backupErrs)
 	}
 
+	// If err is nil and updatedObj is nil, it means the item is skipped by plugin action,
+	// we should return here to avoid backing up the item, and avoid potential NPE in the following code.
+	if updatedObj == nil {
+		log.Infof("Remove item from the backup's backupItems list and totalItems list because it's skipped by plugin action.")
+		ib.backupRequest.BackedUpItems.DeleteItem(key)
+		return false, itemFiles, nil
+	}
+
 	itemFiles = append(itemFiles, additionalItemFiles...)
 	obj = updatedObj
 	if metadata, err = meta.Accessor(obj); err != nil {
@@ -398,6 +406,13 @@ func (ib *itemBackupper) executeActions(
 		}
 
 		u := &unstructured.Unstructured{Object: updatedItem.UnstructuredContent()}
+
+		if _, ok := u.GetAnnotations()[velerov1api.SkipFromBackupAnnotation]; ok {
+			log.Infof("Resource (groupResource=%s, namespace=%s, name=%s) is skipped from backup by action %s.",
+				groupResource.String(), namespace, name, actionName)
+			return nil, itemFiles, nil
+		}
+
 		if actionName == csiBIAPluginName {
 			if additionalItemIdentifiers == nil && u.GetAnnotations()[velerov1api.SkippedNoCSIPVAnnotation] == "true" {
 				// snapshot was skipped by CSI plugin
@@ -687,15 +702,14 @@ func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource 
 			return nil, errors.WithStack(err)
 		}
 
-		pvName := pvc.Spec.VolumeName
-		if pvName == "" {
-			return nil, errors.Errorf("PVC has no volume backing this claim")
+		var pv *corev1api.PersistentVolume
+		if pvName := pvc.Spec.VolumeName; pvName != "" {
+			pv = &corev1api.PersistentVolume{}
+			if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
+				return nil, errors.WithStack(err)
+			}
 		}
-
-		pv := &corev1api.PersistentVolume{}
-		if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
-			return nil, errors.WithStack(err)
-		}
+		// If pv is nil for unbound PVCs - policy matching will use PVC-only conditions
 		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
 		return ib.backupRequest.ResPolicies.GetMatchAction(vfd)
 	}
@@ -709,7 +723,10 @@ func (ib *itemBackupper) trackSkippedPV(obj runtime.Unstructured, groupResource 
 	if name, err := getPVName(obj, groupResource); len(name) > 0 && err == nil {
 		ib.backupRequest.SkippedPVTracker.Track(name, approach, reason)
 	} else if err != nil {
-		log.WithError(err).Warnf("unable to get PV name, skip tracking.")
+		// Log at info level for tracking purposes. This is not an error because
+		// it's expected for some resources (e.g., PVCs in Pending or Lost phase)
+		// to not have a PV name. This occurs when volume policy skips unbound PVCs.
+		log.WithError(err).Infof("unable to get PV name, skip tracking.")
 	}
 }
 
@@ -719,6 +736,17 @@ func (ib *itemBackupper) unTrackSkippedPV(obj runtime.Unstructured, groupResourc
 	if name, err := getPVName(obj, groupResource); len(name) > 0 && err == nil {
 		ib.backupRequest.SkippedPVTracker.Untrack(name)
 	} else if err != nil {
+		// For PVCs in Pending or Lost phase, it's expected that there's no PV name.
+		// Log at debug level instead of warning to reduce noise.
+		if groupResource == kuberesource.PersistentVolumeClaims {
+			pvc := new(corev1api.PersistentVolumeClaim)
+			if convErr := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pvc); convErr == nil {
+				if pvc.Status.Phase == corev1api.ClaimPending || pvc.Status.Phase == corev1api.ClaimLost {
+					log.WithError(err).Debugf("unable to get PV name for %s PVC, skip untracking.", pvc.Status.Phase)
+					return
+				}
+			}
+		}
 		log.WithError(err).Warnf("unable to get PV name, skip untracking.")
 	}
 }

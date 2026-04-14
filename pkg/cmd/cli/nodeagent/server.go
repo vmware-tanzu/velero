@@ -323,7 +323,25 @@ func (s *nodeAgentServer) run() {
 
 	podResources := corev1api.ResourceRequirements{}
 	if s.dataPathConfigs != nil && s.dataPathConfigs.PodResources != nil {
-		if res, err := kube.ParseResourceRequirements(s.dataPathConfigs.PodResources.CPURequest, s.dataPathConfigs.PodResources.MemoryRequest, s.dataPathConfigs.PodResources.CPULimit, s.dataPathConfigs.PodResources.MemoryLimit); err != nil {
+		// To make the PodResources ConfigMap without ephemeral storage request/limit backward compatible,
+		// need to avoid set value as empty, because empty string will cause parsing error.
+		ephemeralStorageRequest := constant.DefaultEphemeralStorageRequest
+		if s.dataPathConfigs.PodResources.EphemeralStorageRequest != "" {
+			ephemeralStorageRequest = s.dataPathConfigs.PodResources.EphemeralStorageRequest
+		}
+		ephemeralStorageLimit := constant.DefaultEphemeralStorageLimit
+		if s.dataPathConfigs.PodResources.EphemeralStorageLimit != "" {
+			ephemeralStorageLimit = s.dataPathConfigs.PodResources.EphemeralStorageLimit
+		}
+
+		if res, err := kube.ParseResourceRequirements(
+			s.dataPathConfigs.PodResources.CPURequest,
+			s.dataPathConfigs.PodResources.MemoryRequest,
+			ephemeralStorageRequest,
+			s.dataPathConfigs.PodResources.CPULimit,
+			s.dataPathConfigs.PodResources.MemoryLimit,
+			ephemeralStorageLimit,
+		); err != nil {
 			s.logger.WithError(err).Warn("Pod resource requirements are invalid, ignore")
 		} else {
 			podResources = res
