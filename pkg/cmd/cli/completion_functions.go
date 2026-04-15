@@ -19,6 +19,7 @@ package cli
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,128 +31,105 @@ import (
 // completionFunc is the function signature for cobra's ValidArgsFunction.
 type completionFunc = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)
 
-// CompleteBackupNames returns a completion function that lists backup names from the cluster.
+// completeNames is a generic helper that builds a completion function for any
+// Velero list type. The caller provides a constructor for the list object and a
+// callback that extracts resource names from it.
+func completeNames[L kbclient.ObjectList](f client.Factory, newList func() L, getNames func(L) []string) completionFunc {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		kbClient, err := f.KubebuilderClient()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		list := newList()
+		if err := kbClient.List(ctx, list, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		var filtered []string
+		for _, name := range getNames(list) {
+			if strings.HasPrefix(name, toComplete) {
+				filtered = append(filtered, name)
+			}
+		}
+		return filtered, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
 func CompleteBackupNames(f client.Factory) completionFunc {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		kbClient, err := f.KubebuilderClient()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		backups := new(velerov1api.BackupList)
-		if err := kbClient.List(context.TODO(), backups, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		var names []string
-		for _, b := range backups.Items {
-			if strings.HasPrefix(b.Name, toComplete) {
-				names = append(names, b.Name)
+	return completeNames(f,
+		func() *velerov1api.BackupList { return new(velerov1api.BackupList) },
+		func(l *velerov1api.BackupList) []string {
+			names := make([]string, len(l.Items))
+			for i, b := range l.Items {
+				names[i] = b.Name
 			}
-		}
-		return names, cobra.ShellCompDirectiveNoFileComp
-	}
+			return names
+		},
+	)
 }
 
-// CompleteRestoreNames returns a completion function that lists restore names from the cluster.
 func CompleteRestoreNames(f client.Factory) completionFunc {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		kbClient, err := f.KubebuilderClient()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		restores := new(velerov1api.RestoreList)
-		if err := kbClient.List(context.TODO(), restores, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		var names []string
-		for _, r := range restores.Items {
-			if strings.HasPrefix(r.Name, toComplete) {
-				names = append(names, r.Name)
+	return completeNames(f,
+		func() *velerov1api.RestoreList { return new(velerov1api.RestoreList) },
+		func(l *velerov1api.RestoreList) []string {
+			names := make([]string, len(l.Items))
+			for i, r := range l.Items {
+				names[i] = r.Name
 			}
-		}
-		return names, cobra.ShellCompDirectiveNoFileComp
-	}
+			return names
+		},
+	)
 }
 
-// CompleteScheduleNames returns a completion function that lists schedule names from the cluster.
 func CompleteScheduleNames(f client.Factory) completionFunc {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		kbClient, err := f.KubebuilderClient()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		schedules := new(velerov1api.ScheduleList)
-		if err := kbClient.List(context.TODO(), schedules, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		var names []string
-		for _, s := range schedules.Items {
-			if strings.HasPrefix(s.Name, toComplete) {
-				names = append(names, s.Name)
+	return completeNames(f,
+		func() *velerov1api.ScheduleList { return new(velerov1api.ScheduleList) },
+		func(l *velerov1api.ScheduleList) []string {
+			names := make([]string, len(l.Items))
+			for i, s := range l.Items {
+				names[i] = s.Name
 			}
-		}
-		return names, cobra.ShellCompDirectiveNoFileComp
-	}
+			return names
+		},
+	)
 }
 
-// CompleteBackupStorageLocationNames returns a completion function that lists backup storage location names from the cluster.
 func CompleteBackupStorageLocationNames(f client.Factory) completionFunc {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		kbClient, err := f.KubebuilderClient()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		locations := new(velerov1api.BackupStorageLocationList)
-		if err := kbClient.List(context.TODO(), locations, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		var names []string
-		for _, l := range locations.Items {
-			if strings.HasPrefix(l.Name, toComplete) {
-				names = append(names, l.Name)
+	return completeNames(f,
+		func() *velerov1api.BackupStorageLocationList { return new(velerov1api.BackupStorageLocationList) },
+		func(l *velerov1api.BackupStorageLocationList) []string {
+			names := make([]string, len(l.Items))
+			for i, loc := range l.Items {
+				names[i] = loc.Name
 			}
-		}
-		return names, cobra.ShellCompDirectiveNoFileComp
-	}
+			return names
+		},
+	)
 }
 
-// CompleteVolumeSnapshotLocationNames returns a completion function that lists volume snapshot location names from the cluster.
 func CompleteVolumeSnapshotLocationNames(f client.Factory) completionFunc {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		kbClient, err := f.KubebuilderClient()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		locations := new(velerov1api.VolumeSnapshotLocationList)
-		if err := kbClient.List(context.TODO(), locations, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		var names []string
-		for _, l := range locations.Items {
-			if strings.HasPrefix(l.Name, toComplete) {
-				names = append(names, l.Name)
+	return completeNames(f,
+		func() *velerov1api.VolumeSnapshotLocationList { return new(velerov1api.VolumeSnapshotLocationList) },
+		func(l *velerov1api.VolumeSnapshotLocationList) []string {
+			names := make([]string, len(l.Items))
+			for i, loc := range l.Items {
+				names[i] = loc.Name
 			}
-		}
-		return names, cobra.ShellCompDirectiveNoFileComp
-	}
+			return names
+		},
+	)
 }
 
-// CompleteBackupRepositoryNames returns a completion function that lists backup repository names from the cluster.
 func CompleteBackupRepositoryNames(f client.Factory) completionFunc {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		kbClient, err := f.KubebuilderClient()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		repos := new(velerov1api.BackupRepositoryList)
-		if err := kbClient.List(context.TODO(), repos, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		var names []string
-		for _, r := range repos.Items {
-			if strings.HasPrefix(r.Name, toComplete) {
-				names = append(names, r.Name)
+	return completeNames(f,
+		func() *velerov1api.BackupRepositoryList { return new(velerov1api.BackupRepositoryList) },
+		func(l *velerov1api.BackupRepositoryList) []string {
+			names := make([]string, len(l.Items))
+			for i, r := range l.Items {
+				names[i] = r.Name
 			}
-		}
-		return names, cobra.ShellCompDirectiveNoFileComp
-	}
+			return names
+		},
+	)
 }
