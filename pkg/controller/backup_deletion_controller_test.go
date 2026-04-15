@@ -671,7 +671,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td.backupStore.On("GetBackupVolumeSnapshots", input.Spec.BackupName).Return(snapshots, nil)
 		td.backupStore.On("GetBackupContents", input.Spec.BackupName).Return(nil, fmt.Errorf("error downloading tarball"))
 
-		_, err := td.controller.Reconcile(t.Context(), td.req)
+		_, err := td.controller.Reconcile(context.TODO(), td.req)
 		require.NoError(t, err)
 
 		td.backupStore.AssertCalled(t, "GetBackupContents", input.Spec.BackupName)
@@ -688,7 +688,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.Contains(t, res.Status.Errors[0], "error downloading backup tarball, CSI snapshot cleanup was skipped")
 
 		// backup CR should NOT be deleted
-		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
+		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      backup.Name,
 		}, &velerov1api.Backup{})
@@ -767,7 +767,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.True(t, apierrors.IsNotFound(err), "Expected DBR to be deleted after not-found tarball error, but actual error: %v", err)
 
 		// backup CR should be deleted because there are no errors in errs
-		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
+		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      backup.Name,
 		}, &velerov1api.Backup{})
