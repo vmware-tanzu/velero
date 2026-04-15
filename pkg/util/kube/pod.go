@@ -274,7 +274,7 @@ func ToSystemAffinity(loadAffinity *LoadAffinity, volumeTopology *corev1api.Node
 
 func DiagnosePod(pod *corev1api.Pod, events *corev1api.EventList) string {
 	var diag strings.Builder
-	diag.WriteString(fmt.Sprintf("Pod %s/%s, phase %s, node name %s, message %s\n", pod.Namespace, pod.Name, pod.Status.Phase, pod.Spec.NodeName, pod.Status.Message))
+	_, _ = fmt.Fprintf(&diag, "Pod %s/%s, phase %s, node name %s, message %s\n", pod.Namespace, pod.Name, pod.Status.Phase, pod.Spec.NodeName, pod.Status.Message)
 
 	for _, condition := range pod.Status.Conditions {
 		diag.WriteString(fmt.Sprintf("Pod condition %s, status %s, reason %s, message %s\n", condition.Type, condition.Status, condition.Reason, condition.Message))
