@@ -103,11 +103,6 @@ local_resource(
     deps = ["internal", "pkg/cmd"],
 )
 
-local_resource(
-    "restic_binary",
-    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild/restic; BIN=velero GOOS=linux GOARCH=amd64 GOARM="" RESTIC_VERSION=0.13.1 OUTPUT_DIR=_tiltbuild/restic ./hack/build-restic.sh',
-)
-
 # Note: we need a distro with a bash shell to exec into the Velero container
 tilt_dockerfile_header = """
 FROM ubuntu:22.04 as tilt
@@ -118,7 +113,6 @@ WORKDIR /
 COPY --from=tilt-helper /start.sh .
 COPY --from=tilt-helper /restart.sh .
 COPY velero .
-COPY restic/restic /usr/bin/restic
 """
 
 dockerfile_contents = "\n".join([
