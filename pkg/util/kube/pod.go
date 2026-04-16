@@ -277,13 +277,13 @@ func DiagnosePod(pod *corev1api.Pod, events *corev1api.EventList) string {
 	_, _ = fmt.Fprintf(&diag, "Pod %s/%s, phase %s, node name %s, message %s\n", pod.Namespace, pod.Name, pod.Status.Phase, pod.Spec.NodeName, pod.Status.Message)
 
 	for _, condition := range pod.Status.Conditions {
-		diag.WriteString(fmt.Sprintf("Pod condition %s, status %s, reason %s, message %s\n", condition.Type, condition.Status, condition.Reason, condition.Message))
+		_, _ = fmt.Fprintf(&diag, "Pod condition %s, status %s, reason %s, message %s\n", condition.Type, condition.Status, condition.Reason, condition.Message)
 	}
 
 	if events != nil {
 		for _, e := range events.Items {
 			if e.InvolvedObject.UID == pod.UID && e.Type == corev1api.EventTypeWarning {
-				diag.WriteString(fmt.Sprintf("Pod event reason %s, message %s\n", e.Reason, e.Message))
+				_, _ = fmt.Fprintf(&diag, "Pod event reason %s, message %s\n", e.Reason, e.Message)
 			}
 		}
 	}

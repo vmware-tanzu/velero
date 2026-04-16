@@ -714,7 +714,7 @@ func DiagnoseVS(vs *snapshotv1api.VolumeSnapshot, events *corev1api.EventList) s
 	if events != nil {
 		for _, e := range events.Items {
 			if e.InvolvedObject.UID == vs.UID && e.Type == corev1api.EventTypeWarning {
-				diag.WriteString(fmt.Sprintf("VS event reason %s, message %s\n", e.Reason, e.Message))
+				_, _ = fmt.Fprintf(&diag, "VS event reason %s, message %s\n", e.Reason, e.Message)
 			}
 		}
 	}

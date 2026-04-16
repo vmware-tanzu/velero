@@ -470,7 +470,7 @@ func DiagnosePVC(pvc *corev1api.PersistentVolumeClaim, events *corev1api.EventLi
 	if events != nil {
 		for _, e := range events.Items {
 			if e.InvolvedObject.UID == pvc.UID && e.Type == corev1api.EventTypeWarning {
-				diag.WriteString(fmt.Sprintf("PVC event reason %s, message %s\n", e.Reason, e.Message))
+				_, _ = fmt.Fprintf(&diag, "PVC event reason %s, message %s\n", e.Reason, e.Message)
 			}
 		}
 	}
