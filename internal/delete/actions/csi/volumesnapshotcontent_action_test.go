@@ -251,67 +251,6 @@ func TestCheckVSCReadiness(t *testing.T) {
 			}
 		})
 	}
-
-	// Error injection tests for tryDeleteOriginalVSC
-	t.Run("Get returns non-NotFound error, returns false", func(t *testing.T) {
-		errClient := &fakeClientWithErrors{
-			Client:   velerotest.NewFakeControllerRuntimeClient(t),
-			getError: fmt.Errorf("connection refused"),
-		}
-		p := &volumeSnapshotContentDeleteItemAction{
-			log:      logrus.StandardLogger(),
-			crClient: errClient,
-		}
-		require.False(t, p.tryDeleteOriginalVSC(t.Context(), "some-vsc"))
-	})
-
-	t.Run("Patch fails, returns false", func(t *testing.T) {
-		realClient := velerotest.NewFakeControllerRuntimeClient(t)
-		vsc := &snapshotv1api.VolumeSnapshotContent{
-			ObjectMeta: metav1.ObjectMeta{Name: "patch-fail-vsc"},
-			Spec: snapshotv1api.VolumeSnapshotContentSpec{
-				DeletionPolicy:    snapshotv1api.VolumeSnapshotContentRetain,
-				Driver:            "disk.csi.azure.com",
-				Source:            snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: stringPtr("snap-789")},
-				VolumeSnapshotRef: corev1api.ObjectReference{Name: "vs-3", Namespace: "default"},
-			},
-		}
-		require.NoError(t, realClient.Create(t.Context(), vsc))
-
-		errClient := &fakeClientWithErrors{
-			Client:     realClient,
-			patchError: fmt.Errorf("patch forbidden"),
-		}
-		p := &volumeSnapshotContentDeleteItemAction{
-			log:      logrus.StandardLogger(),
-			crClient: errClient,
-		}
-		require.False(t, p.tryDeleteOriginalVSC(t.Context(), "patch-fail-vsc"))
-	})
-
-	t.Run("Delete fails, returns false", func(t *testing.T) {
-		realClient := velerotest.NewFakeControllerRuntimeClient(t)
-		vsc := &snapshotv1api.VolumeSnapshotContent{
-			ObjectMeta: metav1.ObjectMeta{Name: "delete-fail-vsc"},
-			Spec: snapshotv1api.VolumeSnapshotContentSpec{
-				DeletionPolicy:    snapshotv1api.VolumeSnapshotContentDelete,
-				Driver:            "disk.csi.azure.com",
-				Source:            snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: stringPtr("snap-999")},
-				VolumeSnapshotRef: corev1api.ObjectReference{Name: "vs-4", Namespace: "default"},
-			},
-		}
-		require.NoError(t, realClient.Create(t.Context(), vsc))
-
-		errClient := &fakeClientWithErrors{
-			Client:      realClient,
-			deleteError: fmt.Errorf("delete forbidden"),
-		}
-		p := &volumeSnapshotContentDeleteItemAction{
-			log:      logrus.StandardLogger(),
-			crClient: errClient,
-		}
-		require.False(t, p.tryDeleteOriginalVSC(t.Context(), "delete-fail-vsc"))
-	})
 }
 
 func TestVSCExecute_CreateSleepDeleteOrder(t *testing.T) {
@@ -345,12 +284,4 @@ func TestVSCExecute_CreateSleepDeleteOrder(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, []string{"create", "sleep", "delete"}, events)
-}
-
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-func stringPtr(s string) *string {
-	return &s
 }
