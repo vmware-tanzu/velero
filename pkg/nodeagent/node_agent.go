@@ -80,6 +80,31 @@ func KbClientIsRunningInNode(ctx context.Context, namespace string, nodeName str
 	return isRunningInNode(ctx, namespace, nodeName, nil, kubeClient)
 }
 
+// HasRunningPods checks if any node agent pod is running in the namespace through controller client. If not, return the error found.
+func HasRunningPods(ctx context.Context, namespace string, crClient ctrlclient.Client) error {
+	pods := new(corev1api.PodList)
+	parsedSelector, err := labels.Parse(fmt.Sprintf("role=%s", nodeAgentRole))
+	if err != nil {
+		return errors.Wrap(err, "fail to parse selector")
+	}
+
+	err = crClient.List(ctx, pods, &ctrlclient.ListOptions{
+		LabelSelector: parsedSelector,
+		Namespace:     namespace,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to list node-agent pods")
+	}
+
+	for i := range pods.Items {
+		if kube.IsPodRunning(&pods.Items[i]) == nil {
+			return nil
+		}
+	}
+
+	return errors.New("no running node-agent pods found")
+}
+
 // IsRunningInNode checks if the node agent pod is running properly in a specified node through controller client. If not, return the error found
 func IsRunningInNode(ctx context.Context, namespace string, nodeName string, crClient ctrlclient.Client) error {
 	return isRunningInNode(ctx, namespace, nodeName, crClient, nil)

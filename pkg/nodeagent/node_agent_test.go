@@ -213,6 +213,72 @@ func TestIsRunningInNode(t *testing.T) {
 	}
 }
 
+func TestHasRunningPods(t *testing.T) {
+	scheme := runtime.NewScheme()
+	corev1api.AddToScheme(scheme)
+
+	nonNodeAgentPod := builder.ForPod("fake-ns", "fake-pod").Result()
+	nodeAgentPodNotRunning := builder.ForPod("fake-ns", "fake-pod-pending").Labels(map[string]string{"role": "node-agent"}).Result()
+	nodeAgentPodRunning := builder.ForPod("fake-ns", "fake-pod-running").
+		Labels(map[string]string{"role": "node-agent"}).
+		Phase(corev1api.PodRunning).
+		NodeName("fake-node").
+		Result()
+
+	tests := []struct {
+		name          string
+		kubeClientObj []runtime.Object
+		namespace     string
+		expectErr     string
+	}{
+		{
+			name:      "no pods at all",
+			namespace: "fake-ns",
+			expectErr: "no running node-agent pods found",
+		},
+		{
+			name:      "only non-node-agent pods",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				nonNodeAgentPod,
+			},
+			expectErr: "no running node-agent pods found",
+		},
+		{
+			name:      "node-agent pods exist but none running",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				nodeAgentPodNotRunning,
+			},
+			expectErr: "no running node-agent pods found",
+		},
+		{
+			name:      "at least one running node-agent pod",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				nodeAgentPodNotRunning,
+				nodeAgentPodRunning,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClientBuilder := clientFake.NewClientBuilder()
+			fakeClientBuilder = fakeClientBuilder.WithScheme(scheme)
+
+			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
+
+			err := HasRunningPods(t.Context(), test.namespace, fakeClient)
+			if test.expectErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, test.expectErr)
+			}
+		})
+	}
+}
+
 func TestGetPodSpec(t *testing.T) {
 	podSpec := corev1api.PodSpec{
 		NodeName: "fake-node",

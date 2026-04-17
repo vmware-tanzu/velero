@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -492,6 +493,74 @@ func TestDefaultBackupTTL(t *testing.T) {
 	}
 }
 
+func TestPrepareBackupRequest_NodeAgentValidation(t *testing.T) {
+	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
+	require.NoError(t, err)
+
+	nodeAgentPod := builder.ForPod(velerov1api.DefaultNamespace, "node-agent-abc").
+		Labels(map[string]string{"role": "node-agent"}).
+		NodeName("worker-1").
+		Phase(corev1api.PodRunning).
+		Result()
+
+	tests := []struct {
+		name                    string
+		backup                  *velerov1api.Backup
+		objs                    []runtime.Object
+		expectedValidationError string
+	}{
+		{
+			name:                    "snapshotMoveData with no node-agent pods",
+			backup:                  defaultBackup().SnapshotMoveData(true).Result(),
+			expectedValidationError: "no running node-agent pods found; the built-in data mover requires node-agent to be deployed",
+		},
+		{
+			name:   "snapshotMoveData with running node-agent pod",
+			backup: defaultBackup().SnapshotMoveData(true).Result(),
+			objs:   []runtime.Object{nodeAgentPod},
+		},
+		{
+			name:   "snapshotMoveData with custom data mover skips check",
+			backup: defaultBackup().SnapshotMoveData(true).DataMover("custom-mover").Result(),
+		},
+		{
+			name:   "snapshotMoveData disabled skips check",
+			backup: defaultBackup().Result(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			formatFlag := logging.FormatText
+			logger := logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+			apiServer := velerotest.NewAPIServer(t)
+			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+			require.NoError(t, err)
+
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, test.objs...)
+
+			c := &backupReconciler{
+				discoveryHelper:  discoveryHelper,
+				kbClient:         fakeClient,
+				defaultBackupTTL: 24 * 30 * time.Hour,
+				clock:            testclocks.NewFakeClock(now),
+				formatFlag:       formatFlag,
+			}
+
+			res := c.prepareBackupRequest(ctx, test.backup, logger)
+			defer res.WorkerPool.Stop()
+
+			if test.expectedValidationError != "" {
+				assert.Contains(t, res.Status.ValidationErrors, test.expectedValidationError)
+			} else {
+				for _, e := range res.Status.ValidationErrors {
+					assert.NotContains(t, e, "node-agent")
+				}
+			}
+		})
+	}
+}
+
 func TestPrepareBackupRequest_SetsVGSLabelKey(t *testing.T) {
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
 	require.NoError(t, err)
@@ -670,6 +739,15 @@ func TestProcessBackupCompletions(t *testing.T) {
 	require.NoError(t, err)
 	now = now.Local()
 	timestamp := metav1.NewTime(now)
+
+	// Node-agent pod is needed for all test cases so that the node-agent
+	// validation in prepareBackupRequest does not reject backups that use
+	// snapshot data movement.
+	nodeAgentPod := builder.ForPod(velerov1api.DefaultNamespace, "node-agent-abc").
+		Labels(map[string]string{"role": "node-agent"}).
+		NodeName("worker-1").
+		Phase(corev1api.PodRunning).
+		Result()
 
 	tests := []struct {
 		name                     string
@@ -1515,6 +1593,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					builder.ForVolumeSnapshotContent("testVSC").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).VolumeSnapshotClassName("testClass").Status(&snapshotv1api.VolumeSnapshotContentStatus{
 						SnapshotHandle: &snapshotHandle,
 					}).Result(),
+					nodeAgentPod,
 				)
 			} else {
 				fakeClient = velerotest.NewFakeControllerRuntimeClient(t,
@@ -1522,6 +1601,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					builder.ForVolumeSnapshotContent("testVSC").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).VolumeSnapshotClassName("testClass").Status(&snapshotv1api.VolumeSnapshotContentStatus{
 						SnapshotHandle: &snapshotHandle,
 					}).Result(),
+					nodeAgentPod,
 				)
 			}
 
