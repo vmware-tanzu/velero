@@ -205,24 +205,6 @@ func TestRestorePodVolumes(t *testing.T) {
 			},
 		},
 		{
-			name: "get repository type fail",
-			pvbs: []*velerov1api.PodVolumeBackup{
-				createPVBObj(true, true, 1, "restic"),
-				createPVBObj(true, true, 2, "kopia"),
-			},
-			kubeClientObj: []runtime.Object{
-				createNodeAgentDaemonset(),
-			},
-			restoredPod:     createPodObj(false, false, false, 2),
-			sourceNamespace: "fake-ns",
-			errs: []expectError{
-				{
-					err:        "multiple repository type in one backup",
-					prefixOnly: true,
-				},
-			},
-		},
-		{
 			name: "ensure repo fail",
 			pvbs: []*velerov1api.PodVolumeBackup{
 				createPVBObj(true, true, 1, "kopia"),

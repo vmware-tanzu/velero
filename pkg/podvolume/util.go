@@ -62,12 +62,12 @@ func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod
 
 // GetPvbRepositoryType returns the repositoryType according to the PVB information
 func GetPvbRepositoryType(pvb *velerov1api.PodVolumeBackup) string {
-	return getRepositoryType(pvb.Spec.UploaderType)
+	return getRepositoryType()
 }
 
 // GetPvrRepositoryType returns the repositoryType according to the PVR information
 func GetPvrRepositoryType(pvr *velerov1api.PodVolumeRestore) string {
-	return getRepositoryType(pvr.Spec.UploaderType)
+	return getRepositoryType()
 }
 
 // getVolumeBackupInfoForPod returns a map, of volume name -> VolumeBackupInfo,
@@ -97,7 +97,7 @@ func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, 
 			snapshotID:     pvb.Status.SnapshotID,
 			snapshotSize:   pvb.Status.Progress.TotalBytes,
 			uploaderType:   getUploaderTypeOrDefault(pvb.Spec.UploaderType),
-			repositoryType: getRepositoryType(pvb.Spec.UploaderType),
+			repositoryType: getRepositoryType(),
 		}
 	}
 
@@ -111,7 +111,7 @@ func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, 
 	}
 
 	for k, v := range fromAnnntation {
-		volumes[k] = volumeBackupInfo{v, 0, uploader.ResticType, velerov1api.BackupRepositoryTypeRestic}
+		volumes[k] = volumeBackupInfo{v, 0, uploader.KopiaType, velerov1api.BackupRepositoryTypeKopia}
 	}
 
 	return volumes
@@ -135,7 +135,7 @@ func GetSnapshotIdentifier(podVolumeBackups *velerov1api.PodVolumeBackupList) ma
 			VolumeNamespace:       item.Spec.Pod.Namespace,
 			BackupStorageLocation: item.Spec.BackupStorageLocation,
 			SnapshotID:            item.Status.SnapshotID,
-			RepositoryType:        getRepositoryType(item.Spec.UploaderType),
+			RepositoryType:        getRepositoryType(),
 			UploaderType:          item.Spec.UploaderType,
 			Source:                item.Status.Path,
 			RepoIdentifier:        item.Spec.RepoIdentifier,
@@ -164,27 +164,14 @@ func getUploaderTypeOrDefault(uploaderType string) string {
 	if uploaderType != "" {
 		return uploaderType
 	}
-	return uploader.ResticType
+	return uploader.KopiaType
 }
 
-// getRepositoryType returns the hardcode repositoryType for different backup methods - Restic or Kopia,uploaderType
-// indicates the method.
-// For Restic backup method, it is always hardcode to BackupRepositoryTypeRestic, never changed.
-// For Kopia backup method, this means we hardcode repositoryType as BackupRepositoryTypeKopia for Unified Repo,
-// at present (Kopia backup method is using Unified Repo). However, it doesn't mean we could deduce repositoryType
-// from uploaderType for Unified Repo.
-// TODO: post v1.10, refactor this function for Kopia backup method. In future, when we have multiple implementations of
-// Unified Repo (besides Kopia), we will add the repositoryType to BSL, because by then, we are not able to hardcode
-// the repositoryType to BackupRepositoryTypeKopia for Unified Repo.
-func getRepositoryType(uploaderType string) string {
-	switch uploaderType {
-	case "", uploader.ResticType:
-		return velerov1api.BackupRepositoryTypeRestic
-	case uploader.KopiaType:
-		return velerov1api.BackupRepositoryTypeKopia
-	default:
-		return ""
-	}
+// getRepositoryType returns the hardcode repositoryType.
+// TODO: In future, when we have multiple implementations of Unified Repo (besides Kopia), we will add the repositoryType to BSL,
+// because by then, we are not able to hardcode the repositoryType to BackupRepositoryTypeKopia for Unified Repo.
+func getRepositoryType() string {
+	return velerov1api.BackupRepositoryTypeKopia
 }
 
 func isPVBMatchPod(pvb *velerov1api.PodVolumeBackup, podName string, namespace string) bool {
