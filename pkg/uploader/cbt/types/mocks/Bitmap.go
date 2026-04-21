@@ -6,7 +6,7 @@ package mocks
 
 import (
 	mock "github.com/stretchr/testify/mock"
-	"github.com/vmware-tanzu/velero/pkg/uploader/cbt"
+	"github.com/vmware-tanzu/velero/pkg/uploader/cbt/types"
 )
 
 // NewBitmap creates a new instance of Bitmap. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -81,19 +81,19 @@ func (_c *Bitmap_ChangeID_Call) RunAndReturn(run func() string) *Bitmap_ChangeID
 }
 
 // Iterator provides a mock function for the type Bitmap
-func (_mock *Bitmap) Iterator() cbt.Iterator {
+func (_mock *Bitmap) Iterator() types.Iterator {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Iterator")
 	}
 
-	var r0 cbt.Iterator
-	if returnFunc, ok := ret.Get(0).(func() cbt.Iterator); ok {
+	var r0 types.Iterator
+	if returnFunc, ok := ret.Get(0).(func() types.Iterator); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(cbt.Iterator)
+			r0 = ret.Get(0).(types.Iterator)
 		}
 	}
 	return r0
@@ -116,12 +116,12 @@ func (_c *Bitmap_Iterator_Call) Run(run func()) *Bitmap_Iterator_Call {
 	return _c
 }
 
-func (_c *Bitmap_Iterator_Call) Return(iterator cbt.Iterator) *Bitmap_Iterator_Call {
+func (_c *Bitmap_Iterator_Call) Return(iterator types.Iterator) *Bitmap_Iterator_Call {
 	_c.Call.Return(iterator)
 	return _c
 }
 
-func (_c *Bitmap_Iterator_Call) RunAndReturn(run func() cbt.Iterator) *Bitmap_Iterator_Call {
+func (_c *Bitmap_Iterator_Call) RunAndReturn(run func() types.Iterator) *Bitmap_Iterator_Call {
 	_c.Call.Return(run)
 	return _c
 }

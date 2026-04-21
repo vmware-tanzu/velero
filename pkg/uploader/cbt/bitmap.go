@@ -20,49 +20,9 @@ import (
 	"math/bits"
 
 	"github.com/RoaringBitmap/roaring"
+
+	"github.com/vmware-tanzu/velero/pkg/uploader/cbt/types"
 )
-
-// Bitmap defines the methods to store and iterate the CBT bitmap
-type Bitmap interface {
-	// Set sets bits within the provided range
-	Set(uint64, uint64)
-
-	// SetFull sets all bits to the bitmap
-	SetFull()
-
-	// Snapshot returns snapshot of the bitmap
-	Snapshot() string
-
-	// ChangeID returns the changeID of the bitmap
-	ChangeID() string
-
-	// VolumeID return ID of the volume from which the snapshot is taken
-	VolumeID() string
-
-	// Iterator returns the iterator for the CBT Bitmap
-	Iterator() Iterator
-}
-
-// Iterator defines the methods to iterate the CBT bitmap and query the associated information
-type Iterator interface {
-	// ChangeID returns the changeID of the bitmap
-	ChangeID() string
-
-	// Snapshot returns snapshot of the bitmap
-	Snapshot() string
-
-	// VolumeID return ID of the volume from which the snapshot is taken
-	VolumeID() string
-
-	// BlockSize returns the granularity of the bitmap
-	BlockSize() uint
-
-	// Count returns the toal number of count in the bitmap
-	Count() uint64
-
-	// Next returns the offset of the next set block and whether it comes to the end of the iteration
-	Next() (uint64, bool)
-}
 
 const (
 	InvalidOffset64 = ^uint64(0)
@@ -83,7 +43,7 @@ type bitmapIterator struct {
 	iterator roaring.IntPeekable
 }
 
-func NewBitmap(blockSize uint, length uint64, snapshot string, changeID string, volumeID string) Bitmap {
+func NewBitmap(blockSize uint, length uint64, snapshot string, changeID string, volumeID string) types.Bitmap {
 	return &bitmapImpl{
 		bitmap:       roaring.New(),
 		blockSize:    blockSize,
@@ -105,14 +65,14 @@ func (c *bitmapImpl) Set(offset, length uint64) {
 	}
 
 	start := offset >> c.blockSizeLog
-	end := uint64((offset + length + uint64(c.blockSize) - 1) >> c.blockSizeLog)
+	end := (offset + length + uint64(c.blockSize) - 1) >> c.blockSizeLog
 
 	c.bitmap.AddRange(start, end)
 }
 
 func (c *bitmapImpl) SetFull() {
 	start := uint64(0)
-	end := uint64((c.length + uint64(c.blockSize) - 1) >> c.blockSizeLog)
+	end := (c.length + uint64(c.blockSize) - 1) >> c.blockSizeLog
 
 	c.bitmap.AddRange(start, end)
 }
@@ -129,7 +89,7 @@ func (c *bitmapImpl) VolumeID() string {
 	return c.volumeID
 }
 
-func (c *bitmapImpl) Iterator() Iterator {
+func (c *bitmapImpl) Iterator() types.Iterator {
 	if c.bitmap == nil {
 		return nil
 	}

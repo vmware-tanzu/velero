@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cbt_test
+package cbt
 
 import (
 	"context"
@@ -27,8 +27,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/cbtservice"
 	cbtservicemocks "github.com/vmware-tanzu/velero/pkg/cbtservice/mocks"
-	"github.com/vmware-tanzu/velero/pkg/uploader/cbt"
-	cbtmocks "github.com/vmware-tanzu/velero/pkg/uploader/cbt/mocks"
+	cbtmocks "github.com/vmware-tanzu/velero/pkg/uploader/cbt/types/mocks"
 )
 
 func TestSetBitmapOrFull(t *testing.T) {
@@ -126,13 +125,7 @@ func TestSetBitmapOrFull(t *testing.T) {
 				svc = svcMock
 			}
 
-			// Use type assertion to bypass gopls false positive on mock type
-			var bmp cbt.Bitmap
-			if bmpMock != nil {
-				bmp = interface{}(bmpMock).(cbt.Bitmap)
-			}
-
-			err := cbt.SetBitmapOrFull(context.Background(), svc, bmp)
+			err := SetBitmapOrFull(context.Background(), svc, bmpMock)
 
 			if tt.expectedErrStr != "" {
 				require.Error(t, err)

@@ -22,10 +22,11 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/cbtservice"
+	"github.com/vmware-tanzu/velero/pkg/uploader/cbt/types"
 )
 
 // SetBitmapOrFull translates the allocated/changed blocks from CBT service to the given bitmap or set the bitmap to full when error happens
-func SetBitmapOrFull(ctx context.Context, service cbtservice.Service, bitmap Bitmap) (err error) {
+func SetBitmapOrFull(ctx context.Context, service cbtservice.Service, bitmap types.Bitmap) (err error) {
 	defer func() {
 		if err != nil {
 			bitmap.SetFull()
