@@ -110,7 +110,6 @@ func TestShouldExpandWildcards(t *testing.T) {
 			excludes: []string{},
 			expected: false, // plus is literal, not wildcard
 		},
-		
 	}
 
 	for _, tt := range tests {
