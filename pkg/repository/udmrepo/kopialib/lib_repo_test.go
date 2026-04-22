@@ -663,13 +663,16 @@ func TestNewObjectWriter(t *testing.T) {
 		rawWriter    *repomocks.MockRepositoryWriter
 		rawWriterRet object.Writer
 		expectedRet  udmrepo.ObjectWriter
+		expectedErr  string
 	}{
 		{
-			name: "raw writer is nil",
+			name:        "raw writer is nil",
+			expectedErr: "repo writer is closed or not open",
 		},
 		{
-			name:      "new object writer fail",
-			rawWriter: repomocks.NewMockRepositoryWriter(t),
+			name:        "new object writer fail",
+			rawWriter:   repomocks.NewMockRepositoryWriter(t),
+			expectedErr: "error creating writer for object ",
 		},
 		{
 			name:         "succeed",
@@ -688,9 +691,14 @@ func TestNewObjectWriter(t *testing.T) {
 				kr.rawWriter = tc.rawWriter
 			}
 
-			ret := kr.NewObjectWriter(t.Context(), udmrepo.ObjectWriteOptions{})
+			ret, err := kr.NewObjectWriter(t.Context(), udmrepo.ObjectWriteOptions{})
 
-			assert.Equal(t, tc.expectedRet, ret)
+			if tc.expectedErr == "" {
+				require.NoError(t, err)
+				require.Equal(t, tc.expectedRet, ret)
+			} else {
+				require.EqualError(t, err, tc.expectedErr)
+			}
 		})
 	}
 }
