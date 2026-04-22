@@ -570,6 +570,13 @@ func (b *backupReconciler) prepareBackupRequest(ctx context.Context, backup *vel
 		}
 	}
 
+	// Empty IncludedNamespaces means "include all namespaces". Normalize
+	// to ["*"] so that downstream wildcard expansion does not collapse
+	// an empty-includes + wildcard-excludes combination into "back up nothing".
+	if len(request.Spec.IncludedNamespaces) == 0 {
+		request.Spec.IncludedNamespaces = []string{"*"}
+	}
+
 	// validate the included/excluded namespaces
 	for _, err := range collections.ValidateNamespaceIncludesExcludes(request.Spec.IncludedNamespaces, request.Spec.ExcludedNamespaces) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
