@@ -156,7 +156,7 @@ func TestGetVolumesByPod(t *testing.T) {
 					Volumes: []corev1api.Volume{
 						// PVB Volumes
 						{Name: "pvbPV1"}, {Name: "pvbPV2"}, {Name: "pvbPV3"},
-						/// Excluded from PVB because colume mounting default service account token
+						/// Excluded from PVB because column mounting default service account token
 						{Name: "default-token-5xq45"},
 					},
 				},

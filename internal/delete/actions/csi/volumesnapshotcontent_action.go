@@ -27,10 +27,8 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -43,6 +41,10 @@ type volumeSnapshotContentDeleteItemAction struct {
 	log      logrus.FieldLogger
 	crClient crclient.Client
 }
+
+const tempVSCCreateDeleteGap = 2 * time.Second
+
+var sleepBetweenTempVSCCreateAndDelete = time.Sleep
 
 // AppliesTo returns information indicating
 // VolumeSnapshotContentRestoreItemAction action should be invoked
@@ -107,31 +109,11 @@ func (p *volumeSnapshotContentDeleteItemAction) Execute(
 		return errors.Wrapf(err, "fail to create VolumeSnapshotContent %s", snapCont.Name)
 	}
 
-	// Read resource timeout from backup annotation, if not set, use default value.
-	timeout, err := time.ParseDuration(
-		input.Backup.Annotations[velerov1api.ResourceTimeoutAnnotation])
-	if err != nil {
-		p.log.Warnf("fail to parse resource timeout annotation %s: %s",
-			input.Backup.Annotations[velerov1api.ResourceTimeoutAnnotation], err.Error())
-		timeout = 10 * time.Minute
-	}
-	p.log.Debugf("resource timeout is set to %s", timeout.String())
+	// Add a small delay before delete to avoid create/delete race conditions in CSI controllers.
+	sleepBetweenTempVSCCreateAndDelete(tempVSCCreateDeleteGap)
 
-	interval := 5 * time.Second
-
-	// Wait until VSC created and ReadyToUse is true.
-	if err := wait.PollUntilContextTimeout(
-		context.Background(),
-		interval,
-		timeout,
-		true,
-		func(ctx context.Context) (bool, error) {
-			return checkVSCReadiness(ctx, &snapCont, p.crClient)
-		},
-	); err != nil {
-		return errors.Wrapf(err, "fail to wait VolumeSnapshotContent %s becomes ready.", snapCont.Name)
-	}
-
+	// Delete the temp VSC immediately to trigger cloud snapshot removal.
+	// The CSI driver will handle the actual cloud snapshot deletion.
 	if err := p.crClient.Delete(
 		context.TODO(),
 		&snapCont,
