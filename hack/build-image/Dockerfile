@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM --platform=$TARGETPLATFORM golang:1.25.7-bookworm
+FROM --platform=$TARGETPLATFORM golang:1.25.9-trixie
 
 ARG GOPROXY
 
