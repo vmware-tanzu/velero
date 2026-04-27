@@ -1,3 +1,41 @@
+## v1.18.1
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.18.1
+
+### Container Image
+`velero/velero:v1.18.1`
+
+### Documentation
+https://velero.io/docs/v1.18/
+
+### Upgrading
+https://velero.io/docs/v1.18/upgrade-to-1.18/
+
+### All Changes
+  * Fix wildcard expansion when includes is empty and excludes has wildcards (#9743, @Joeavaikath)
+  * Backporting PR #9700 and #9693, fix issue #9699, add a 2-second gap between temporary CSI VolumeSnapshotContent create and delete operations. Enhance backup deletion logic to handle tarball download failures (#9731, @priyansh17)
+  * Fix issue #9703, fix CSI PVC Backup Plugin list options to only list in installed namespace (#9708, @adam-jian-zhang)
+  * Bump external-snapshotter to v8.4.0 and migrate VolumeGroupSnapshot API from v1beta1 to v1beta2 for Kubernetes 1.34+ compatibility (#9706, @shubham-pampattiwar)
+  * Fix issue #9681, fix restores and podvolumerestores list options to only list in installed namespace (#9696, @adam-jian-zhang)
+  * Fix issue #9659, in the case that PVB/PVR/DU/DD is cancelled before the data path is really started, call EndEvent to prevent data mover pod from crashing because of delay event distribution (#9672, @Lyndon-Li)
+  * Fix issue #9626, let go for uninitialized repo under readonly mode (#9669, @Lyndon-Li)
+  * Fix issue #9460, flush buffer before data mover completes (#9610, @Lyndon-Li)
+  * Fix issue #9475, use node-selector instead of nodName for generic restore (#9609, @Lyndon-Li)
+  * Fix issue #9496, support customized host os (#9606, @Lyndon-Li)
+  * Fix issue #9343, include PV topology to data mover pod affinities (#9594, @Lyndon-Li)
+  * Fix VolumeGroupSnapshot restore failure with Ceph RBD CSI driver by creating stub VolumeGroupSnapshotContent during restore and looking up VolumeSnapshotClass by driver for credential support (#9687, @shubham-pampattiwar)
+  * Add custom action type to volume policies (#9678, @sseago)
+  * Fix issue #9666, fix node-agent node detection in multiple instances scenario (#9671, @adam-jian-zhang)
+  * Add check for file extraction from tarball. (#9661, @blackpiglet)
+  * Fix issue #9636, fix configmap lookup in non-default namespaces (#9637, @adam-jian-zhang)
+  * Optimize VSC handle readiness polling for VSS backups (#9629, @sseago)
+  * Fix DBR stuck when CSI snapshot no longer exists in cloud provider (#9604, @shubham-pampattiwar)
+  * If BIA return updateObj with SkipFromBackupAnnotation, treat it as skip the resource from backup. (#9597, @blackpiglet)
+  * Add ephemeral storage limit and request support for data mover and maintenance job (#9596, @blackpiglet)
+  * Remove wildcard check from getNamespacesToList. (#9587, @blackpiglet)
+
+
 ## v1.18
 
 ### Download
