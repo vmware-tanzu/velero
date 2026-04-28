@@ -343,7 +343,6 @@ update-crd:
 
 build-dirs:
 	@mkdir -p _output/bin/$(GOOS)/$(GOARCH)
-	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build .go/golangci-lint
 	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build .go/golangci-lint .go/goimports
 
 build-env:
