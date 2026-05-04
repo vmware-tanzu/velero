@@ -97,8 +97,9 @@ type backupReconciler struct {
 	defaultVolumesToFsBackup    bool
 	defaultBackupTTL            time.Duration
 	defaultVGSLabelKey          string
-	defaultCSISnapshotTimeout   time.Duration
-	resourceTimeout             time.Duration
+	defaultCSISnapshotTimeout      time.Duration
+	defaultCSISnapshotErrorTimeout time.Duration
+	resourceTimeout                time.Duration
 	defaultItemOperationTimeout time.Duration
 	defaultSnapshotLocations    map[string]string
 	metrics                     *metrics.ServerMetrics
@@ -126,6 +127,7 @@ func NewBackupReconciler(
 	defaultBackupTTL time.Duration,
 	defaultVGSLabelKey string,
 	defaultCSISnapshotTimeout time.Duration,
+	defaultCSISnapshotErrorTimeout time.Duration,
 	resourceTimeout time.Duration,
 	defaultItemOperationTimeout time.Duration,
 	defaultSnapshotLocations map[string]string,
@@ -153,8 +155,9 @@ func NewBackupReconciler(
 		defaultVolumesToFsBackup:    defaultVolumesToFsBackup,
 		defaultBackupTTL:            defaultBackupTTL,
 		defaultVGSLabelKey:          defaultVGSLabelKey,
-		defaultCSISnapshotTimeout:   defaultCSISnapshotTimeout,
-		resourceTimeout:             resourceTimeout,
+		defaultCSISnapshotTimeout:      defaultCSISnapshotTimeout,
+		defaultCSISnapshotErrorTimeout: defaultCSISnapshotErrorTimeout,
+		resourceTimeout:                resourceTimeout,
 		defaultItemOperationTimeout: defaultItemOperationTimeout,
 		defaultSnapshotLocations:    defaultSnapshotLocations,
 		metrics:                     metrics,
@@ -400,6 +403,11 @@ func (b *backupReconciler) prepareBackupRequest(ctx context.Context, backup *vel
 	if request.Spec.CSISnapshotTimeout.Duration == 0 {
 		// set default CSI VolumeSnapshot timeout
 		request.Spec.CSISnapshotTimeout.Duration = b.defaultCSISnapshotTimeout
+	}
+
+	if request.Spec.CSISnapshotErrorTimeout.Duration == 0 {
+		// set default CSI VolumeSnapshot error timeout
+		request.Spec.CSISnapshotErrorTimeout.Duration = b.defaultCSISnapshotErrorTimeout
 	}
 
 	if request.Spec.ItemOperationTimeout.Duration == 0 {

@@ -301,10 +301,10 @@ func (p *volumeSnapshotBackupItemAction) Progress(
 			errorMessage = *vs.Status.Error.Message
 		}
 
-		timeout := backup.Spec.CSISnapshotTimeout.Duration
+		timeout := backup.Spec.CSISnapshotErrorTimeout.Duration
 		if timeout > 0 && time.Since(progress.Started) >= timeout {
 			p.log.Errorf(
-				"VolumeSnapshot %s/%s has a persistent error beyond CSISnapshotTimeout (%s): %s",
+				"VolumeSnapshot %s/%s has a persistent error beyond CSISnapshotErrorTimeout (%s): %s",
 				vs.Namespace, vs.Name, timeout, errorMessage)
 			progress.Completed = true
 			progress.Updated = time.Now()
@@ -313,7 +313,7 @@ func (p *volumeSnapshotBackupItemAction) Progress(
 			return progress, nil
 		}
 
-		p.log.Warnf("VolumeSnapshot %s/%s has an error within the CSISnapshotTimeout window: %s. Snapshot controller will retry later.",
+		p.log.Warnf("VolumeSnapshot %s/%s has an error within the CSISnapshotErrorTimeout window: %s. Snapshot controller will retry later.",
 			vs.Namespace, vs.Name, errorMessage)
 
 		return progress, nil
@@ -349,17 +349,17 @@ func (p *volumeSnapshotBackupItemAction) Progress(
 				errorMessage = *vsc.Status.Error.Message
 			}
 
-			timeout := backup.Spec.CSISnapshotTimeout.Duration
+			timeout := backup.Spec.CSISnapshotErrorTimeout.Duration
 			if timeout > 0 && time.Since(progress.Started) >= timeout {
 				p.log.Errorf(
-					"VolumeSnapshotContent %s has a persistent error beyond CSISnapshotTimeout (%s): %s",
+					"VolumeSnapshotContent %s has a persistent error beyond CSISnapshotErrorTimeout (%s): %s",
 					vsc.Name, timeout, errorMessage)
 				progress.Completed = true
 				progress.Updated = now
 				progress.Err = fmt.Sprintf("VolumeSnapshotContent %s has a persistent error: %s",
 					vsc.Name, errorMessage)
 			} else {
-				p.log.Warnf("VolumeSnapshotContent %s has an error within the CSISnapshotTimeout window: %s. Snapshot controller will retry later.",
+				p.log.Warnf("VolumeSnapshotContent %s has an error within the CSISnapshotErrorTimeout window: %s. Snapshot controller will retry later.",
 					vsc.Name, errorMessage)
 			}
 		}
