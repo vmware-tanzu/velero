@@ -33,7 +33,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	corev1api "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -497,27 +497,43 @@ func TestPrepareBackupRequest_NodeAgentValidation(t *testing.T) {
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
 	require.NoError(t, err)
 
-	nodeAgentPod := builder.ForPod(velerov1api.DefaultNamespace, "node-agent-abc").
-		Labels(map[string]string{"role": "node-agent"}).
-		NodeName("worker-1").
-		Phase(corev1api.PodRunning).
-		Result()
+	nodeAgentDS := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1api.DefaultNamespace,
+			Name:      "node-agent",
+		},
+		Status: appsv1api.DaemonSetStatus{NumberReady: 3},
+	}
+
+	nodeAgentDSNotReady := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1api.DefaultNamespace,
+			Name:      "node-agent",
+		},
+		Status: appsv1api.DaemonSetStatus{NumberReady: 0},
+	}
 
 	tests := []struct {
-		name                    string
-		backup                  *velerov1api.Backup
-		objs                    []runtime.Object
-		expectedValidationError string
+		name            string
+		backup          *velerov1api.Backup
+		objs            []runtime.Object
+		expectNodeAgent bool
 	}{
 		{
-			name:                    "snapshotMoveData with no node-agent pods",
-			backup:                  defaultBackup().SnapshotMoveData(true).Result(),
-			expectedValidationError: "no running node-agent pods found; the built-in data mover requires node-agent to be deployed",
+			name:            "snapshotMoveData with no node-agent daemonset",
+			backup:          defaultBackup().SnapshotMoveData(true).Result(),
+			expectNodeAgent: true,
 		},
 		{
-			name:   "snapshotMoveData with running node-agent pod",
+			name:            "snapshotMoveData with node-agent daemonset not ready",
+			backup:          defaultBackup().SnapshotMoveData(true).Result(),
+			objs:            []runtime.Object{nodeAgentDSNotReady},
+			expectNodeAgent: true,
+		},
+		{
+			name:   "snapshotMoveData with ready node-agent daemonset",
 			backup: defaultBackup().SnapshotMoveData(true).Result(),
-			objs:   []runtime.Object{nodeAgentPod},
+			objs:   []runtime.Object{nodeAgentDS},
 		},
 		{
 			name:   "snapshotMoveData with custom data mover skips check",
@@ -550,8 +566,15 @@ func TestPrepareBackupRequest_NodeAgentValidation(t *testing.T) {
 			res := c.prepareBackupRequest(ctx, test.backup, logger)
 			defer res.WorkerPool.Stop()
 
-			if test.expectedValidationError != "" {
-				assert.Contains(t, res.Status.ValidationErrors, test.expectedValidationError)
+			if test.expectNodeAgent {
+				hasNodeAgentError := false
+				for _, e := range res.Status.ValidationErrors {
+					if strings.Contains(e, "node-agent") {
+						hasNodeAgentError = true
+						break
+					}
+				}
+				assert.True(t, hasNodeAgentError, "expected a node-agent validation error")
 			} else {
 				for _, e := range res.Status.ValidationErrors {
 					assert.NotContains(t, e, "node-agent")
@@ -740,14 +763,16 @@ func TestProcessBackupCompletions(t *testing.T) {
 	now = now.Local()
 	timestamp := metav1.NewTime(now)
 
-	// Node-agent pod is needed for all test cases so that the node-agent
+	// Node-agent daemonset is needed for all test cases so that the node-agent
 	// validation in prepareBackupRequest does not reject backups that use
 	// snapshot data movement.
-	nodeAgentPod := builder.ForPod(velerov1api.DefaultNamespace, "node-agent-abc").
-		Labels(map[string]string{"role": "node-agent"}).
-		NodeName("worker-1").
-		Phase(corev1api.PodRunning).
-		Result()
+	nodeAgentDS := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1api.DefaultNamespace,
+			Name:      "node-agent",
+		},
+		Status: appsv1api.DaemonSetStatus{NumberReady: 3},
+	}
 
 	tests := []struct {
 		name                     string
@@ -1593,7 +1618,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					builder.ForVolumeSnapshotContent("testVSC").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).VolumeSnapshotClassName("testClass").Status(&snapshotv1api.VolumeSnapshotContentStatus{
 						SnapshotHandle: &snapshotHandle,
 					}).Result(),
-					nodeAgentPod,
+					nodeAgentDS,
 				)
 			} else {
 				fakeClient = velerotest.NewFakeControllerRuntimeClient(t,
@@ -1601,7 +1626,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					builder.ForVolumeSnapshotContent("testVSC").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).VolumeSnapshotClassName("testClass").Status(&snapshotv1api.VolumeSnapshotContentStatus{
 						SnapshotHandle: &snapshotHandle,
 					}).Result(),
-					nodeAgentPod,
+					nodeAgentDS,
 				)
 			}
 

@@ -213,17 +213,18 @@ func TestIsRunningInNode(t *testing.T) {
 	}
 }
 
-func TestHasRunningPods(t *testing.T) {
+func TestIsReady(t *testing.T) {
 	scheme := runtime.NewScheme()
-	corev1api.AddToScheme(scheme)
+	appsv1api.AddToScheme(scheme)
 
-	nonNodeAgentPod := builder.ForPod("fake-ns", "fake-pod").Result()
-	nodeAgentPodNotRunning := builder.ForPod("fake-ns", "fake-pod-pending").Labels(map[string]string{"role": "node-agent"}).Result()
-	nodeAgentPodRunning := builder.ForPod("fake-ns", "fake-pod-running").
-		Labels(map[string]string{"role": "node-agent"}).
-		Phase(corev1api.PodRunning).
-		NodeName("fake-node").
-		Result()
+	dsNotReady := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "fake-ns", Name: "node-agent"},
+		Status:     appsv1api.DaemonSetStatus{NumberReady: 0},
+	}
+	dsReady := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "fake-ns", Name: "node-agent"},
+		Status:     appsv1api.DaemonSetStatus{NumberReady: 3},
+	}
 
 	tests := []struct {
 		name          string
@@ -232,44 +233,35 @@ func TestHasRunningPods(t *testing.T) {
 		expectErr     string
 	}{
 		{
-			name:      "no pods at all",
+			name:      "daemonset not found",
 			namespace: "fake-ns",
-			expectErr: "no running node-agent pods found",
+			expectErr: "failed to get node-agent daemonset: daemonsets.apps \"node-agent\" not found",
 		},
 		{
-			name:      "only non-node-agent pods",
+			name:      "daemonset exists but no ready pods",
 			namespace: "fake-ns",
 			kubeClientObj: []runtime.Object{
-				nonNodeAgentPod,
+				dsNotReady,
 			},
-			expectErr: "no running node-agent pods found",
+			expectErr: "node-agent daemonset has no ready pods",
 		},
 		{
-			name:      "node-agent pods exist but none running",
+			name:      "daemonset has ready pods",
 			namespace: "fake-ns",
 			kubeClientObj: []runtime.Object{
-				nodeAgentPodNotRunning,
-			},
-			expectErr: "no running node-agent pods found",
-		},
-		{
-			name:      "at least one running node-agent pod",
-			namespace: "fake-ns",
-			kubeClientObj: []runtime.Object{
-				nodeAgentPodNotRunning,
-				nodeAgentPodRunning,
+				dsReady,
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClientBuilder := clientFake.NewClientBuilder()
-			fakeClientBuilder = fakeClientBuilder.WithScheme(scheme)
+			fakeClient := clientFake.NewClientBuilder().
+				WithScheme(scheme).
+				WithRuntimeObjects(test.kubeClientObj...).
+				Build()
 
-			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
-
-			err := HasRunningPods(t.Context(), test.namespace, fakeClient)
+			err := IsReady(t.Context(), test.namespace, fakeClient)
 			if test.expectErr == "" {
 				assert.NoError(t, err)
 			} else {

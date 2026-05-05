@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,29 +81,18 @@ func KbClientIsRunningInNode(ctx context.Context, namespace string, nodeName str
 	return isRunningInNode(ctx, namespace, nodeName, nil, kubeClient)
 }
 
-// HasRunningPods checks if any node agent pod is running in the namespace through controller client. If not, return the error found.
-func HasRunningPods(ctx context.Context, namespace string, crClient ctrlclient.Client) error {
-	pods := new(corev1api.PodList)
-	parsedSelector, err := labels.Parse(fmt.Sprintf("role=%s", nodeAgentRole))
-	if err != nil {
-		return errors.Wrap(err, "fail to parse selector")
+// IsReady checks whether the node-agent daemonset has at least one ready pod by inspecting the DaemonSet status.
+func IsReady(ctx context.Context, namespace string, crClient ctrlclient.Client) error {
+	ds := new(appsv1api.DaemonSet)
+	if err := crClient.Get(ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: daemonSet}, ds); err != nil {
+		return errors.Wrap(err, "failed to get node-agent daemonset")
 	}
 
-	err = crClient.List(ctx, pods, &ctrlclient.ListOptions{
-		LabelSelector: parsedSelector,
-		Namespace:     namespace,
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to list node-agent pods")
+	if ds.Status.NumberReady == 0 {
+		return errors.New("node-agent daemonset has no ready pods")
 	}
 
-	for i := range pods.Items {
-		if kube.IsPodRunning(&pods.Items[i]) == nil {
-			return nil
-		}
-	}
-
-	return errors.New("no running node-agent pods found")
+	return nil
 }
 
 // IsRunningInNode checks if the node agent pod is running properly in a specified node through controller client. If not, return the error found

@@ -496,14 +496,14 @@ func (b *backupReconciler) prepareBackupRequest(ctx context.Context, backup *vel
 		}
 	}
 
-	// validate that node-agent pods are running when snapshot data movement with the
-	// built-in data mover is requested. Without this, the DataUpload CR will be created
-	// but never processed (the DataUpload controller runs inside node-agent), causing the
-	// backup to hang until itemOperationTimeout expires.
+	// validate that the node-agent daemonset is ready when snapshot data movement with
+	// the built-in data mover is requested. Without this, the DataUpload CR will be
+	// created but never processed (the DataUpload controller runs inside node-agent),
+	// causing the backup to hang until itemOperationTimeout expires.
 	if boolptr.IsSetToTrue(request.Spec.SnapshotMoveData) && datamover.IsBuiltInUploader(request.Spec.DataMover) {
-		if err := nodeagent.HasRunningPods(ctx, request.Namespace, b.kbClient); err != nil {
+		if err := nodeagent.IsReady(ctx, request.Namespace, b.kbClient); err != nil {
 			request.Status.ValidationErrors = append(request.Status.ValidationErrors,
-				"no running node-agent pods found; the built-in data mover requires node-agent to be deployed")
+				fmt.Sprintf("node-agent is not ready: %v; the built-in data mover requires node-agent to be deployed and running", err))
 		}
 	}
 
