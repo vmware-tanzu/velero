@@ -506,18 +506,17 @@ func TestFindPVRForTargetPod(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(velerov1api.SchemeGroupVersion, &velerov1api.PodVolumeRestore{}, &velerov1api.PodVolumeRestoreList{})
-	clientBuilder := fake.NewClientBuilder().WithScheme(scheme)
 
 	// no matching PVR
 	reconciler := &PodVolumeRestoreReconciler{
-		client: clientBuilder.Build(),
+		client: fake.NewClientBuilder().WithScheme(scheme).Build(),
 		logger: logrus.New(),
 	}
 	requests := reconciler.findPVRForTargetPod(t.Context(), pod)
 	assert.Empty(t, requests)
 
 	// contain one matching PVR
-	reconciler.client = clientBuilder.WithLists(&velerov1api.PodVolumeRestoreList{
+	reconciler.client = fake.NewClientBuilder().WithScheme(scheme).WithLists(&velerov1api.PodVolumeRestoreList{
 		Items: []velerov1api.PodVolumeRestore{
 			{
 				ObjectMeta: metav1.ObjectMeta{
