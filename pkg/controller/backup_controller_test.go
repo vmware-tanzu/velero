@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -1656,7 +1657,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			err = c.kbClient.Get(t.Context(), kbclient.ObjectKey{Namespace: test.backup.Namespace, Name: test.backup.Name}, res)
 			require.NoError(t, err)
 			res.ResourceVersion = ""
-			assert.Equal(t, test.expectedResult, res)
+			assert.Empty(t, cmp.Diff(test.expectedResult, res, cmpopts.IgnoreFields(velerov1api.Backup{}, "TypeMeta")))
 			// reset defaultBackupLocation resourceVersion
 			defaultBackupLocation.ObjectMeta.ResourceVersion = ""
 		})
