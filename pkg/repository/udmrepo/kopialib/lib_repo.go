@@ -388,9 +388,9 @@ func (kr *kopiaRepository) Close(ctx context.Context) error {
 	return nil
 }
 
-func (kr *kopiaRepository) NewObjectWriter(ctx context.Context, opt udmrepo.ObjectWriteOptions) udmrepo.ObjectWriter {
+func (kr *kopiaRepository) NewObjectWriter(ctx context.Context, opt udmrepo.ObjectWriteOptions) (udmrepo.ObjectWriter, error) {
 	if kr.rawWriter == nil {
-		return nil
+		return nil, errors.New("repo writer is closed or not open")
 	}
 
 	writer := kr.rawWriter.NewObjectWriter(kopia.SetupKopiaLog(ctx, kr.logger), object.WriterOptions{
@@ -402,12 +402,22 @@ func (kr *kopiaRepository) NewObjectWriter(ctx context.Context, opt udmrepo.Obje
 	})
 
 	if writer == nil {
-		return nil
+		return nil, errors.Errorf("error creating writer for object %s", opt.Description)
 	}
 
 	return &kopiaObjectWriter{
 		rawWriter: writer,
-	}
+	}, nil
+}
+
+// TODO add implementation in following PRs
+func (kr *kopiaRepository) WriteMetadata(ctx context.Context, meta *udmrepo.Metadata, opt udmrepo.ObjectWriteOptions) (udmrepo.ID, error) {
+	return "", errors.New("not supported")
+}
+
+// TODO add implementation in following PRs
+func (kr *kopiaRepository) ReadMetadata(ctx context.Context, id udmrepo.ID) (*udmrepo.Metadata, error) {
+	return nil, errors.New("not supported")
 }
 
 func (kr *kopiaRepository) PutManifest(ctx context.Context, manifest udmrepo.RepoManifest) (udmrepo.ID, error) {
@@ -434,6 +444,21 @@ func (kr *kopiaRepository) DeleteManifest(ctx context.Context, id udmrepo.ID) er
 	}
 
 	return nil
+}
+
+// TODO add implementation in following PRs
+func (kr *kopiaRepository) SaveSnapshot(ctx context.Context, snap udmrepo.Snapshot) (udmrepo.ID, error) {
+	return "", errors.New("not supported")
+}
+
+// TODO add implementation in following PRs
+func (kr *kopiaRepository) GetSnapshot(ctx context.Context, id udmrepo.ID) (udmrepo.Snapshot, error) {
+	return udmrepo.Snapshot{}, errors.New("not supported")
+}
+
+// TODO add implementation in following PRs
+func (kr *kopiaRepository) DeleteSnapshot(ctx context.Context, id udmrepo.ID) error {
+	return errors.New("not supported")
 }
 
 func (kr *kopiaRepository) Flush(ctx context.Context) error {
@@ -546,8 +571,9 @@ func (kow *kopiaObjectWriter) Write(p []byte) (int, error) {
 	return kow.rawWriter.Write(p)
 }
 
-func (kow *kopiaObjectWriter) Seek(offset int64, whence int) (int64, error) {
-	return -1, errors.New("not supported")
+// TODO add implementation in following PRs
+func (kow *kopiaObjectWriter) WriteAt(p []byte, offset int64) (int, error) {
+	return 0, errors.New("not supported")
 }
 
 func (kow *kopiaObjectWriter) Checkpoint() (udmrepo.ID, error) {

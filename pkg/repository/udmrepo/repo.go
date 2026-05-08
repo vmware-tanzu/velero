@@ -62,17 +62,39 @@ const (
 
 // ObjectWriteOptions defines the options when creating an object for write
 type ObjectWriteOptions struct {
-	FullPath    string // Full logical path of the object
-	DataType    int    // OBJECT_DATA_TYPE_*
-	Description string // A description of the object, could be empty
-	Prefix      ID     // A prefix of the name used to save the object
-	AccessMode  int    // OBJECT_DATA_ACCESS_*
-	BackupMode  int    // OBJECT_DATA_BACKUP_*
-	AsyncWrites int    // Num of async writes for the object, 0 means no async write
+	FullPath     string // Full logical path of the object
+	DataType     int    // OBJECT_DATA_TYPE_*
+	Description  string // A description of the object, could be empty
+	Prefix       ID     // A prefix of the name used to save the object
+	AccessMode   int    // OBJECT_DATA_ACCESS_*
+	BackupMode   int    // OBJECT_DATA_BACKUP_*
+	AsyncWrites  int    // Num of async writes for the object, 0 means no async write
+	ParentObject ID     // The object in the previous snapshot, for incremental backup
 }
 
 type AdvancedFeatureInfo struct {
 	MultiPartBackup bool // if set to true, it means the repo supports multiple-part backup
+}
+
+type ObjectMetadata struct {
+	ID   ID
+	Type int // OBJECT_DATA_TYPE_*
+	Size int64
+}
+
+type Metadata struct {
+	SubObjects   []ObjectMetadata // For dir metadata only, the sub objects in this dir.
+	ExtraDataLen int              // Extra data associated to this metadata.
+	ExtraData    []byte
+}
+
+type Snapshot struct {
+	Source      string
+	Description string
+	StartTime   time.Time
+	EndTime     time.Time
+	Tags        map[string]string
+	RootObject  ID
 }
 
 // BackupRepoService is used to initialize, open or maintain a backup repository
@@ -119,7 +141,14 @@ type BackupRepo interface {
 
 	// NewObjectWriter creates a new object and return the object's writer interface.
 	// return: A unified identifier of the object on success.
-	NewObjectWriter(ctx context.Context, opt ObjectWriteOptions) ObjectWriter
+	NewObjectWriter(ctx context.Context, opt ObjectWriteOptions) (ObjectWriter, error)
+
+	// WriteMetadata writes metadata to the repo, metadata is used to describe data, e.g., file system
+	// dirs are saved as metadata
+	WriteMetadata(ctx context.Context, meta *Metadata, opt ObjectWriteOptions) (ID, error)
+
+	// ReadMetadata reads a metadata from repo by the metadata's object ID
+	ReadMetadata(ctx context.Context, id ID) (*Metadata, error)
 
 	// PutManifest saves a manifest object into the backup repository.
 	PutManifest(ctx context.Context, mani RepoManifest) (ID, error)
@@ -139,6 +168,15 @@ type BackupRepo interface {
 	// Time returns the local time of the backup repository. It may be different from the time of the caller
 	Time() time.Time
 
+	// SaveSnapshot saves a repo snapshot
+	SaveSnapshot(ctx context.Context, snapshot Snapshot) (ID, error)
+
+	// GetSnapshot returns a repo snapshot from snapshot ID
+	GetSnapshot(ctx context.Context, id ID) (Snapshot, error)
+
+	// DeleteSnapshot deletes a repo snapshot
+	DeleteSnapshot(ctx context.Context, id ID) error
+
 	// Close closes the backup repository
 	Close(ctx context.Context) error
 }
@@ -154,8 +192,8 @@ type ObjectReader interface {
 type ObjectWriter interface {
 	io.WriteCloser
 
-	// Seeker is used in the cases that the object is not written sequentially
-	io.Seeker
+	// WriterAt is used in the cases that the object is not written sequentially
+	io.WriterAt
 
 	// Checkpoint is periodically called to preserve the state of data written to the repo so far.
 	// Checkpoint returns a unified identifier that represent the current state.

@@ -71,7 +71,7 @@ jobs:
         run: |
           echo "Building MinIO image from Bitnami Dockerfile..."
           git clone --depth 1 https://github.com/bitnami/containers.git /tmp/bitnami-containers
-          cd /tmp/bitnami-containers/bitnami/minio/2025/debian-12
+          cd /tmp/bitnami-containers/bitnami/minio/2026/debian-12
           docker build -t bitnami/minio:local .
           docker save bitnami/minio:local > ${{ github.workspace }}/minio-image.tar
   # Create json of k8s versions to test
