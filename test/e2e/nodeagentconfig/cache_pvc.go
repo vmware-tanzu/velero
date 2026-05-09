@@ -57,7 +57,7 @@ func (c *CachePVCTestCase) Init() error {
 	c.NamespacesTotal = 1
 	c.NSIncluded = &[]string{}
 	for nsNum := 0; nsNum < c.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%05d", c.CaseBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", c.CaseBaseName, nsNum)
 		*c.NSIncluded = append(*c.NSIncluded, createNSName)
 	}
 
