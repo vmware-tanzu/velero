@@ -279,7 +279,7 @@ func TestExecute(t *testing.T) {
 				err := crClient.List(t.Context(), dataUploadList, &crclient.ListOptions{LabelSelector: labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: tc.backup.Name})})
 				require.NoError(t, err)
 				require.Len(t, dataUploadList.Items, 1)
-				require.True(t, cmp.Equal(tc.expectedDataUpload, &dataUploadList.Items[0], cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "ResourceVersion", "Name", "Spec.CSISnapshot.VolumeSnapshot")))
+				require.Empty(t, cmp.Diff(tc.expectedDataUpload, &dataUploadList.Items[0], cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "TypeMeta", "ResourceVersion", "Name", "Spec.CSISnapshot.VolumeSnapshot")))
 			}
 
 			if tc.expectedPVC != nil {
@@ -488,7 +488,7 @@ func TestCancel(t *testing.T) {
 				err = crClient.Get(t.Context(), crclient.ObjectKey{Namespace: tc.dataUpload.Namespace, Name: tc.dataUpload.Name}, du)
 				require.NoError(t, err)
 
-				require.True(t, cmp.Equal(tc.expectedDataUpload, *du, cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "ResourceVersion")))
+				require.Empty(t, cmp.Diff(tc.expectedDataUpload, *du, cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "TypeMeta", "ResourceVersion")))
 			}
 		})
 	}

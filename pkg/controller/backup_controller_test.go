@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -318,6 +319,34 @@ func TestBackupLocationLabel(t *testing.T) {
 			assert.Equal(t, test.expectedBackupLocation, res.Labels[velerov1api.StorageLocationLabel])
 		})
 	}
+}
+
+func TestPrepareBackupRequest_EmptyIncludedNamespacesNormalizedToWildcard(t *testing.T) {
+	formatFlag := logging.FormatText
+	logger := logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+
+	apiServer := velerotest.NewAPIServer(t)
+	discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+	require.NoError(t, err)
+
+	backupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Result()
+	fakeClient := velerotest.NewFakeControllerRuntimeClient(t, backupLocation)
+
+	c := &backupReconciler{
+		discoveryHelper:       discoveryHelper,
+		kbClient:              fakeClient,
+		defaultBackupLocation: backupLocation.Name,
+		clock:                 &clock.RealClock{},
+		formatFlag:            formatFlag,
+	}
+
+	backup := defaultBackup().Result()
+	backup.Spec.IncludedNamespaces = nil
+
+	res := c.prepareBackupRequest(ctx, backup, logger)
+	defer res.WorkerPool.Stop()
+
+	assert.Equal(t, []string{"*"}, res.Spec.IncludedNamespaces)
 }
 
 func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
@@ -709,6 +738,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.True(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -748,6 +778,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  "alt-loc",
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.False(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -791,6 +822,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  "read-write",
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.True(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -831,6 +863,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Spec: velerov1api.BackupSpec{
 					TTL:                              metav1.Duration{Duration: 10 * time.Minute},
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.False(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -871,6 +904,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.True(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -912,6 +946,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.False(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -953,6 +988,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.True(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -994,6 +1030,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.True(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -1035,6 +1072,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.False(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -1077,6 +1115,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.True(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -1119,6 +1158,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.True(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -1161,6 +1201,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.False(),
 					SnapshotMoveData:                 boolptr.True(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -1204,6 +1245,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.False(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -1247,6 +1289,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.False(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -1290,6 +1333,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.False(),
 					SnapshotMoveData:                 boolptr.True(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -1334,6 +1378,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.False(),
 					SnapshotMoveData:                 boolptr.False(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -1377,6 +1422,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.False(),
 					SnapshotMoveData:                 boolptr.True(),
 					ExcludedClusterScopedResources:   autoExcludeClusterScopedResources,
@@ -1424,6 +1470,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.False(),
 					SnapshotMoveData:                 boolptr.True(),
 					IncludedClusterScopedResources:   []string{"storageclasses"},
@@ -1473,6 +1520,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: velerov1api.BackupSpec{
 					StorageLocation:                  defaultBackupLocation.Name,
+					IncludedNamespaces:               []string{"*"},
 					DefaultVolumesToFsBackup:         boolptr.False(),
 					SnapshotMoveData:                 boolptr.True(),
 					IncludedClusterScopedResources:   []string{"storageclasses"},
@@ -1609,7 +1657,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			err = c.kbClient.Get(t.Context(), kbclient.ObjectKey{Namespace: test.backup.Namespace, Name: test.backup.Name}, res)
 			require.NoError(t, err)
 			res.ResourceVersion = ""
-			assert.Equal(t, test.expectedResult, res)
+			assert.Empty(t, cmp.Diff(test.expectedResult, res, cmpopts.IgnoreFields(velerov1api.Backup{}, "TypeMeta")))
 			// reset defaultBackupLocation resourceVersion
 			defaultBackupLocation.ObjectMeta.ResourceVersion = ""
 		})
