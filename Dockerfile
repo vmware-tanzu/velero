@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Velero binary build section
-FROM --platform=$BUILDPLATFORM golang:1.25.9-trixie AS velero-builder
+FROM --platform=$BUILDPLATFORM golang:1.25.10-trixie AS velero-builder
 
 ARG GOPROXY
 ARG BIN
@@ -49,7 +49,7 @@ RUN mkdir -p /output/usr/bin && \
     go clean -modcache -cache
 
 # Restic binary build section
-FROM --platform=$BUILDPLATFORM golang:1.25.9-trixie AS restic-builder
+FROM --platform=$BUILDPLATFORM golang:1.25.10-trixie AS restic-builder
 
 ARG GOPROXY
 ARG BIN

@@ -15,7 +15,7 @@
 ARG OS_VERSION=1809
 
 # Velero binary build section
-FROM --platform=$BUILDPLATFORM golang:1.25.9-trixie AS velero-builder
+FROM --platform=$BUILDPLATFORM golang:1.25.10-trixie AS velero-builder
 
 ARG GOPROXY
 ARG BIN

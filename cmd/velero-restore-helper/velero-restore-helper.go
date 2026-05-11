@@ -65,6 +65,7 @@ func done() bool {
 
 		doneFile := filepath.Join("/restores", child.Name(), ".velero", os.Args[1])
 
+		// #nosec G304,G703 -- doneFile is generated from internal logic and not user-controllable.
 		if _, err := os.Stat(doneFile); os.IsNotExist(err) {
 			fmt.Printf("The filesystem restore done file %s is not found yet. Retry later.\n", doneFile)
 			return false
