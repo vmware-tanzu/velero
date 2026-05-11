@@ -564,8 +564,8 @@ func (ctx *finalizerContext) WaitRestoreExecHook() (errs results.Result) {
 	// deadline, so a hook that was registered via Add() but never
 	// recorded as executed (pod evicted, container never ready,
 	// goroutine panic, leaked tracker entry) left the restore stuck in
-	// Finalizing forever and — because the finalizer controller is a
-	// single-threaded controller-runtime reconciler — blocked every
+	// Finalizing forever and, because the finalizer controller is a
+	// single-threaded controller-runtime reconciler, blocked every
 	// other restore on the cluster.
 	timeout := ctx.resourceTimeout
 	if timeout <= 0 {

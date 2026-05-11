@@ -483,7 +483,7 @@ func TestWaitRestoreExecHook(t *testing.T) {
 	hookTracker3.Add(restoreName3, podNs, podName, container, source, hookName, hook.PhasePre, 0)
 
 	// hookTracker4: an entry that is added but never recorded. This
-	// reproduces the hang that motivated the resourceTimeout guard —
+	// reproduces the hang that motivated the resourceTimeout guard,
 	// without the timeout, WaitRestoreExecHook would block forever.
 	hookTracker4 := hook.NewMultiHookTracker()
 	restoreName4 := "restore4"
