@@ -83,7 +83,6 @@ func KbClientIsRunningInNode(ctx context.Context, namespace string, nodeName str
 
 // IsReady checks whether the node-agent daemonset has at least one ready pod by inspecting the DaemonSet status.
 func IsReady(ctx context.Context, namespace string, crClient ctrlclient.Client) error {
-
 	ds := new(appsv1api.DaemonSet)
 	windowsDs := new(appsv1api.DaemonSet)
 
