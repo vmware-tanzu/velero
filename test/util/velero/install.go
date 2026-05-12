@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/mod/semver"
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -313,35 +312,35 @@ func cleanVSpherePluginConfig(c clientset.Interface, ns, secretName, configMapNa
 }
 
 // ValidateVeleroVersion checks if the given version is valid
-// version can be in the format of 'main', 'release-x.y(-dev)', or 'vX.Y(.Z)'
+// version can be in the format of 'main', 'release-x.y(-dev)', or 'vX.Y(.Z)(-rc.1...)'
 func ValidateVeleroVersion(version string) error {
 	mainRe := regexp.MustCompile(`^main$`)
 	releaseRe := regexp.MustCompile(`^release-(\d+)\.(\d+)(-dev)?$`)
-	tagRe := regexp.MustCompile(`^v(\d+)\.(\d+)(\.\d+)?$`)
+	tagRe := regexp.MustCompile(`^v(\d+)\.(\d+)(\.\d+)?`)
 
 	if mainRe.MatchString(version) || releaseRe.MatchString(version) || tagRe.MatchString(version) {
 		return nil
 	}
 
 	fmt.Println("Invalid Velero version:", version)
-	return fmt.Errorf("invalid Velero version: %s, Velero version must be 'main', 'release-x.y(-dev)', or 'vX.Y.Z'", version)
+	return fmt.Errorf("invalid Velero version: %s, Velero version must be 'main', 'release-x.y(-dev)', or 'vX.Y(.Z)(...)'", version)
 }
 
 // VersionNoOlderThan checks if the given version is no older than the targetVersion
-// version can be in the format of 'main', 'release-x.y(-dev)', or 'vX.Y(.Z)'
-// targetVersion must be in the format of 'main', or 'vX.Y.(Z)'
+// version can be in the format of 'main', 'release-x.y(-dev)', or 'vX.Y(.Z)(...)'
+// targetVersion must be in the format of 'main', or 'vX.Y.(Z)(...)'
 // return true if version is no older than targetVersion
 func VersionNoOlderThan(version string, targetVersion string) (bool, error) {
 	mainRe := regexp.MustCompile(`^main$`)
 	releaseRe := regexp.MustCompile(`^release-(\d+)\.(\d+)(-dev)?$`)
-	tagRe := regexp.MustCompile(`^v(\d+)\.(\d+)(\.\d+)?$`)
+	tagRe := regexp.MustCompile(`^v(\d+)\.(\d+)(\.\d+)?`)
 
 	if err := ValidateVeleroVersion(version); err != nil {
 		return false, err
 	}
 	if !tagRe.MatchString(targetVersion) && !mainRe.MatchString(targetVersion) {
-		fmt.Printf("targetVersion %s is invalid. it must be in the format of 'main', or 'vX.Y.(Z)'.\n", targetVersion)
-		return false, fmt.Errorf("targetVersion is invalid. it must be in the format of 'main', or 'vX.Y.(Z)'.")
+		fmt.Printf("targetVersion %s is invalid. it must be in the format of 'main', or 'vX.Y(.Z)(...)'.\n", targetVersion)
+		return false, fmt.Errorf("targetVersion is invalid. it must be in the format of 'main', or 'vX.Y(.Z)(...)'.")
 	}
 
 	fmt.Printf("version: %s, targetVersion: %s\n", version, targetVersion)
@@ -373,12 +372,19 @@ func VersionNoOlderThan(version string, targetVersion string) (bool, error) {
 		}
 
 	case tagRe.MatchString(version):
+		matches := tagRe.FindStringSubmatch(version)
+		major := matches[1]
+		minor := matches[2]
+
 		switch {
 		case mainRe.MatchString(targetVersion):
 			return false, nil
 
 		default:
-			if semver.Compare(version, targetVersion) >= 0 {
+			matches := tagRe.FindStringSubmatch(targetVersion)
+			targetMajor := matches[1]
+			targetMinor := matches[2]
+			if major >= targetMajor && minor >= targetMinor {
 				return true, nil
 			} else {
 				return false, nil
