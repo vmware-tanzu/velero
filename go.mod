@@ -51,14 +51,14 @@ require (
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.33.3
-	k8s.io/apiextensions-apiserver v0.33.3
-	k8s.io/apimachinery v0.33.3
-	k8s.io/cli-runtime v0.33.3
-	k8s.io/client-go v0.33.3
+	k8s.io/api v0.33.11
+	k8s.io/apiextensions-apiserver v0.33.11
+	k8s.io/apimachinery v0.33.11
+	k8s.io/cli-runtime v0.33.11
+	k8s.io/client-go v0.33.11
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/kube-aggregator v0.33.3
-	k8s.io/metrics v0.33.3
+	k8s.io/kube-aggregator v0.33.11
+	k8s.io/metrics v0.33.11
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	sigs.k8s.io/controller-runtime v0.21.0
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3
