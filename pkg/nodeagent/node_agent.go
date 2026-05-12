@@ -83,13 +83,19 @@ func KbClientIsRunningInNode(ctx context.Context, namespace string, nodeName str
 
 // IsReady checks whether the node-agent daemonset has at least one ready pod by inspecting the DaemonSet status.
 func IsReady(ctx context.Context, namespace string, crClient ctrlclient.Client) error {
+
 	ds := new(appsv1api.DaemonSet)
-	if err := crClient.Get(ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: daemonSet}, ds); err != nil {
-		return errors.Wrap(err, "failed to get node-agent daemonset")
+	windowsDs := new(appsv1api.DaemonSet)
+
+	linuxErr := crClient.Get(ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: daemonSet}, ds)
+	winErr := crClient.Get(ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: daemonsetWindows}, windowsDs)
+
+	if linuxErr != nil && winErr != nil {
+		return errors.New(fmt.Sprintf("failed to get node-agent daemonsets. linux error: %v, windows error: %v", linuxErr, winErr))
 	}
 
-	if ds.Status.NumberReady == 0 {
-		return errors.New("node-agent daemonset has no ready pods")
+	if ds.Status.NumberReady == 0 && windowsDs.Status.NumberReady == 0 {
+		return errors.New("node-agent is not ready: no ready pods found in both linux and windows daemonsets")
 	}
 
 	return nil

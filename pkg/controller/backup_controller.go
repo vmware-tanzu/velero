@@ -49,12 +49,10 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/constant"
-	"github.com/vmware-tanzu/velero/pkg/datamover"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
@@ -493,17 +491,6 @@ func (b *backupReconciler) prepareBackupRequest(ctx context.Context, backup *vel
 		for _, loc := range locs {
 			request.Spec.VolumeSnapshotLocations = append(request.Spec.VolumeSnapshotLocations, loc.Name)
 			request.SnapshotLocations = append(request.SnapshotLocations, loc)
-		}
-	}
-
-	// validate that the node-agent daemonset is ready when snapshot data movement with
-	// the built-in data mover is requested. Without this, the DataUpload CR will be
-	// created but never processed (the DataUpload controller runs inside node-agent),
-	// causing the backup to hang until itemOperationTimeout expires.
-	if boolptr.IsSetToTrue(request.Spec.SnapshotMoveData) && datamover.IsBuiltInUploader(request.Spec.DataMover) {
-		if err := nodeagent.IsReady(ctx, request.Namespace, b.kbClient); err != nil {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors,
-				fmt.Sprintf("node-agent is not ready: %v; the built-in data mover requires node-agent to be deployed and running", err))
 		}
 	}
 

@@ -217,13 +217,21 @@ func TestIsReady(t *testing.T) {
 	scheme := runtime.NewScheme()
 	appsv1api.AddToScheme(scheme)
 
-	dsNotReady := &appsv1api.DaemonSet{
+	dsLinuxNotReady := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "fake-ns", Name: "node-agent"},
 		Status:     appsv1api.DaemonSetStatus{NumberReady: 0},
 	}
-	dsReady := &appsv1api.DaemonSet{
+	dsLinuxReady := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "fake-ns", Name: "node-agent"},
 		Status:     appsv1api.DaemonSetStatus{NumberReady: 3},
+	}
+	dsWindowsNotReady := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "fake-ns", Name: "node-agent-windows"},
+		Status:     appsv1api.DaemonSetStatus{NumberReady: 0},
+	}
+	dsWindowsReady := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "fake-ns", Name: "node-agent-windows"},
+		Status:     appsv1api.DaemonSetStatus{NumberReady: 2},
 	}
 
 	tests := []struct {
@@ -233,23 +241,63 @@ func TestIsReady(t *testing.T) {
 		expectErr     string
 	}{
 		{
-			name:      "daemonset not found",
+			name:      "neither daemonset found",
 			namespace: "fake-ns",
-			expectErr: "failed to get node-agent daemonset: daemonsets.apps \"node-agent\" not found",
+			expectErr: "failed to get node-agent daemonsets. linux error: daemonsets.apps \"node-agent\" not found, windows error: daemonsets.apps \"node-agent-windows\" not found",
 		},
 		{
-			name:      "daemonset exists but no ready pods",
+			name:      "linux daemonset exists but no ready pods",
 			namespace: "fake-ns",
 			kubeClientObj: []runtime.Object{
-				dsNotReady,
+				dsLinuxNotReady,
 			},
-			expectErr: "node-agent daemonset has no ready pods",
+			expectErr: "node-agent is not ready: no ready pods found in both linux and windows daemonsets",
 		},
 		{
-			name:      "daemonset has ready pods",
+			name:      "linux daemonset has ready pods",
 			namespace: "fake-ns",
 			kubeClientObj: []runtime.Object{
-				dsReady,
+				dsLinuxReady,
+			},
+		},
+		{
+			name:      "windows daemonset only with ready pods",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				dsWindowsReady,
+			},
+		},
+		{
+			name:      "windows daemonset only with no ready pods",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				dsWindowsNotReady,
+			},
+			expectErr: "node-agent is not ready: no ready pods found in both linux and windows daemonsets",
+		},
+		{
+			name:      "both daemonsets exist with ready pods",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				dsLinuxReady,
+				dsWindowsReady,
+			},
+		},
+		{
+			name:      "both daemonsets exist but neither has ready pods",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				dsLinuxNotReady,
+				dsWindowsNotReady,
+			},
+			expectErr: "node-agent is not ready: no ready pods found in both linux and windows daemonsets",
+		},
+		{
+			name:      "linux not ready but windows ready",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				dsLinuxNotReady,
+				dsWindowsReady,
 			},
 		},
 	}

@@ -40,6 +40,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	storagev1api "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -130,7 +131,10 @@ func TestExecute(t *testing.T) {
 			sc:      builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
 			vsClass: builder.ForVolumeSnapshotClass("testVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
 			extraObjects: []runtime.Object{
-				builder.ForPod("velero", "node-agent-pod").Labels(map[string]string{"role": "node-agent"}).Phase(corev1api.PodRunning).NodeName("test-node").Result(),
+				&appsv1api.DaemonSet{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "velero", Name: "node-agent"},
+					Status:     appsv1api.DaemonSetStatus{NumberReady: 3},
+				},
 			},
 			operationID: ".",
 			expectedDataUpload: &velerov2alpha1.DataUpload{
@@ -178,13 +182,25 @@ func TestExecute(t *testing.T) {
 			sc:      builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
 			vsClass: builder.ForVolumeSnapshotClass("tescVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
 			extraObjects: []runtime.Object{
-				builder.ForPod("velero", "node-agent-pod").Labels(map[string]string{"role": "node-agent"}).Phase(corev1api.PodRunning).NodeName("test-node").Result(),
+				&appsv1api.DaemonSet{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "velero", Name: "node-agent"},
+					Status:     appsv1api.DaemonSetStatus{NumberReady: 3},
+				},
 			},
 			operationID: ".",
 			expectedPVC: builder.ForPersistentVolumeClaim("velero", "testPVC").
 				ObjectMeta(builder.WithAnnotations(velerov1api.MustIncludeAdditionalItemAnnotation, "true", velerov1api.DataUploadNameAnnotation, "velero/"),
 					builder.WithLabels(velerov1api.BackupNameLabel, "test")).
 				VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
+		},
+		{
+			name:              "Test SnapshotMoveData without node-agent",
+			backup:            builder.ForBackup("velero", "test").SnapshotMoveData(true).CSISnapshotTimeout(1 * time.Minute).Result(),
+			pvc:               builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
+			pv:                builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
+			sc:                builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
+			vsClass:           builder.ForVolumeSnapshotClass("testVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
+			skipVSReadyUpdate: true,
 		},
 		{
 			name:           "Test ResourcePolicy",
