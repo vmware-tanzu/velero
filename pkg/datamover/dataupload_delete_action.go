@@ -14,6 +14,7 @@ import (
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 )
@@ -34,6 +35,19 @@ func (d *DataUploadDeleteAction) Execute(input *velero.DeleteItemActionExecuteIn
 	du := &velerov2alpha1.DataUpload{}
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), &du); err != nil {
 		return errors.WithStack(errors.Wrapf(err, "failed to convert input.Item from unstructured"))
+	}
+	// Skip DataUploads that do not belong to the backup being deleted. The
+	// backup tarball may incidentally include DataUpload CRs from the velero
+	// namespace that belong to a different backup (e.g. when an hourly
+	// schedule with snapshotMoveData=false captures the velero namespace
+	// containing a daily schedule's DataUploads). Creating a snapshot-info
+	// ConfigMap labeled with the wrong backup name causes the real owning
+	// backup's deleteMovedSnapshots query to miss it, leaking the Kopia
+	// snapshot in the object store.
+	if owner := du.Labels[velerov1.BackupNameLabel]; owner != "" && owner != label.GetValidName(input.Backup.Name) {
+		d.logger.Infof("Skipping DataUpload %s/%s: belongs to backup %q, not %q",
+			du.Namespace, du.Name, owner, input.Backup.Name)
+		return nil
 	}
 	cm := genConfigmap(input.Backup, *du)
 	if cm == nil {
