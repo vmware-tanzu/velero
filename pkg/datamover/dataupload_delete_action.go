@@ -36,17 +36,24 @@ func (d *DataUploadDeleteAction) Execute(input *velero.DeleteItemActionExecuteIn
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), &du); err != nil {
 		return errors.WithStack(errors.Wrapf(err, "failed to convert input.Item from unstructured"))
 	}
-	// Skip DataUploads that do not belong to the backup being deleted. The
-	// backup tarball may incidentally include DataUpload CRs from the velero
-	// namespace that belong to a different backup (e.g. when an hourly
-	// schedule with snapshotMoveData=false captures the velero namespace
-	// containing a daily schedule's DataUploads). Creating a snapshot-info
-	// ConfigMap labeled with the wrong backup name causes the real owning
-	// backup's deleteMovedSnapshots query to miss it, leaking the Kopia
-	// snapshot in the object store.
+	// Detect DataUploads that do not belong to the backup being deleted.
+	// Velero does not support self-protection: the velero namespace should
+	// never be captured in a backup tarball. When it is (e.g. an operator
+	// schedule covers the velero namespace), the tarball can contain
+	// DataUpload CRs belonging to *other* backups. Creating a snapshot-info
+	// ConfigMap labeled with the executing backup's name in that case
+	// mislabels the snapshot and causes the real owning backup's
+	// deleteMovedSnapshots query to miss it, leaking the Kopia snapshot in
+	// the object store. Log a warning so misconfigured installs are visible,
+	// and skip the snapshot-info ConfigMap creation to avoid mislabeling.
 	if owner := du.Labels[velerov1.BackupNameLabel]; owner != "" && owner != label.GetValidName(input.Backup.Name) {
-		d.logger.Infof("Skipping DataUpload %s/%s: belongs to backup %q, not %q",
-			du.Namespace, du.Name, owner, input.Backup.Name)
+		d.logger.Warnf(
+			"DataUpload %q belongs to backup %q but is being deleted under backup %q; "+
+				"this almost always means the velero namespace was included in a backup tarball. "+
+				"Velero does not support self-protection — exclude the velero namespace from your schedules. "+
+				"Skipping snapshot-info ConfigMap creation to avoid mislabeling.",
+			du.Name, owner, input.Backup.Name,
+		)
 		return nil
 	}
 	cm := genConfigmap(input.Backup, *du)

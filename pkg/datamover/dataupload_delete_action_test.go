@@ -18,9 +18,11 @@ package datamover
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
@@ -81,11 +83,12 @@ func TestDataUploadDeleteActionAppliesTo(t *testing.T) {
 
 func TestDataUploadDeleteActionExecute(t *testing.T) {
 	tests := []struct {
-		name             string
-		duName           string
-		duOwnerBackup    string // value placed in velero.io/backup-name label on the DataUpload
-		executingBackup  string // name of the Backup being deleted (input.Backup.Name)
-		wantConfigMap    bool
+		name            string
+		duName          string
+		duOwnerBackup   string // value placed in velero.io/backup-name label on the DataUpload
+		executingBackup string // name of the Backup being deleted (input.Backup.Name)
+		wantConfigMap   bool
+		wantWarn        bool // whether a warn-level log about a foreign DataUpload is expected
 	}{
 		{
 			name:            "DataUpload owned by the executing backup creates a snapshot-info ConfigMap",
@@ -93,13 +96,15 @@ func TestDataUploadDeleteActionExecute(t *testing.T) {
 			duOwnerBackup:   "daily-backup",
 			executingBackup: "daily-backup",
 			wantConfigMap:   true,
+			wantWarn:        false,
 		},
 		{
-			name:            "DataUpload owned by a different backup is skipped (no ConfigMap created)",
+			name:            "DataUpload owned by a different backup is skipped and a warning is logged",
 			duName:          "daily-backup-abcde",
 			duOwnerBackup:   "daily-backup",
 			executingBackup: "hourly-backup",
 			wantConfigMap:   false,
+			wantWarn:        true,
 		},
 		{
 			name:            "DataUpload with no backup-name label falls through (legacy behavior preserved)",
@@ -107,13 +112,16 @@ func TestDataUploadDeleteActionExecute(t *testing.T) {
 			duOwnerBackup:   "",
 			executingBackup: "some-backup",
 			wantConfigMap:   true,
+			wantWarn:        false,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			crClient := velerotest.NewFakeControllerRuntimeClient(t)
-			action := NewDataUploadDeleteAction(logrus.StandardLogger(), crClient)
+			logger, hook := logrustest.NewNullLogger()
+			logger.SetLevel(logrus.DebugLevel)
+			action := NewDataUploadDeleteAction(logger, crClient)
 
 			du := newCompletedDataUpload(tc.duName, tc.duOwnerBackup)
 			backup := builder.ForBackup("velero", tc.executingBackup).StorageLocation("default").Result()
@@ -139,6 +147,23 @@ func TestDataUploadDeleteActionExecute(t *testing.T) {
 				assert.True(t, apierrors.IsNotFound(getErr),
 					"expected no ConfigMap to be created for foreign DataUpload, but got: %v", getErr)
 			}
+
+			// The action must surface foreign-backup DataUploads as warnings so
+			// operators who accidentally included the velero namespace in a
+			// backup can detect the misconfiguration from logs, instead of
+			// having the case silently swallowed.
+			var sawForeignWarn bool
+			for _, entry := range hook.AllEntries() {
+				if entry.Level == logrus.WarnLevel &&
+					strings.Contains(entry.Message, "velero namespace") &&
+					strings.Contains(entry.Message, tc.duName) {
+					sawForeignWarn = true
+					break
+				}
+			}
+			assert.Equal(t, tc.wantWarn, sawForeignWarn,
+				"unexpected foreign-backup warn log presence (want=%v, got=%v); entries=%v",
+				tc.wantWarn, sawForeignWarn, hook.AllEntries())
 		})
 	}
 }
