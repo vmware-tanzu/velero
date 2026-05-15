@@ -56,7 +56,7 @@ This creates three critical gaps for common backup scenarios:
 
 ### Configuration Model
 
-The namespace-scoped filters and fine-grained global filters are defined in the same ResourcePolicy ConfigMap that is already referenced by `BackupSpec.ResourcePolicy`. The YAML format is extended with two new top-level keys:
+The namespace-scoped filters and fine-grained global filters are defined in the same ResourcePolicy ConfigMap that is already referenced by `BackupSpec.ResourcePolicy`. The YAML format is extended with two new top-level keys: `fineGrainedGlobalFilterPolicy` and `namespacedFilterPolicies`
 
 ```yaml
 version: v1
