@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -42,6 +44,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
+	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -67,14 +71,17 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 	defaultBackupLocation := builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "default").Result()
 
 	tests := []struct {
-		name                string
-		backup              *velerov1api.Backup
-		backupOperations    []*itemoperation.BackupOperation
-		backupLocation      *velerov1api.BackupStorageLocation
-		enableCSI           bool
-		expectError         bool
-		expectPhase         velerov1api.BackupPhase
-		expectedCompletedVS int
+		name                     string
+		backup                   *velerov1api.Backup
+		backupOperations         []*itemoperation.BackupOperation
+		backupLocation           *velerov1api.BackupStorageLocation
+		enableCSI                bool
+		expectError              bool
+		expectPhase              velerov1api.BackupPhase
+		expectedCompletedVS      int
+		putBackupMetadataErr     error
+		putBackupContentsErr     error
+		expectCompletionTimestamp bool
 	}{
 		{
 			name: "Finalizing backup is completed",
@@ -161,10 +168,11 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 					Phase:                       velerov1api.BackupPhaseFinalizing,
 				}).
 				Result(),
-			backupLocation:      defaultBackupLocation,
-			enableCSI:           true,
-			expectPhase:         velerov1api.BackupPhaseCompleted,
-			expectedCompletedVS: 1,
+			backupLocation:           defaultBackupLocation,
+			enableCSI:                true,
+			expectPhase:              velerov1api.BackupPhaseCompleted,
+			expectedCompletedVS:      1,
+			expectCompletionTimestamp: true,
 			backupOperations: []*itemoperation.BackupOperation{
 				{
 					Spec: itemoperation.BackupOperationSpec{
@@ -184,6 +192,63 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 							},
 						},
 						OperationID: "operation-3",
+					},
+					Status: itemoperation.OperationStatus{
+						Phase:   itemoperation.OperationPhaseCompleted,
+						Created: &metav1Now,
+					},
+				},
+			},
+		},
+		{
+			name: "PutBackupMetadata failure keeps Finalizing phase",
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-4").
+				StorageLocation("default").
+				ObjectMeta(builder.WithUID("foo")).
+				StartTimestamp(fakeClock.Now()).
+				Phase(velerov1api.BackupPhaseFinalizing).Result(),
+			backupLocation:       defaultBackupLocation,
+			expectError:          true,
+			expectPhase:          velerov1api.BackupPhaseFinalizing,
+			putBackupMetadataErr: fmt.Errorf("object lock prevented overwrite"),
+			backupOperations:     []*itemoperation.BackupOperation{},
+		},
+		{
+			name: "PutBackupMetadata failure keeps FinalizingPartiallyFailed phase",
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-5").
+				StorageLocation("default").
+				ObjectMeta(builder.WithUID("foo")).
+				StartTimestamp(fakeClock.Now()).
+				Phase(velerov1api.BackupPhaseFinalizingPartiallyFailed).Result(),
+			backupLocation:       defaultBackupLocation,
+			expectError:          true,
+			expectPhase:          velerov1api.BackupPhaseFinalizingPartiallyFailed,
+			putBackupMetadataErr: fmt.Errorf("object lock prevented overwrite"),
+			backupOperations:     []*itemoperation.BackupOperation{},
+		},
+		{
+			name: "PutBackupContents failure keeps Finalizing phase",
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-6").
+				StorageLocation("default").
+				ObjectMeta(builder.WithUID("foo")).
+				StartTimestamp(fakeClock.Now()).
+				Phase(velerov1api.BackupPhaseFinalizing).Result(),
+			backupLocation:       defaultBackupLocation,
+			expectError:          true,
+			expectPhase:          velerov1api.BackupPhaseFinalizing,
+			putBackupContentsErr: fmt.Errorf("upload failed"),
+			backupOperations: []*itemoperation.BackupOperation{
+				{
+					Spec: itemoperation.BackupOperationSpec{
+						BackupName:       "backup-6",
+						BackupUID:        "foo",
+						BackupItemAction: "foo",
+						ResourceIdentifier: velero.ResourceIdentifier{
+							GroupResource: kuberesource.Pods,
+							Namespace:     "ns-1",
+							Name:          "pod-1",
+						},
+						OperationID: "operation-6",
 					},
 					Status: itemoperation.OperationStatus{
 						Phase:   itemoperation.OperationPhaseCompleted,
@@ -216,12 +281,17 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 
 			fakeGlobalClient := velerotest.NewFakeControllerRuntimeClient(t, initObjs...)
 
+			// Reinitialize mocks per test to avoid accumulated expectations
+			backupStore = &persistencemocks.BackupStore{}
+			pluginManager = &pluginmocks.Manager{}
+
 			reconciler, backupper := mockBackupFinalizerReconciler(fakeClient, fakeGlobalClient, fakeClock)
 			pluginManager.On("CleanupClients").Return(nil)
 			backupStore.On("GetBackupItemOperations", test.backup.Name).Return(test.backupOperations, nil)
 			backupStore.On("GetBackupContents", mock.Anything).Return(io.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
-			backupStore.On("PutBackupContents", mock.Anything, mock.Anything).Return(nil)
-			backupStore.On("PutBackupMetadata", mock.Anything, mock.Anything).Return(nil)
+			backupStore.On("PutBackupContents", mock.Anything, mock.Anything).Return(test.putBackupContentsErr)
+			backupStore.On("PutBackupMetadata", mock.Anything, mock.Anything).Return(test.putBackupMetadataErr)
+
 			backupStore.On("GetBackupVolumeInfos", mock.Anything).Return(nil, nil)
 			backupStore.On("PutBackupVolumeInfos", mock.Anything, mock.Anything).Return(nil)
 			pluginManager.On("GetBackupItemActionsV2").Return(nil, nil)
@@ -239,6 +309,9 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, test.expectPhase, backupAfter.Status.Phase)
 			assert.Equal(t, test.expectedCompletedVS, backupAfter.Status.CSIVolumeSnapshotsCompleted)
+			if test.expectError {
+				assert.Nil(t, backupAfter.Status.CompletionTimestamp, "CompletionTimestamp should not be set on upload failure")
+			}
 		})
 	}
 }

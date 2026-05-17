@@ -201,38 +201,52 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, errors.WithStack(err)
 		}
 	}
-	backupScheduleName := backupRequest.GetLabels()[velerov1api.ScheduleNameLabel]
+	// Set final phase and timestamps before encoding the backup metadata.
 	switch backup.Status.Phase {
 	case velerov1api.BackupPhaseFinalizing:
 		backup.Status.Phase = velerov1api.BackupPhaseCompleted
-		r.metrics.RegisterBackupSuccess(backupScheduleName)
-		r.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusSucc)
 	case velerov1api.BackupPhaseFinalizingPartiallyFailed:
 		backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
-		r.metrics.RegisterBackupPartialFailure(backupScheduleName)
-		r.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
 	}
-
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 	backup.Status.CSIVolumeSnapshotsCompleted = updateCSIVolumeSnapshotsCompleted(operations)
 
-	recordBackupMetrics(log, backup, outBackupFile, r.metrics, true)
-
-	// update backup metadata in object store
+	// Encode and upload backup metadata and contents to object store.
+	// On failure, restore the original status so the deferred patch
+	// does not advance the cluster CR past Finalizing.
 	backupJSON := new(bytes.Buffer)
 	if err := encode.To(backup, "json", backupJSON); err != nil {
+		backup.Status.Phase = original.Status.Phase
+		backup.Status.CompletionTimestamp = original.Status.CompletionTimestamp
 		return ctrl.Result{}, errors.Wrap(err, "error encoding backup json")
 	}
 	err = backupStore.PutBackupMetadata(backup.Name, backupJSON)
 	if err != nil {
+		backup.Status.Phase = original.Status.Phase
+		backup.Status.CompletionTimestamp = original.Status.CompletionTimestamp
 		return ctrl.Result{}, errors.Wrap(err, "error uploading backup json")
 	}
 	if len(operations) > 0 {
 		err = backupStore.PutBackupContents(backup.Name, outBackupFile)
 		if err != nil {
+			backup.Status.Phase = original.Status.Phase
+			backup.Status.CompletionTimestamp = original.Status.CompletionTimestamp
 			return ctrl.Result{}, errors.Wrap(err, "error uploading backup final contents")
 		}
 	}
+
+	// Record metrics only after all uploads succeed.
+	backupScheduleName := backupRequest.GetLabels()[velerov1api.ScheduleNameLabel]
+	switch original.Status.Phase {
+	case velerov1api.BackupPhaseFinalizing:
+		r.metrics.RegisterBackupSuccess(backupScheduleName)
+		r.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusSucc)
+	case velerov1api.BackupPhaseFinalizingPartiallyFailed:
+		r.metrics.RegisterBackupPartialFailure(backupScheduleName)
+		r.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
+	}
+	recordBackupMetrics(log, backup, outBackupFile, r.metrics, true)
+
 	return ctrl.Result{}, nil
 }
 
