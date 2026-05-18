@@ -5,7 +5,7 @@
 **Backup Filter**: The mechanism in Velero that determines which Kubernetes resources are collected from the cluster and written into the backup archive. Backup filters currently operate on four dimensions: namespace, resource type, label, and cluster scope.  
 **Global Filter**: A filter that applies uniformly across all namespaces in a backup. All existing Velero backup filters are global filters.  
 **Namespace-Scoped Filter**: A filter that applies only within specific namespaces, overriding the global filter for those namespaces. This is the capability introduced by this design.  
-**FineGrainedGlobalFilterPolicy**: A global filter for cluster-scoped resources that allows per-kind label selectors and name patterns, functioning similarly to `NamespacedFilterPolicy` but applied to cluster-scoped resources globally.  
+**ClusterScopedFilterPolicy**: A global filter for cluster-scoped resources that allows per-kind label selectors and name patterns, functioning similarly to `NamespacedFilterPolicy` but applied to cluster-scoped resources globally.  
 **Resource Filter**: A filter rule that pairs one or more resource kinds with their own label selector and/or name patterns. Multiple resource filters within a namespace-scoped policy allow different filtering criteria for different resource types.  
 **Resource Name Filter**: A filter that matches individual resource instances by their metadata.name, using glob patterns. This is a new filter dimension introduced by this design.  
 **Resource Policy**: An existing Velero mechanism where backup behavior rules are defined in a ConfigMap and referenced from `BackupSpec.ResourcePolicy`. Currently used for volume policies and global include/exclude policies.  
@@ -35,7 +35,7 @@ This creates three critical gaps for common backup scenarios:
 ## Goals
 
 - Extend the `ResourcePolicies` ConfigMap format with a `namespacedFilterPolicies` section that allows per-namespace, per-kind resource filtering with independent label selectors and name patterns for each resource type
-- Extend the `ResourcePolicies` ConfigMap format with a `fineGrainedGlobalFilterPolicy` section that allows per-kind resource filtering with independent label selectors and name patterns for cluster-scoped resources globally
+- Extend the `ResourcePolicies` ConfigMap format with a `clusterScopedFilterPolicy` section that allows per-kind resource filtering with independent label selectors and name patterns for cluster-scoped resources globally
 - Support resource name filtering by glob patterns using the same `gobwas/glob` library that Velero uses for namespace patterns, ensuring consistency across the codebase
 - Support per-kind label selectors, so that different resource types within the same namespace can be filtered with different labels
 - Maintain full backward compatibility — existing backups with no `namespacedFilterPolicies` behave exactly as they do today
@@ -56,7 +56,7 @@ This creates three critical gaps for common backup scenarios:
 
 ### Configuration Model
 
-The namespace-scoped filters and fine-grained global filters are defined in the same ResourcePolicy ConfigMap that is already referenced by `BackupSpec.ResourcePolicy`. The YAML format is extended with two new top-level keys: `fineGrainedGlobalFilterPolicy` and `namespacedFilterPolicies`
+The namespace-scoped filters and fine-grained global filters are defined in the same ResourcePolicy ConfigMap that is already referenced by `BackupSpec.ResourcePolicy`. The YAML format is extended with two new top-level keys: `clusterScopedFilterPolicy` and `namespacedFilterPolicies`
 
 ```yaml
 version: v1
@@ -70,7 +70,7 @@ includeExcludePolicy:
   # existing global include/exclude policy (unchanged)
   includedNamespaceScopedResources:
     - configmaps
-fineGrainedGlobalFilterPolicy:
+clusterScopedFilterPolicy:
   # NEW: global overrides for cluster-scoped resources
   resourceFilters:
     - kinds: [ClusterRole, ClusterRoleBinding]
@@ -96,7 +96,7 @@ namespacedFilterPolicies:
           app: my-service
 ```
 
-All four sections coexist in the same ConfigMap. They are independent — `volumePolicies` handles volume backup strategy, `includeExcludePolicy` handles global resource type filtering, `fineGrainedGlobalFilterPolicy` handles cluster-scoped resource filtering by kind/name/label, and `namespacedFilterPolicies` handles per-namespace, per-kind overrides.
+All four sections coexist in the same ConfigMap. They are independent — `volumePolicies` handles volume backup strategy, `includeExcludePolicy` handles global resource type filtering, `clusterScopedFilterPolicy` handles cluster-scoped resource filtering by kind/name/label, and `namespacedFilterPolicies` handles per-namespace, per-kind overrides.
 
 ### The `resourceFilters` Model
 
@@ -124,6 +124,7 @@ A `ResourceFilter` entry with an empty (or omitted) `kinds` field, or a field ex
 - At most **one** catch-all entry is allowed per `NamespacedFilterPolicy`.
 - `names` and `excludedNames` are **not** supported on catch-all entries. Name patterns are kind-specific by nature and cannot be applied across arbitrary kinds; use kind-specific entries for name-based filtering.
 - The catch-all applies to kinds that are **not listed in any other `resourceFilters` entry** in the same policy. Kind-specific entries take precedence over the catch-all.
+- A catch-all entry **does not inherit or fall back to `BackupSpec.LabelSelector`**. If a catch-all entry has no `labelSelector`/`orLabelSelectors`, all unlisted resource kinds in the namespace are included with **no label filtering** — the global label selector is not applied. Define a catch-all with an explicit `labelSelector` if label-based filtering is desired for unlisted kinds.
 
 **Evaluation order within a namespace filter policy:**
 1. For each resource kind encountered during backup, the system first checks whether a kind-specific `resourceFilters` entry exists for that kind.
@@ -135,7 +136,7 @@ A `ResourceFilter` entry with an empty (or omitted) `kinds` field, or a field ex
 
 The namespace-scoped filter system and fine-grained global filter system layer on top of the existing global filter system. They intentionally behave differently:
 - **`namespacedFilterPolicies`** acts as an **exclusive allowlist (boundary)**. Only kinds explicitly listed (or matched by a catch-all) are backed up from that namespace. This gives namespace owners complete and isolated control over their namespace's backup contents, preventing unexpected data spillage from global fallbacks.
-- **`fineGrainedGlobalFilterPolicy`** acts as a **refinement overlay (tweak)**. Unlisted cluster-scoped kinds fall back to the standard global filters. This allows administrators to selectively adjust filtering for a few specific cluster-scoped kinds without rewriting the entire global inclusion list.
+- **`clusterScopedFilterPolicy`** acts as a **refinement overlay (tweak)**. Unlisted cluster-scoped kinds fall back to the standard global filters. This allows administrators to selectively adjust filtering for a few specific cluster-scoped kinds without rewriting the entire global inclusion list.
 
 **For Namespace-Scoped Resources:**
 
@@ -156,14 +157,19 @@ The evaluation order is:
 
 6. **Interaction with `includeExcludePolicy`**: `namespacedFilterPolicies` is a **refinement** of the global resource filter system, not a replacement. Global exclusions defined in `includeExcludePolicy` (e.g., `excludedNamespaceScopedResources: [secrets]`) are applied first at the resource-type level before per-namespace filter policies are consulted. A namespace-scoped filter policy cannot re-include a resource kind that has been globally excluded by `includeExcludePolicy`. For example, if `secrets` is listed under `excludedNamespaceScopedResources`, no `Secret` resources will be backed up from any namespace, even if a `namespacedFilterPolicies` entry explicitly lists `Secret` for that namespace. Users who need per-namespace secret selection must remove `secrets` from the global exclusion list.
 
+   To help users catch this misconfiguration early, Velero logs a warning at backup start when a `namespacedFilterPolicies` entry lists a kind that is globally excluded by `includeExcludePolicy`:
+   ```
+   level=warn msg="namespacedFilterPolicies entry lists a kind that is globally excluded by includeExcludePolicy; the per-namespace filter entry has no effect" kind="secrets" namespacePattern="ns-a"
+   ```
+
 **For Cluster-Scoped Resources:**
 
-1. If `fineGrainedGlobalFilterPolicy` is present, it acts as a **refinement overlay** over the existing global filters for cluster-scoped resources. It is NOT an exclusive allowlist.
+1. If `clusterScopedFilterPolicy` is present, it acts as a **refinement overlay** over the existing global filters for cluster-scoped resources. It is NOT an exclusive allowlist.
    - To back up cluster-scoped resources in a namespace-filtered backup, you must still explicitly include them via `BackupSpec.IncludedClusterScopedResources`.
    - If a cluster-scoped kind is listed in its `resourceFilters`, its specific `labelSelector`/`orLabelSelectors` and `names`/`excludedNames` patterns are applied.
    - If a cluster-scoped kind is **not listed**, it falls back to the standard global filters (`BackupSpec.LabelSelector`, etc.) and is included in the backup.
 
-2. If `fineGrainedGlobalFilterPolicy` is absent, Velero falls back to the existing global filters (`IncludedClusterScopedResources`, `IncludedResources`, `LabelSelector`, etc.) for cluster-scoped resources.
+2. If `clusterScopedFilterPolicy` is absent, Velero falls back to the existing global filters (`IncludedClusterScopedResources`, `IncludedResources`, `LabelSelector`, etc.) for cluster-scoped resources.
 
 3. **The `velero.io/exclude-from-backup=true` label** always takes precedence over all filters.
 
@@ -179,7 +185,7 @@ flowchart TD
     H["Use global filters:<br>- BackupSpec IncludedResources<br>- BackupSpec LabelSelector<br>- includeExcludePolicy"]
     
     I{"Is resource<br>cluster-scoped?"}
-    J{"Is fineGrainedGlobalFilterPolicy<br>present?"}
+    J{"Is clusterScopedFilterPolicy<br>present?"}
     K{"Is kind in resourceFilters?"}
     L["Apply kind-specific filters:<br>- labelSelector / orLabelSelectors<br>- names / excludedNames"]
     
@@ -206,7 +212,7 @@ The existing backup pipeline has two stages: item collection and item backup. Na
 **Stage 1 — Item Collection (`item_collector.go`).** Resources are listed from the Kubernetes API.
 
 - **Resource type check** in `getResourceItems()`: Before iterating namespaces, the global resource type check still applies.
-  - **For Cluster-Scoped Resources:** The global resource type check (`ShouldInclude`) determines if the kind is collected. `FineGrainedGlobalFilterPolicy` does not skip unlisted cluster-scoped kinds at this stage.
+  - **For Cluster-Scoped Resources:** The global resource type check (`ShouldInclude`) determines if the kind is collected. `ClusterScopedFilterPolicy` does not skip unlisted cluster-scoped kinds at this stage.
   - **For Namespace-Scoped Resources:** Within the namespace loop, a per-namespace resource type check is added. If a filter policy matches the current namespace, only resource kinds listed in `resourceFilters[].kinds` are included — if the current resource type is not listed, it is skipped for that namespace.
 - **Label selector** in `listResourceByLabelsPerNamespace()` and `listResourceByLabelsGlobally()`: The function looks up the filter policy (either the namespace-specific one or the fine-grained global one). If found, it retrieves the `ResourceFilter` entry for the current resource kind and uses that entry's `labelSelector`/`orLabelSelectors` for the Kubernetes API list call. If no filter policy is found, the global selectors are used as before.
 
@@ -230,7 +236,7 @@ A follow-up design will add namespace-scoped filters to the restore pipeline.
 This section documents the system behavior in edge cases and error conditions:
 
 **Plugin AdditionalItems and Auto-Backed Up CRDs:**
-Cluster-scoped resources injected dynamically (such as `VolumeSnapshotClass` from the CSI plugin or `CustomResourceDefinition` from Velero's auto-backup loop) do not require hardcoded exceptions. In `itemInclusionChecks()`, Velero natively allows unlisted cluster-scoped resources to pass through unless explicitly excluded by the user. `FineGrainedGlobalFilterPolicy` preserves this permissive behavior: if a dynamically injected cluster-scoped resource is NOT listed in the policy, it passes through untouched. If it IS listed, its specific `names` and `excludedNames` filters are strictly enforced.
+Cluster-scoped resources injected dynamically (such as `VolumeSnapshotClass` from the CSI plugin or `CustomResourceDefinition` from Velero's auto-backup loop) do not require hardcoded exceptions. In `itemInclusionChecks()`, Velero natively allows unlisted cluster-scoped resources to pass through unless explicitly excluded by the user. `ClusterScopedFilterPolicy` preserves this permissive behavior: if a dynamically injected cluster-scoped resource is NOT listed in the policy, it passes through untouched. If it IS listed, its specific `names` and `excludedNames` filters are strictly enforced.
 
 **Plugin-injected namespace-scoped additional items** follow the same permissive principle. When a `BackupItemAction` returns additional items whose kind is not listed in the matched `namespacedFilterPolicies` entry and there is no catch-all entry, those items still pass through Stage 2 (`itemInclusionChecks`). This is intentional: blocking plugin-injected items at Stage 2 would break backup completeness — for example, a CSI plugin may inject a `VolumeSnapshotContent` that is required for a correct restore even when the user's filter policy only lists application resource types.
 
@@ -321,7 +327,7 @@ namespacedFilterPolicies[0].resourceFilters[0]: invalid label selector: "invalid
 ```
 
 **Out-of-Scope Kinds in Filter Entries:**
-A user may accidentally list a cluster-scoped kind (e.g., `ClusterRole`) inside a `namespacedFilterPolicies` entry, or a namespace-scoped kind (e.g., `ConfigMap`) inside `fineGrainedGlobalFilterPolicy`. The system silently ignores such entries at the Kubernetes API level — namespace-scoped items are never listed globally, and cluster-scoped items are never listed per-namespace, so no matching resources will ever be found. A warning is logged at backup start to help the user detect the misconfiguration. No validation error is raised — the entry is harmless but ineffective.
+A user may accidentally list a cluster-scoped kind (e.g., `ClusterRole`) inside a `namespacedFilterPolicies` entry, or a namespace-scoped kind (e.g., `ConfigMap`) inside `clusterScopedFilterPolicy`. The system silently ignores such entries at the Kubernetes API level — namespace-scoped items are never listed globally, and cluster-scoped items are never listed per-namespace, so no matching resources will ever be found. A warning is logged at backup start to help the user detect the misconfiguration. No validation error is raised — the entry is harmless but ineffective.
 
 **Discovery Helper Unavailable:**
 If the discovery helper is completely unavailable during backup initialization, the backup fails with:
@@ -352,11 +358,10 @@ This is consistent with how other discovery-dependent features handle this error
    namespacedFilterPolicies[N]: at least one resourceFilter must be specified
    ```
 
-3. **Each resource filter without kinds can only be defined once, and cannot specify names/excludedNames. Additionally, it must specify either labelSelector or orLabelSelectors:**
+3. **Each resource filter without kinds can only be defined once, and cannot specify names/excludedNames.**
    ```
    namespacedFilterPolicies[N]: only one resource filter with empty kinds is allowed
    namespacedFilterPolicies[N].resourceFilters[M]: names or excludedNames cannot be specified when kinds is empty
-   namespacedFilterPolicies[N].resourceFilters[M]: labelSelector or orLabelSelectors must be specified when kinds is empty
    ```
 
 4. **No duplicate kinds across resource filter entries** within the same namespace filter:
@@ -379,11 +384,11 @@ This is consistent with how other discovery-dependent features handle this error
 
 9. **Resource kind validation with discovery helper** (performed during backup initialization).
 
-**Validation functions for `fineGrainedGlobalFilterPolicy`:**
+**Validation functions for `clusterScopedFilterPolicy`:**
 
 1. **At least one resourceFilter must be specified.**
    ```
-   fineGrainedGlobalFilterPolicy: at least one resourceFilter must be specified
+   clusterScopedFilterPolicy: at least one resourceFilter must be specified
    ```
 
 2. **No duplicate kinds across resource filters.**
@@ -392,7 +397,7 @@ This is consistent with how other discovery-dependent features handle this error
 
 4. **Resource name patterns must be valid globs.**
 
-Additionally, in `backup_controller.go`, a validation check ensures that `namespacedFilterPolicies` and `fineGrainedGlobalFilterPolicy` are not used with old-style resource filters (`IncludedResources`/`ExcludedResources`/`IncludeClusterResources`), similar to the existing check for `includeExcludePolicy`.
+Additionally, in `backup_controller.go`, a validation check ensures that `namespacedFilterPolicies` and `clusterScopedFilterPolicy` are not used with old-style resource filters (`IncludedResources`/`ExcludedResources`/`IncludeClusterResources`), similar to the existing check for `includeExcludePolicy`.
 
 ## ConfigMap Examples
 
