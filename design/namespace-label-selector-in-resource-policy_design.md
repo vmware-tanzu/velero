@@ -100,7 +100,7 @@ The union of namespaces matched by all `includedNamespacesByLabel` selectors is 
 Namespaces matched by any `excludedNamespacesByLabel` selector are removed from that set.
 The final set is stored in `backup.status.includedNamespaces` so users can observe which namespaces were actually selected.
 
-This design coexists with the existing `includeExcludePolicy` fields (`includedClusterScopedResources`, `excludedClusterScopedResources`, `includedNamespaceScopedResources`, `excludedNamespaceScopedResources`) and is independent of the `namespacedFilterPolicies` and `fineGrainedGlobalFilterPolicy` sections described in the [Fine Grained Backup Filters](backup-filter-enhancement/fine-grained-backup-filters-design.md) design.
+This design coexists with the existing `includeExcludePolicy` fields (`includedClusterScopedResources`, `excludedClusterScopedResources`, `includedNamespaceScopedResources`, `excludedNamespaceScopedResources`) and is independent of the `namespacedFilterPolicies` and `clusterScopedFilterPolicy` sections described in the [Fine Grained Backup Filters](backup-filter-enhancement/fine-grained-backup-filters-design.md) design.
 
 ## Detailed Design
 
