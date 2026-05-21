@@ -51,7 +51,7 @@ type Iterator interface {
 	// BlockSize returns the granularity of the bitmap
 	BlockSize() uint
 
-	// Count returns the toal number of count in the bitmap
+	// Count returns the total number of count in the bitmap
 	Count() uint64
 
 	// Next returns the offset of the next set block and whether it comes to the end of the iteration
