@@ -227,33 +227,43 @@ func TestExecute(t *testing.T) {
 			pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&tc.pvc)
 			require.NoError(t, err)
 
+			var reconcileErrCh chan error
 			if tc.pvc != nil && !tc.failVSCreate && !tc.skipVSReadyUpdate {
+				reconcileErrCh = make(chan error, 1)
 				go func() {
 					var vsList snapshotv1api.VolumeSnapshotList
 					err := wait.PollUntilContextTimeout(t.Context(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
-						err = pvcBIA.crClient.List(ctx, &vsList, &crclient.ListOptions{Namespace: tc.pvc.Namespace})
-
-						require.NoError(t, err)
-						if err != nil || len(vsList.Items) == 0 {
+						if err := pvcBIA.crClient.List(ctx, &vsList, &crclient.ListOptions{Namespace: tc.pvc.Namespace}); err != nil {
 							return false, err
 						}
+						if len(vsList.Items) == 0 {
+							return false, nil
+						}
+
 						return true, nil
 					})
 
-					require.NoError(t, err)
+					if err != nil {
+						reconcileErrCh <- err
+						return
+					}
+
 					vscName := "testVSC"
+					handleName := "testHandle"
+					vsc := builder.ForVolumeSnapshotContent("testVSC").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &handleName}).Result()
+					err = pvcBIA.crClient.Create(t.Context(), vsc)
+					if err != nil {
+						reconcileErrCh <- err
+						return
+					}
+
 					readyToUse := true
 					vsList.Items[0].Status = &snapshotv1api.VolumeSnapshotStatus{
 						BoundVolumeSnapshotContentName: &vscName,
 						ReadyToUse:                     &readyToUse,
 					}
 					err = pvcBIA.crClient.Update(t.Context(), &vsList.Items[0])
-					require.NoError(t, err)
-
-					handleName := "testHandle"
-					vsc := builder.ForVolumeSnapshotContent("testVSC").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &handleName}).Result()
-					err = pvcBIA.crClient.Create(t.Context(), vsc)
-					require.NoError(t, err)
+					reconcileErrCh <- err
 				}()
 			}
 
@@ -274,12 +284,16 @@ func TestExecute(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			if reconcileErrCh != nil {
+				require.NoError(t, <-reconcileErrCh)
+			}
+
 			if tc.expectedDataUpload != nil {
 				dataUploadList := new(velerov2alpha1.DataUploadList)
 				err := crClient.List(t.Context(), dataUploadList, &crclient.ListOptions{LabelSelector: labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: tc.backup.Name})})
 				require.NoError(t, err)
 				require.Len(t, dataUploadList.Items, 1)
-				require.True(t, cmp.Equal(tc.expectedDataUpload, &dataUploadList.Items[0], cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "ResourceVersion", "Name", "Spec.CSISnapshot.VolumeSnapshot")))
+				require.Empty(t, cmp.Diff(tc.expectedDataUpload, &dataUploadList.Items[0], cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "TypeMeta", "ResourceVersion", "Name", "Spec.CSISnapshot.VolumeSnapshot")))
 			}
 
 			if tc.expectedPVC != nil {
@@ -488,7 +502,7 @@ func TestCancel(t *testing.T) {
 				err = crClient.Get(t.Context(), crclient.ObjectKey{Namespace: tc.dataUpload.Namespace, Name: tc.dataUpload.Name}, du)
 				require.NoError(t, err)
 
-				require.True(t, cmp.Equal(tc.expectedDataUpload, *du, cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "ResourceVersion")))
+				require.Empty(t, cmp.Diff(tc.expectedDataUpload, *du, cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "TypeMeta", "ResourceVersion")))
 			}
 		})
 	}
