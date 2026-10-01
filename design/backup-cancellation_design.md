@@ -1,8 +1,5 @@
 # Backup Cancellation
 
-_Note_: The preferred style for design documents is one sentence per line.
-*Do not wrap lines*.
-
 ## Abstract
 
 This proposal adds a supported way to cancel an in-progress Velero backup, stopping further work where possible and retaining the Backup object and any available artifacts for diagnosis.
