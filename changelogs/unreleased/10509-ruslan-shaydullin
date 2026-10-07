@@ -1,1 +1,1 @@
-Add a design proposal for shared Backup/Restore cancellation with Restore-specific lifecycle handling.
+Add the Restore cancellation design, the Restore follow-on to the unified cancellation RFC (#10602).
