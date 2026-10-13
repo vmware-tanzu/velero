@@ -27,10 +27,10 @@ import (
 
 	"github.com/cockroachdb/errors"
 
-	"github.com/vmware-tanzu/velero/internal/volume"
-	velerotest "github.com/vmware-tanzu/velero/test"
-	csi "github.com/vmware-tanzu/velero/test/util/csi"
-	velero "github.com/vmware-tanzu/velero/test/util/velero"
+	"github.com/velero-io/velero/internal/volume"
+	velerotest "github.com/velero-io/velero/test"
+	csi "github.com/velero-io/velero/test/util/csi"
+	velero "github.com/velero-io/velero/test/util/velero"
 )
 
 type ObjectsInStorage interface {

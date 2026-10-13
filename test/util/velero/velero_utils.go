@@ -45,16 +45,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/internal/volume"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
-	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	"github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test"
-	common "github.com/vmware-tanzu/velero/test/util/common"
-	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	"github.com/velero-io/velero/internal/volume"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	cliinstall "github.com/velero-io/velero/pkg/cmd/cli/install"
+	"github.com/velero-io/velero/pkg/cmd/util/flag"
+	veleroexec "github.com/velero-io/velero/pkg/util/exec"
+	"github.com/velero-io/velero/test"
+	. "github.com/velero-io/velero/test"
+	common "github.com/velero-io/velero/test/util/common"
+	. "github.com/velero-io/velero/test/util/k8s"
 )
 
 const BackupObjectsPrefix = "backups"
@@ -933,7 +933,7 @@ func InstallVeleroCLI(ctx context.Context, version string) (string, error) {
 	postfix := ".tar.gz"
 	tarball := name + postfix
 	err := wait.PollUntilContextTimeout(ctx, time.Second*5, time.Minute*5, true, func(ctx context.Context) (bool, error) {
-		tempFile, err := getVeleroCliTarball("https://github.com/vmware-tanzu/velero/releases/download/" + version + "/" + tarball)
+		tempFile, err := getVeleroCliTarball("https://github.com/velero-io/velero/releases/download/" + version + "/" + tarball)
 		if err != nil {
 			return false, errors.WithMessagef(err, "failed to get Velero CLI tarball")
 		}

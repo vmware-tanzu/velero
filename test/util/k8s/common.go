@@ -30,9 +30,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	common "github.com/vmware-tanzu/velero/test/util/common"
+	"github.com/velero-io/velero/pkg/builder"
+	veleroexec "github.com/velero-io/velero/pkg/util/exec"
+	common "github.com/velero-io/velero/test/util/common"
 )
 
 // ensureClusterExists returns whether or not a Kubernetes cluster exists for tests to be run on.

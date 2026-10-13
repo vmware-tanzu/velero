@@ -36,9 +36,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	repomocks "github.com/vmware-tanzu/velero/pkg/repository/mocks"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-	uploadermocks "github.com/vmware-tanzu/velero/pkg/uploader/mocks"
+	repomocks "github.com/velero-io/velero/pkg/repository/mocks"
+	"github.com/velero-io/velero/pkg/uploader"
+	uploadermocks "github.com/velero-io/velero/pkg/uploader/mocks"
 )
 
 type snapshotMockes struct {

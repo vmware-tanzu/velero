@@ -23,10 +23,10 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/podvolume/configs"
-	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/podvolume/configs"
+	repotypes "github.com/velero-io/velero/pkg/repository/types"
+	"github.com/velero-io/velero/pkg/uploader"
 )
 
 const (
@@ -87,8 +87,8 @@ func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, 
 		}
 
 		// If the volume came from a projected or DownwardAPI source, skip its restore.
-		// This allows backups affected by https://github.com/vmware-tanzu/velero/issues/3863
-		// or https://github.com/vmware-tanzu/velero/issues/4053 to be restored successfully.
+		// This allows backups affected by https://github.com/velero-io/velero/issues/3863
+		// or https://github.com/velero-io/velero/issues/4053 to be restored successfully.
 		if volumeHasNonRestorableSource(pvb.Spec.Volume, pod.Spec.Volumes) {
 			continue
 		}

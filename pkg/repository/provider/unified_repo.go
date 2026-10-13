@@ -30,12 +30,12 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
-	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	reposervice "github.com/vmware-tanzu/velero/pkg/repository/udmrepo/service"
+	"github.com/velero-io/velero/internal/credentials"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	repoconfig "github.com/velero-io/velero/pkg/repository/config"
+	repokey "github.com/velero-io/velero/pkg/repository/keys"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
+	reposervice "github.com/velero-io/velero/pkg/repository/udmrepo/service"
 )
 
 type unifiedRepoProvider struct {

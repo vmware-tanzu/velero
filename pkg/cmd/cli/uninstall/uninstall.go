@@ -41,14 +41,14 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/confirm"
-	"github.com/vmware-tanzu/velero/pkg/controller"
-	"github.com/vmware-tanzu/velero/pkg/install"
-	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/velero-io/velero/pkg/apis/velero/v2alpha1"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/cmd"
+	"github.com/velero-io/velero/pkg/cmd/util/confirm"
+	"github.com/velero-io/velero/pkg/controller"
+	"github.com/velero-io/velero/pkg/install"
+	kubeutil "github.com/velero-io/velero/pkg/util/kube"
 )
 
 var gracefulDeletionMaximumDuration = 1 * time.Minute
@@ -207,7 +207,7 @@ func deleteNamespace(ctx context.Context, kbClient kbclient.Client, namespace st
 		fmt.Print(".")
 	}
 
-	// Must wait until the namespace is deleted to avoid the issue https://github.com/vmware-tanzu/velero/issues/3974
+	// Must wait until the namespace is deleted to avoid the issue https://github.com/velero-io/velero/issues/3974
 	wait.Until(checkFunc, 5*time.Millisecond, ctx.Done())
 	if err != nil {
 		return err

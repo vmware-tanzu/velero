@@ -22,7 +22,7 @@ import (
 
 	"github.com/cockroachdb/errors"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
 )
 
 func TestStoreBackupConfig(t *testing.T) {

@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	"github.com/velero-io/velero/pkg/buildinfo"
 )
 
 func TestNewCommand(t *testing.T) {

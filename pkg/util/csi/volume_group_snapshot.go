@@ -27,9 +27,9 @@ import (
 	"k8s.io/client-go/util/retry"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/label"
-	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
+	velerov1 "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/label"
+	kubeutil "github.com/velero-io/velero/pkg/util/kube"
 )
 
 // CleanupBackupVolumeGroupSnapshots removes group snapshot API objects associated

@@ -27,11 +27,11 @@ import (
 	. "github.com/onsi/gomega"
 	corev1api "k8s.io/api/core/v1"
 
-	. "github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
-	"github.com/vmware-tanzu/velero/test/util/common"
-	. "github.com/vmware-tanzu/velero/test/util/common"
-	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	. "github.com/velero-io/velero/test"
+	. "github.com/velero-io/velero/test/e2e/test"
+	"github.com/velero-io/velero/test/util/common"
+	. "github.com/velero-io/velero/test/util/common"
+	. "github.com/velero-io/velero/test/util/k8s"
 )
 
 type BackupVolumeInfo struct {
@@ -144,7 +144,7 @@ func (v *BackupVolumeInfo) CreateResources() error {
 
 		for _, pod := range podList.Items {
 			for i := 0; i <= pvcCount-1; i++ {
-				// Hitting issue https://github.com/vmware-tanzu/velero/issues/7388
+				// Hitting issue https://github.com/velero-io/velero/issues/7388
 				// So populate data only to some of pods, leave other pods empty to verify empty PV datamover
 				if i%2 == 0 {
 					Expect(CreateFileToPod(

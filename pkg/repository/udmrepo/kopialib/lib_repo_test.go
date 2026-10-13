@@ -38,10 +38,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	repomocks "github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/mocks"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
+	repomocks "github.com/velero-io/velero/pkg/repository/udmrepo/kopialib/backend/mocks"
 
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerotest "github.com/velero-io/velero/pkg/test"
 )
 
 func TestOpen(t *testing.T) {
