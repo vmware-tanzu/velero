@@ -22,12 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	"github.com/vmware-tanzu/velero/internal/volumehelper"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	podvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
-	vhutil "github.com/vmware-tanzu/velero/pkg/util/volumehelper"
+	"github.com/velero-io/velero/internal/resourcepolicies"
+	"github.com/velero-io/velero/internal/volumehelper"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/util/boolptr"
+	podvolumeutil "github.com/velero-io/velero/pkg/util/podvolume"
+	vhutil "github.com/velero-io/velero/pkg/util/volumehelper"
 )
 
 // ShouldPerformSnapshotWithBackup is used for third-party plugins.

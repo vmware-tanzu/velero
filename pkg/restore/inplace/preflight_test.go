@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/vmware-tanzu/velero/pkg/restorehelper"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/velero-io/velero/pkg/restorehelper"
+	velerotest "github.com/velero-io/velero/pkg/test"
 )
 
 func podUsingPVC(name, pvcName string, phase corev1api.PodPhase, terminating bool) *corev1api.Pod {

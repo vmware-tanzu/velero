@@ -26,11 +26,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	. "github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test/util/k8s"
-	. "github.com/vmware-tanzu/velero/test/util/kibishii"
-	. "github.com/vmware-tanzu/velero/test/util/providers"
-	. "github.com/vmware-tanzu/velero/test/util/velero"
+	. "github.com/velero-io/velero/test"
+	. "github.com/velero-io/velero/test/util/k8s"
+	. "github.com/velero-io/velero/test/util/kibishii"
+	. "github.com/velero-io/velero/test/util/providers"
+	. "github.com/velero-io/velero/test/util/velero"
 )
 
 var upgradeNamespace string
@@ -232,8 +232,8 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				})
 			}
 			// the snapshots of AWS may be still in pending status when do the restore, wait for a while
-			// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
-			// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
+			// to avoid this https://github.com/velero-io/velero/issues/1799
+			// TODO remove this after https://github.com/velero-io/velero/issues/3533 is fixed
 			if tmpCfg.CloudProvider == AWS && useVolumeSnapshots {
 				fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
 				time.Sleep(5 * time.Minute)

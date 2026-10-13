@@ -21,8 +21,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
-	"github.com/vmware-tanzu/velero/test/util/k8s"
+	"github.com/velero-io/velero/pkg/cmd/cli/install"
+	"github.com/velero-io/velero/test/util/k8s"
 )
 
 // e2e-storage-class is the default StorageClass for E2E.

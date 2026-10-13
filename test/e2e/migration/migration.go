@@ -24,14 +24,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/vmware-tanzu/velero/test"
-	framework "github.com/vmware-tanzu/velero/test/e2e/test"
-	"github.com/vmware-tanzu/velero/test/util/common"
-	util "github.com/vmware-tanzu/velero/test/util/csi"
-	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
-	"github.com/vmware-tanzu/velero/test/util/kibishii"
-	"github.com/vmware-tanzu/velero/test/util/providers"
-	veleroutil "github.com/vmware-tanzu/velero/test/util/velero"
+	"github.com/velero-io/velero/test"
+	framework "github.com/velero-io/velero/test/e2e/test"
+	"github.com/velero-io/velero/test/util/common"
+	util "github.com/velero-io/velero/test/util/csi"
+	k8sutil "github.com/velero-io/velero/test/util/k8s"
+	"github.com/velero-io/velero/test/util/kibishii"
+	"github.com/velero-io/velero/test/util/providers"
+	veleroutil "github.com/velero-io/velero/test/util/velero"
 )
 
 const BackupObjectsPrefix = "backups"
@@ -283,7 +283,7 @@ func (m *migrationE2E) Backup() error {
 			})
 		} else {
 			// the snapshots of AWS may be still in pending status when do the restore.
-			// wait for a while to avoid this https://github.com/vmware-tanzu/velero/issues/1799
+			// wait for a while to avoid this https://github.com/velero-io/velero/issues/1799
 			if OriginVeleroCfg.CloudProvider == test.Azure &&
 				strings.EqualFold(OriginVeleroCfg.Features, test.FeatureCSI) ||
 				OriginVeleroCfg.CloudProvider == test.AWS {

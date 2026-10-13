@@ -44,21 +44,21 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/internal/volume"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/metrics"
-	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
-	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
-	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
-	"github.com/vmware-tanzu/velero/pkg/repository"
-	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
-	repomocks "github.com/vmware-tanzu/velero/pkg/repository/mocks"
-	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/velero-io/velero/internal/volume"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	pkgbackup "github.com/velero-io/velero/pkg/backup"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/metrics"
+	persistencemocks "github.com/velero-io/velero/pkg/persistence/mocks"
+	"github.com/velero-io/velero/pkg/plugin/clientmgmt"
+	pluginmocks "github.com/velero-io/velero/pkg/plugin/mocks"
+	"github.com/velero-io/velero/pkg/plugin/velero"
+	"github.com/velero-io/velero/pkg/plugin/velero/mocks"
+	"github.com/velero-io/velero/pkg/repository"
+	repomanager "github.com/velero-io/velero/pkg/repository/manager"
+	repomocks "github.com/velero-io/velero/pkg/repository/mocks"
+	repotypes "github.com/velero-io/velero/pkg/repository/types"
+	velerotest "github.com/velero-io/velero/pkg/test"
 )
 
 type backupDeletionControllerTestData struct {
@@ -292,7 +292,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 		// Clear out resource labels to make sure the controller adds them and does not
 		// panic when encountering a nil Labels map
-		// (https://github.com/vmware-tanzu/velero/issues/1546)
+		// (https://github.com/velero-io/velero/issues/1546)
 		input.Labels = nil
 
 		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").Result()
@@ -595,7 +595,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		input := defaultTestDbr()
 		// Clear out resource labels to make sure the controller adds them and does not
 		// panic when encountering a nil Labels map
-		// (https://github.com/vmware-tanzu/velero/issues/1546)
+		// (https://github.com/velero-io/velero/issues/1546)
 		input.Labels = nil
 
 		location := &velerov1api.BackupStorageLocation{
@@ -680,7 +680,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		input := defaultTestDbr()
 		// Clear out resource labels to make sure the controller adds them and does not
 		// panic when encountering a nil Labels map
-		// (https://github.com/vmware-tanzu/velero/issues/1546)
+		// (https://github.com/velero-io/velero/issues/1546)
 		input.Labels = nil
 
 		location := &velerov1api.BackupStorageLocation{

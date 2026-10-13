@@ -27,7 +27,7 @@ import (
 	"github.com/kopia/kopia/repo/splitter"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
 )
 
 func TestSetupNewRepositoryOptions(t *testing.T) {
