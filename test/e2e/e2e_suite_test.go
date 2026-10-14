@@ -21,6 +21,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -29,30 +30,30 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
-	"github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/backup"
-	. "github.com/vmware-tanzu/velero/test/e2e/backups"
-	. "github.com/vmware-tanzu/velero/test/e2e/basic"
-	. "github.com/vmware-tanzu/velero/test/e2e/basic/api-group"
-	. "github.com/vmware-tanzu/velero/test/e2e/basic/backup-volume-info"
-	. "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
-	. "github.com/vmware-tanzu/velero/test/e2e/bsl-mgmt"
-	. "github.com/vmware-tanzu/velero/test/e2e/migration"
-	. "github.com/vmware-tanzu/velero/test/e2e/nodeagentconfig"
-	. "github.com/vmware-tanzu/velero/test/e2e/parallelfilesdownload"
-	. "github.com/vmware-tanzu/velero/test/e2e/parallelfilesupload"
-	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
-	. "github.com/vmware-tanzu/velero/test/e2e/pv-backup"
-	. "github.com/vmware-tanzu/velero/test/e2e/repomaintenance"
-	. "github.com/vmware-tanzu/velero/test/e2e/resource-filtering"
-	. "github.com/vmware-tanzu/velero/test/e2e/resourcemodifiers"
-	. "github.com/vmware-tanzu/velero/test/e2e/resourcepolicies"
-	. "github.com/vmware-tanzu/velero/test/e2e/scale"
-	. "github.com/vmware-tanzu/velero/test/e2e/schedule"
-	. "github.com/vmware-tanzu/velero/test/e2e/upgrade"
-	"github.com/vmware-tanzu/velero/test/util/k8s"
-	veleroutil "github.com/vmware-tanzu/velero/test/util/velero"
+	"github.com/velero-io/velero/pkg/cmd/cli/install"
+	"github.com/velero-io/velero/test"
+	. "github.com/velero-io/velero/test/e2e/backup"
+	. "github.com/velero-io/velero/test/e2e/backups"
+	. "github.com/velero-io/velero/test/e2e/basic"
+	. "github.com/velero-io/velero/test/e2e/basic/api-group"
+	. "github.com/velero-io/velero/test/e2e/basic/backup-volume-info"
+	. "github.com/velero-io/velero/test/e2e/basic/resources-check"
+	. "github.com/velero-io/velero/test/e2e/bsl-mgmt"
+	. "github.com/velero-io/velero/test/e2e/migration"
+	. "github.com/velero-io/velero/test/e2e/nodeagentconfig"
+	. "github.com/velero-io/velero/test/e2e/parallelfilesdownload"
+	. "github.com/velero-io/velero/test/e2e/parallelfilesupload"
+	. "github.com/velero-io/velero/test/e2e/privilegesmgmt"
+	. "github.com/velero-io/velero/test/e2e/pv-backup"
+	. "github.com/velero-io/velero/test/e2e/repomaintenance"
+	. "github.com/velero-io/velero/test/e2e/resource-filtering"
+	. "github.com/velero-io/velero/test/e2e/resourcemodifiers"
+	. "github.com/velero-io/velero/test/e2e/resourcepolicies"
+	. "github.com/velero-io/velero/test/e2e/scale"
+	. "github.com/velero-io/velero/test/e2e/schedule"
+	. "github.com/velero-io/velero/test/e2e/upgrade"
+	"github.com/velero-io/velero/test/util/k8s"
+	veleroutil "github.com/velero-io/velero/test/util/velero"
 )
 
 func init() {
@@ -377,6 +378,20 @@ func init() {
 		"",
 		"comma-separated list of key=value annotations to add to Velero service account",
 	)
+	flag.StringVar(
+		&test.StorageClassFile,
+		"storage-class-file",
+		"",
+		"StorageClass manifest the tests provision volumes with. Defaults to the provider's file under testdata/storage-class. Optional.",
+	)
+	flag.Func(
+		"storage-class-file-2",
+		"StorageClass manifest for the second class, used by the cases that map between two. Defaults to the provider's file; empty runs without a second StorageClass and skips those cases. Optional.",
+		func(value string) error {
+			test.StorageClassFile2, test.StorageClassFile2Set = value, true
+			return nil
+		},
+	)
 }
 
 // Add label [SkipVanillaZfs]:
@@ -549,6 +564,11 @@ var _ = Describe(
 	"",
 	Label("BackupVolumeInfo", "CSISnapshot"),
 	CSISnapshotVolumeInfoTest,
+)
+var _ = Describe(
+	"",
+	Label("BackupVolumeInfo", "CSIVolumeGroupSnapshot"),
+	CSIVolumeGroupSnapshotVolumeInfoTest,
 )
 var _ = Describe(
 	"",
@@ -789,6 +809,16 @@ func TestE2e(t *testing.T) {
 	testSuitePassed = RunSpecs(t, "E2e Suite")
 }
 
+// volumeGroupSnapshotClassFile returns the VolumeGroupSnapshotClass test data
+// for the provider under test, or the empty string when it has none.
+func volumeGroupSnapshotClassFile() string {
+	path := fmt.Sprintf("../testdata/volume-group-snapshot-class/%s.yaml", test.VeleroCfg.CloudProvider)
+	if _, err := os.Stat(path); err != nil {
+		return ""
+	}
+	return path
+}
+
 var _ = BeforeSuite(func() {
 	By("Install StorageClass for E2E.")
 	Expect(veleroutil.InstallStorageClasses(test.VeleroCfg.CloudProvider)).To(Succeed())
@@ -802,6 +832,13 @@ var _ = BeforeSuite(func() {
 				fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", test.VeleroCfg.CloudProvider),
 			),
 		).To(Succeed())
+
+		// Only some providers have a VolumeGroupSnapshotClass to install, so
+		// the VolumeGroupSnapshot cases only run where the test data exists.
+		if path := volumeGroupSnapshotClassFile(); path != "" {
+			By("Install VolumeGroupSnapshotClass for E2E.")
+			Expect(k8s.KubectlApplyByFile(context.Background(), path)).To(Succeed())
+		}
 	}
 
 	By("Install PriorityClasses for E2E.")
@@ -835,7 +872,7 @@ var _ = AfterSuite(func() {
 		),
 	).To(Succeed())
 
-	By("Delete PriorityClasses created by E2E")
+	By(fmt.Sprintf("Delete StorageClass %s created by E2E", test.StorageClassName2))
 	Expect(
 		k8s.DeleteStorageClass(
 			ctx,
@@ -853,8 +890,14 @@ var _ = AfterSuite(func() {
 				fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", test.VeleroCfg.CloudProvider),
 			),
 		).To(Succeed())
+
+		if path := volumeGroupSnapshotClassFile(); path != "" {
+			By("Delete VolumeGroupSnapshotClass created by E2E")
+			Expect(k8s.KubectlDeleteByFile(ctx, path)).To(Succeed())
+		}
 	}
 
+	By("Delete PriorityClasses created by E2E")
 	Expect(veleroutil.DeletePriorityClasses(
 		ctx,
 		test.VeleroCfg.ClientToInstallVelero.Kubebuilder,

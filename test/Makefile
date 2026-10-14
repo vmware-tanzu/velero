@@ -179,7 +179,18 @@ COMMON_ARGS := --velerocli=$(VELERO_CLI) \
 	--debug-velero-pod-restart=$(DEBUG_VELERO_POD_RESTART) \
 	--fail-fast=$(FAIL_FAST) \
 	--has-vsphere-plugin=$(HAS_VSPHERE_PLUGIN) \
-	--item-block-worker-count=$(ITEM_BLOCK_WORKER_COUNT)
+	--item-block-worker-count=$(ITEM_BLOCK_WORKER_COUNT) \
+	--storage-class-file=$(STORAGE_CLASS_FILE)
+
+# StorageClass manifests to run against. Unset means the provider's own file
+# under testdata/storage-class, which is the default behaviour. STORAGE_CLASS_FILE_2
+# is only passed through when it is actually set, because an empty value means
+# "run without a second StorageClass" and a flag that is always passed cannot
+# express "not set".
+STORAGE_CLASS_FILE ?=
+ifneq ($(origin STORAGE_CLASS_FILE_2),undefined)
+COMMON_ARGS += --storage-class-file-2=$(STORAGE_CLASS_FILE_2)
+endif
 
 # Make sure ginkgo is in $GOBIN
 .PHONY:ginkgo

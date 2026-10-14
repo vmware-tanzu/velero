@@ -23,13 +23,13 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/internal/resourcepolicies"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	"github.com/velero-io/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/util/logging"
 )
 
 /*

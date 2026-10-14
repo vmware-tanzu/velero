@@ -21,8 +21,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
-	"github.com/vmware-tanzu/velero/test/util/k8s"
+	"github.com/velero-io/velero/pkg/cmd/cli/install"
+	"github.com/velero-io/velero/test/util/k8s"
 )
 
 // e2e-storage-class is the default StorageClass for E2E.
@@ -30,6 +30,27 @@ const StorageClassName = "e2e-storage-class"
 
 // e2e-storage-class-2 is used for the StorageClass mapping test case.
 const StorageClassName2 = "e2e-storage-class-2"
+
+// StorageClassFile and StorageClassFile2 are the manifests the two StorageClasses
+// are created from, which is how a cluster whose volumes come from a different
+// provisioner is targeted. Empty means the provider's own file under
+// testdata/storage-class, and an empty StorageClassFile2 runs without a second
+// StorageClass at all. Set by --storage-class-file and --storage-class-file-2.
+var (
+	StorageClassFile  = ""
+	StorageClassFile2 = ""
+	// StorageClassFile2Set records that --storage-class-file-2 was given, since
+	// an empty value means "run without a second StorageClass" and has to be
+	// told apart from the flag not being used at all.
+	StorageClassFile2Set = false
+)
+
+// SecondStorageClassInstalled reports whether the suite created a second
+// StorageClass. The cases that map between two of them have nothing to map
+// when it did not.
+func SecondStorageClassInstalled() bool {
+	return !(StorageClassFile2Set && StorageClassFile2 == "")
+}
 
 const FeatureCSI = "EnableCSI"
 const VanillaZFS = "vanilla-zfs"

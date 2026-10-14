@@ -38,10 +38,10 @@ import (
 	"github.com/kopia/kopia/snapshot/restore"
 	"github.com/kopia/kopia/snapshot/snapshotfs"
 
-	"github.com/vmware-tanzu/velero/pkg/kopia"
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-	uploaderutil "github.com/vmware-tanzu/velero/pkg/uploader/util"
+	"github.com/velero-io/velero/pkg/kopia"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
+	"github.com/velero-io/velero/pkg/uploader"
+	uploaderutil "github.com/velero-io/velero/pkg/uploader/util"
 )
 
 // All function mainly used to make testing more convenient

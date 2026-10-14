@@ -4,7 +4,7 @@
 
 ## Maintainers
 
-All maintainers share collective responsibility for the entire Velero project. There are no siloed, per-area owners: every maintainer is a final reviewer of pull requests across the codebase, and code ownership is assigned to the maintainer group as a whole (see [CODEOWNERS](https://github.com/velero-io/velero/blob/main/CODEOWNERS)). Maintainers review PRs, ensure code quality, triage issues, fix bugs, and perform release and maintenance tasks across all components.
+All maintainers share collective responsibility for the entire Velero project. There are no siloed, per-area owners: every maintainer is a final reviewer of pull requests across the codebase, and code ownership is assigned to the maintainer group as a whole (see [CODEOWNERS](https://github.com/velero-io/velero/blob/main/.github/CODEOWNERS)). Maintainers review PRs, ensure code quality, triage issues, fix bugs, and perform release and maintenance tasks across all components.
 
 | Maintainer          | GitHub ID                                                     | Affiliation                                      |
 |---------------------|---------------------------------------------------------------|--------------------------------------------------|

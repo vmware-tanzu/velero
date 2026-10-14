@@ -33,12 +33,12 @@ import (
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
-	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
-	"github.com/vmware-tanzu/velero/pkg/test"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	factorymocks "github.com/velero-io/velero/pkg/client/mocks"
+	cmdtest "github.com/velero-io/velero/pkg/cmd/test"
+	"github.com/velero-io/velero/pkg/test"
+	velerotest "github.com/velero-io/velero/pkg/test"
 )
 
 func TestCreateOptions_BuildBackup(t *testing.T) {

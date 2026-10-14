@@ -18,7 +18,7 @@
 BIN ?= velero
 
 # This repo's root import path (under GOPATH).
-PKG := github.com/vmware-tanzu/velero
+PKG := github.com/velero-io/velero
 
 # Container tool for local development targets (shell, lint, build-image, etc.)
 # Override with CONTAINER_TOOL=podman to use podman instead of docker.
@@ -223,7 +223,7 @@ TTY := $(shell tty -s && echo "-t")
 
 # Example: make shell CMD="date > datefile"
 shell: build-dirs build-env ## Run a shell in the build container
-	@# bind-mount the Velero root dir in at /github.com/vmware-tanzu/velero
+	@# bind-mount the Velero root dir in at /github.com/velero-io/velero
 	@# because the Kubernetes code-generator tools require the project to
 	@# exist in a directory hierarchy ending like this (but *NOT* necessarily
 	@# under $GOPATH).
@@ -233,7 +233,7 @@ shell: build-dirs build-env ## Run a shell in the build container
 		-i $(TTY) \
 		--rm \
 		-u $$(id -u):$$(id -g) \
-		-v "$$(pwd):/github.com/vmware-tanzu/velero:delegated" \
+		-v "$$(pwd):/github.com/velero-io/velero:delegated" \
 		-v "$$(pwd)/_output/bin:/output:delegated" \
 		-v "$$(pwd)/.go/pkg:/go/pkg:delegated" \
 		-v "$$(pwd)/.go/std:/go/std:delegated" \
@@ -241,7 +241,7 @@ shell: build-dirs build-env ## Run a shell in the build container
 		-v "$$(pwd)/.go/go-build:/.cache/go-build:delegated" \
 		-v "$$(pwd)/.go/golangci-lint:/.cache/golangci-lint:delegated" \
         -v "$$(pwd)/.go/goimports:/.cache/goimports:delegated" \
-		-w /github.com/vmware-tanzu/velero \
+		-w /github.com/velero-io/velero \
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
 
@@ -479,7 +479,7 @@ changelog: ## Generate changelog
 #		PUBLISH=false \
 #		make release
 #
-# To run the release, which will publish a *DRAFT* GitHub release in github.com/vmware-tanzu/velero
+# To run the release, which will publish a *DRAFT* GitHub release in github.com/velero-io/velero
 # (you still need to review/publish the GitHub release manually):
 #		GITHUB_TOKEN=your-github-token \
 #		RELEASE_NOTES_FILE=changelogs/CHANGELOG-1.2.md \

@@ -31,11 +31,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	udmrepomocks "github.com/vmware-tanzu/velero/pkg/repository/udmrepo/mocks"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-	cbt "github.com/vmware-tanzu/velero/pkg/uploader/cbt/types"
-	cbtmocks "github.com/vmware-tanzu/velero/pkg/uploader/cbt/types/mocks"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
+	udmrepomocks "github.com/velero-io/velero/pkg/repository/udmrepo/mocks"
+	"github.com/velero-io/velero/pkg/uploader"
+	cbt "github.com/velero-io/velero/pkg/uploader/cbt/types"
+	cbtmocks "github.com/velero-io/velero/pkg/uploader/cbt/types/mocks"
 )
 
 type mockProgressUpdater struct {

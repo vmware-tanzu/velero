@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/pkg/restorehelper"
+	"github.com/velero-io/velero/pkg/restorehelper"
 )
 
 // CheckPVCNotInUse verifies the target PVC is not used by any active pod,

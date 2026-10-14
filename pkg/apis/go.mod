@@ -1,4 +1,4 @@
-module github.com/vmware-tanzu/velero/pkg/apis
+module github.com/velero-io/velero/pkg/apis
 
 go 1.26.0
 
