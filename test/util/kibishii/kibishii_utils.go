@@ -302,6 +302,10 @@ func installKibishii(
 		strings.EqualFold(veleroFeatures, FeatureCSI) {
 		cloudPlatform = AwsCSI
 	}
+	if strings.EqualFold(cloudPlatform, Kind) &&
+		strings.EqualFold(veleroFeatures, FeatureCSI) {
+		cloudPlatform = KindCSI
+	}
 
 	targetKustomizeDir := path.Join(kibishiiDirectory, cloudPlatform)
 
