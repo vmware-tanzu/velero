@@ -263,8 +263,14 @@ are `none` (default) and `update`. If you choose to update existing resources du
 You can also configure the existing resource policy in a [Restore](api-types/restore.md) object.
 
 **NOTE:** 
-* Update of a resource only applies to the Kubernetes resource data such as its spec. It may not work as expected for certain resource types such as PVCs and Pods. In case of PVCs for example, data in the PV is not restored or overwritten in any way.
+* Update of a resource only applies to the Kubernetes resource data such as its spec. It may not work as expected for certain resource types such as PVCs and Pods. For PVCs, this policy alone does not restore or overwrite data in the PV. Use the separate [existing volume data policy](volume-data-inplace-restore.md#choose-a-restore-policy) to restore data into an existing volume.
 * `update` existing resource policy works in a best-effort way, which means when restore's `--existing-resource-policy` is set to `update`, Velero will try to update the resource if the resource already exists, if the update fails, Velero will fall back to the default non-destructive way in the restore, and just logs a warning without failing the restore.
+
+## Restore existing volume data policy
+
+Use `--existing-volume-data-policy=full` or `--existing-volume-data-policy=incremental` to restore data into existing, bound PVCs. This policy is independent of `--existing-resource-policy`. Before starting, remove consuming Pods and prevent their controllers from recreating them.
+
+See [Volume data in-place restore](volume-data-inplace-restore.md) for supported backup methods, workload preparation, extra-file deletion, namespace mapping requirements, and failure recovery.
 
 ## Restore "status" field of objects
 
