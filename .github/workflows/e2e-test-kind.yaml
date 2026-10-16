@@ -7,8 +7,8 @@ env:
   # Bump them deliberately after reviewing the upstream changes.
   # bitnami/containers: [bitnami/minio] Release 2026.7.17-debian-12-r0
   BITNAMI_CONTAINERS_COMMIT: 19fb570e551f15ab0c8264aafa93774266761b8d
-  # vmware-tanzu-experiments/distributed-data-generator: main as of 2025-07-15
-  KIBISHII_COMMIT: bce0469e5f9dd33f31432fab22ff90ad6f2b45ca
+  # vmware-tanzu-experiments/distributed-data-generator: main as of 2026-10-15
+  KIBISHII_COMMIT: f81fc67f52b9cafe945f7d44ca0507ff65ea4cbd
 on:
   push:
   pull_request:
