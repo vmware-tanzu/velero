@@ -25,7 +25,7 @@ type BackupCancellationRequestSpec struct {
 
 	// DeleteBackup, when true, requests deletion after cancellation completes
 	// successfully: the request controller creates a DeleteBackupRequest once
-	// the backup reaches Cancelled. Not applied when the request is Rejected.
+	// the backup reaches Canceled. Not applied when the request is Rejected.
 	// +optional
 	DeleteBackup bool `json:"deleteBackup,omitempty"`
 }
@@ -39,12 +39,12 @@ const (
 	// phase owner has recorded acceptance on the target Backup yet.
 	BackupCancellationRequestPhaseNew BackupCancellationRequestPhase = "New"
 
-	// BackupCancellationRequestPhaseAccepted means a phase owner recorded Cancelling
+	// BackupCancellationRequestPhaseAccepted means a phase owner recorded Canceling
 	// on the target Backup; the outcome is authoritative.
 	BackupCancellationRequestPhaseAccepted BackupCancellationRequestPhase = "Accepted"
 
 	// BackupCancellationRequestPhaseCompleted means the target Backup reached the
-	// terminal Cancelled phase.
+	// terminal Canceled phase.
 	BackupCancellationRequestPhaseCompleted BackupCancellationRequestPhase = "Completed"
 
 	// BackupCancellationRequestPhaseRejected means the request could not be honored;
@@ -63,7 +63,7 @@ const (
 
 	// BackupCancellationRequestRejectedReasonAlreadyTerminal means the Backup had
 	// already reached a terminal phase (Completed, PartiallyFailed, Failed,
-	// FailedValidation, or Cancelled). Message records the exact phase.
+	// FailedValidation, or Canceled). Message records the exact phase.
 	BackupCancellationRequestRejectedReasonAlreadyTerminal BackupCancellationRequestRejectedReason = "AlreadyTerminal"
 
 	// BackupCancellationRequestRejectedReasonNotFound means no Backup with the
@@ -99,7 +99,7 @@ type BackupCancellationRequestStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:object:generate=true
 // +kubebuilder:storageversion
-// +kubebuilder:printcolumn:name="BackupName",type="string",JSONPath=".spec.backupName",description="The name of the backup to be cancelled"
+// +kubebuilder:printcolumn:name="BackupName",type="string",JSONPath=".spec.backupName",description="The name of the backup to be canceled"
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="The status of the cancellation request"
 // +kubebuilder:printcolumn:name="Reason",type="string",JSONPath=".status.reason",description="The reason a cancellation request was rejected"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"

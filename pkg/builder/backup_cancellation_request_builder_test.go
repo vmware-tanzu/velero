@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
 )
 
 func TestBackupCancellationRequestBuilder(t *testing.T) {

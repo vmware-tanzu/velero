@@ -17,7 +17,7 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: The name of the backup to be cancelled
+    - description: The name of the backup to be canceled
       jsonPath: .spec.backupName
       name: BackupName
       type: string
@@ -66,7 +66,7 @@ spec:
                 description: |-
                   DeleteBackup, when true, requests deletion after cancellation completes
                   successfully: the request controller creates a DeleteBackupRequest once
-                  the backup reaches Cancelled. Not applied when the request is Rejected.
+                  the backup reaches Canceled. Not applied when the request is Rejected.
                 type: boolean
             required:
             - backupName

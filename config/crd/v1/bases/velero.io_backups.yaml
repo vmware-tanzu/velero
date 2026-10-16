@@ -72,7 +72,7 @@ spec:
                 type: string
               cancel:
                 description: |-
-                  Cancel is an internal signal that the backup should be cancelled. It is set
+                  Cancel is an internal signal that the backup should be canceled. It is set
                   by the BackupCancellationRequest controller, not by users directly, and is
                   observed by whichever controller owns the backup's current phase.
                 type: boolean
@@ -579,12 +579,12 @@ spec:
               cancellation:
                 description: |-
                   Cancellation records the outcome of a cancellation. Set only once accepted
-                  (phase Cancelling or Cancelled).
+                  (phase Canceling or Canceled).
                 nullable: true
                 properties:
                   acceptedAt:
                     description: AcceptedAt is when the owning controller accepted
-                      cancellation (recorded Cancelling).
+                      cancellation (recorded Canceling).
                     format: date-time
                     nullable: true
                     type: string
@@ -606,8 +606,8 @@ spec:
                     - PartiallyFailed
                     - Failed
                     - Deleting
-                    - Cancelling
-                    - Cancelled
+                    - Canceling
+                    - Canceled
                     type: string
                   actionsAttempted:
                     description: ActionsAttempted is how many teardown actions cancellation
@@ -698,8 +698,8 @@ spec:
                 - PartiallyFailed
                 - Failed
                 - Deleting
-                - Cancelling
-                - Cancelled
+                - Canceling
+                - Canceled
                 type: string
               progress:
                 description: |-

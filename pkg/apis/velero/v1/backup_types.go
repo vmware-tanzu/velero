@@ -192,7 +192,7 @@ type BackupSpec struct {
 	// +optional
 	BackupType BackupType `json:"backupType,omitempty"`
 
-	// Cancel is an internal signal that the backup should be cancelled. It is set
+	// Cancel is an internal signal that the backup should be canceled. It is set
 	// by the BackupCancellationRequest controller, not by users directly, and is
 	// observed by whichever controller owns the backup's current phase.
 	// +optional
@@ -301,7 +301,7 @@ const (
 
 // BackupPhase is a string representation of the lifecycle phase
 // of a Velero backup.
-// +kubebuilder:validation:Enum=New;Queued;ReadyToStart;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Finalizing;FinalizingPartiallyFailed;Completed;PartiallyFailed;Failed;Deleting;Cancelling;Cancelled
+// +kubebuilder:validation:Enum=New;Queued;ReadyToStart;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Finalizing;FinalizingPartiallyFailed;Completed;PartiallyFailed;Failed;Deleting;Canceling;Canceled
 type BackupPhase string
 
 const (
@@ -369,15 +369,15 @@ const (
 	// BackupPhaseDeleting means the backup and all its associated data are being deleted.
 	BackupPhaseDeleting BackupPhase = "Deleting"
 
-	// BackupPhaseCancelling means cancellation has been accepted for an in-progress
+	// BackupPhaseCanceling means cancellation has been accepted for an in-progress
 	// backup and the owning controller is tearing down its work. The backup is
 	// not usable.
-	BackupPhaseCancelling BackupPhase = "Cancelling"
+	BackupPhaseCanceling BackupPhase = "Canceling"
 
-	// BackupPhaseCancelled means the backup was cancelled. Terminal and
+	// BackupPhaseCanceled means the backup was canceled. Terminal and
 	// non-resumable. Available artifacts are retained for diagnosis but the
 	// backup is not restorable.
-	BackupPhaseCancelled BackupPhase = "Cancelled"
+	BackupPhaseCanceled BackupPhase = "Canceled"
 )
 
 // BackupType specifies how volume data is backed up, with possible values including Full and Incremental.
@@ -500,7 +500,7 @@ type BackupStatus struct {
 	HookStatus *HookStatus `json:"hookStatus,omitempty"`
 
 	// Cancellation records the outcome of a cancellation. Set only once accepted
-	// (phase Cancelling or Cancelled).
+	// (phase Canceling or Canceled).
 	// +optional
 	// +nullable
 	Cancellation *BackupCancellationStatus `json:"cancellation,omitempty"`
@@ -534,11 +534,11 @@ type HookStatus struct {
 	HooksFailed int `json:"hooksFailed,omitempty"`
 }
 
-// BackupCancellationStatus records the outcome of cancelling a backup. It holds
+// BackupCancellationStatus records the outcome of canceling a backup. It holds
 // only fixed-size fields: a backup can start thousands of child operations, so
 // per-action detail goes to the backup log rather than the object.
 type BackupCancellationStatus struct {
-	// AcceptedAt is when the owning controller accepted cancellation (recorded Cancelling).
+	// AcceptedAt is when the owning controller accepted cancellation (recorded Canceling).
 	// +optional
 	// +nullable
 	AcceptedAt *metav1.Time `json:"acceptedAt,omitempty"`

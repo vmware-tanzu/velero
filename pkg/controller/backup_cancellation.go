@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
 )
 
 // Cancellation phase transitions must not use the replay-prone patch helpers
@@ -48,17 +48,17 @@ const (
 // re-validate its preconditions against the object it is given and return
 // false when they no longer hold, in which case no write happens. On
 // conflict, it retries with a fresh read, up to
-// guardedBackupUpdateMaxAttempts attempts. It returns the final object and
-// whether apply made a transition that was written.
-func guardedBackupUpdate(ctx context.Context, kbClient kbclient.Client, ns, name string, apply func(fresh *velerov1api.Backup) bool) (*velerov1api.Backup, bool, error) {
+// guardedBackupUpdateMaxAttempts attempts. It returns whether apply made a
+// transition that was written.
+func guardedBackupUpdate(ctx context.Context, kbClient kbclient.Client, ns, name string, apply func(fresh *velerov1api.Backup) bool) (bool, error) {
 	for attempt := 1; ; attempt++ {
 		fresh := &velerov1api.Backup{}
 		if err := kbClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, fresh); err != nil {
-			return nil, false, err
+			return false, err
 		}
 
 		if !apply(fresh) {
-			return fresh, false, nil
+			return false, nil
 		}
 
 		if err := kbClient.Update(ctx, fresh); err != nil {
@@ -66,52 +66,51 @@ func guardedBackupUpdate(ctx context.Context, kbClient kbclient.Client, ns, name
 				time.Sleep(guardedBackupUpdateBackoff)
 				continue
 			}
-			return nil, false, err
+			return false, err
 		}
 
-		return fresh, true, nil
+		return true, nil
 	}
 }
 
 // acceptCancellation transitions a Backup from one of acceptablePhases to
-// Cancelling when spec.cancel is set, recording acceptance time and the
+// Canceling when spec.cancel is set, recording acceptance time and the
 // phase cancellation was accepted from. It returns true only when this call
 // performed the transition; if the signal is absent, the phase is not
-// acceptable (including already Cancelling), or another writer won the race,
+// acceptable (including already Canceling), or another writer won the race,
 // it returns false and writes nothing.
-func acceptCancellation(ctx context.Context, kbClient kbclient.Client, ns, name string, acceptablePhases ...velerov1api.BackupPhase) (bool, error) {
+func acceptCancellation(ctx context.Context, kbClient kbclient.Client, ns, name string, acceptablePhases ...velerov1api.BackupPhase) (bool, error) { //nolint:unparam // ns is always "velero" in current callers/tests, but the parameter is part of the general-purpose contract future phase owners will call with real namespaces.
 	acceptable := sets.New(acceptablePhases...)
 	now := metav1.Now()
 
-	_, ok, err := guardedBackupUpdate(ctx, kbClient, ns, name, func(fresh *velerov1api.Backup) bool {
+	return guardedBackupUpdate(ctx, kbClient, ns, name, func(fresh *velerov1api.Backup) bool {
 		if !fresh.Spec.Cancel || !acceptable.Has(fresh.Status.Phase) {
 			return false
 		}
 
 		acceptedFrom := fresh.Status.Phase
-		fresh.Status.Phase = velerov1api.BackupPhaseCancelling
+		fresh.Status.Phase = velerov1api.BackupPhaseCanceling
 		fresh.Status.Cancellation = &velerov1api.BackupCancellationStatus{
 			AcceptedAt:        &now,
 			AcceptedFromPhase: acceptedFrom,
 		}
 		return true
 	})
-	return ok, err
 }
 
-// completeCancellation transitions a Cancelling Backup to terminal Cancelled,
+// completeCancellation transitions a Canceling Backup to terminal Canceled,
 // recording the completion timestamp and outcome reason. Counts already on
 // status.cancellation are kept. It returns true only when this call performed
 // the transition; a Backup in any other phase is left untouched.
 func completeCancellation(ctx context.Context, kbClient kbclient.Client, ns, name, reason string) (bool, error) {
 	now := metav1.Now()
 
-	_, ok, err := guardedBackupUpdate(ctx, kbClient, ns, name, func(fresh *velerov1api.Backup) bool {
-		if fresh.Status.Phase != velerov1api.BackupPhaseCancelling {
+	return guardedBackupUpdate(ctx, kbClient, ns, name, func(fresh *velerov1api.Backup) bool {
+		if fresh.Status.Phase != velerov1api.BackupPhaseCanceling {
 			return false
 		}
 
-		fresh.Status.Phase = velerov1api.BackupPhaseCancelled
+		fresh.Status.Phase = velerov1api.BackupPhaseCanceled
 		fresh.Status.CompletionTimestamp = &now
 		if fresh.Status.Cancellation == nil {
 			fresh.Status.Cancellation = &velerov1api.BackupCancellationStatus{}
@@ -121,5 +120,4 @@ func completeCancellation(ctx context.Context, kbClient kbclient.Client, ns, nam
 		}
 		return true
 	})
-	return ok, err
 }

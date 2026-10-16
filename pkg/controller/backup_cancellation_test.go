@@ -32,11 +32,12 @@ import (
 	ctrlfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
 )
 
 func newCancellationTestScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
 	scheme := runtime.NewScheme()
 	require.NoError(t, velerov1api.AddToScheme(scheme))
 	return scheme
@@ -76,7 +77,7 @@ func TestAcceptCancellation(t *testing.T) {
 		assert.True(t, ok)
 
 		updated := getCancellationTestBackup(t, client)
-		assert.Equal(t, velerov1api.BackupPhaseCancelling, updated.Status.Phase)
+		assert.Equal(t, velerov1api.BackupPhaseCanceling, updated.Status.Phase)
 		require.NotNil(t, updated.Status.Cancellation)
 		assert.Equal(t, velerov1api.BackupPhaseInProgress, updated.Status.Cancellation.AcceptedFromPhase)
 		assert.NotNil(t, updated.Status.Cancellation.AcceptedAt)
@@ -106,8 +107,8 @@ func TestAcceptCancellation(t *testing.T) {
 		assert.Equal(t, velerov1api.BackupPhaseFinalizing, getCancellationTestBackup(t, client).Status.Phase)
 	})
 
-	t.Run("does not clobber an already-Cancelling backup", func(t *testing.T) {
-		backup := cancellationTestBackup(velerov1api.BackupPhaseCancelling, true)
+	t.Run("does not clobber an already-Canceling backup", func(t *testing.T) {
+		backup := cancellationTestBackup(velerov1api.BackupPhaseCanceling, true)
 		backup.Status.Cancellation = &velerov1api.BackupCancellationStatus{
 			AcceptedAt:        &metav1.Time{Time: metav1.Now().Add(-1)},
 			AcceptedFromPhase: velerov1api.BackupPhaseQueued,
@@ -123,7 +124,7 @@ func TestAcceptCancellation(t *testing.T) {
 		assert.False(t, ok)
 
 		updated := getCancellationTestBackup(t, client)
-		assert.Equal(t, velerov1api.BackupPhaseCancelling, updated.Status.Phase)
+		assert.Equal(t, velerov1api.BackupPhaseCanceling, updated.Status.Phase)
 		require.NotNil(t, updated.Status.Cancellation)
 		assert.Equal(t, 2, updated.Status.Cancellation.ActionsAttempted)
 		assert.Equal(t, velerov1api.BackupPhaseQueued, updated.Status.Cancellation.AcceptedFromPhase)
@@ -197,8 +198,8 @@ func TestAcceptCancellation(t *testing.T) {
 func TestCompleteCancellation(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("transitions Cancelling to terminal Cancelled, keeping counts", func(t *testing.T) {
-		backup := cancellationTestBackup(velerov1api.BackupPhaseCancelling, true)
+	t.Run("transitions Canceling to terminal Canceled, keeping counts", func(t *testing.T) {
+		backup := cancellationTestBackup(velerov1api.BackupPhaseCanceling, true)
 		backup.Status.Cancellation = &velerov1api.BackupCancellationStatus{
 			AcceptedFromPhase:  velerov1api.BackupPhaseInProgress,
 			ActionsAttempted:   3,
@@ -215,7 +216,7 @@ func TestCompleteCancellation(t *testing.T) {
 		assert.True(t, ok)
 
 		updated := getCancellationTestBackup(t, client)
-		assert.Equal(t, velerov1api.BackupPhaseCancelled, updated.Status.Phase)
+		assert.Equal(t, velerov1api.BackupPhaseCanceled, updated.Status.Phase)
 		assert.NotNil(t, updated.Status.CompletionTimestamp)
 		require.NotNil(t, updated.Status.Cancellation)
 		assert.Equal(t, "teardown requested; 2 actions unconfirmed", updated.Status.Cancellation.Reason)
@@ -224,7 +225,7 @@ func TestCompleteCancellation(t *testing.T) {
 		assert.Equal(t, 2, updated.Status.Cancellation.ActionsUnconfirmed)
 	})
 
-	t.Run("does nothing when the backup is not Cancelling", func(t *testing.T) {
+	t.Run("does nothing when the backup is not Canceling", func(t *testing.T) {
 		client := ctrlfake.NewClientBuilder().
 			WithScheme(newCancellationTestScheme(t)).
 			WithObjects(cancellationTestBackup(velerov1api.BackupPhaseInProgress, true)).
