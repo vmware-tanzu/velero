@@ -60,6 +60,21 @@ SKIP_BUILD="${SKIP_BUILD:-false}"
 
 FEATURES="${FEATURES:-}"
 GINKGO_LABELS="${GINKGO_LABELS:-}"
+
+# --features takes a comma-separated list, so an exact comparison stops
+# matching as soon as a second feature is enabled. Mirrors FeatureEnabled in
+# test/types.go.
+feature_enabled() {
+  local want="$1" entry
+  local IFS=,
+  for entry in ${FEATURES}; do
+    entry="$(echo "${entry}" | tr -d '[:space:]')"
+    if [ "$(echo "${entry}" | tr '[:upper:]' '[:lower:]')" = "$(echo "${want}" | tr '[:upper:]' '[:lower:]')" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
 FAIL_FAST="${FAIL_FAST:-false}"
 # CLEANUP=false keeps the cluster and MinIO after the run whatever the outcome,
 # for poking at a passing run. FAIL_FAST only keeps them when the run failed.
@@ -189,7 +204,12 @@ fi
 echo "==> Loading ${VELERO_IMAGE}-linux-amd64 into the cluster"
 kind load docker-image "${VELERO_IMAGE}-linux-amd64" --name "${KIND_CLUSTER}"
 
-if [ "${FEATURES}" = "EnableCSI" ]; then
+# The suite's own StorageClass comes from testdata/storage-class/<provider>.yaml
+# unless told otherwise, and the kind one provisions with rancher.io/local-path.
+# A CSI run needs a CSI-backed class or the driver installed below has nothing
+# to snapshot, which is the same file the CSI job in CI passes.
+storage_class_file=""
+if feature_enabled EnableCSI; then
   if [ -x "${repo_root}/hack/install-csi-hostpath.sh" ]; then
     echo "==> Installing CSI snapshot support"
     "${repo_root}/hack/install-csi-hostpath.sh"
@@ -198,6 +218,7 @@ if [ "${FEATURES}" = "EnableCSI" ]; then
     echo "       CSI driver that can snapshot; kind's default storage cannot." >&2
     exit 1
   fi
+  storage_class_file="../testdata/storage-class/kind-csi.yaml"
 fi
 
 echo "==> Running the e2e suite"
@@ -213,5 +234,6 @@ ADDITIONAL_BSL_BUCKET="${ADDITIONAL_BSL_BUCKET}" \
 ADDITIONAL_CREDS_FILE="${creds_file}" \
 VELERO_IMAGE="${VELERO_IMAGE}-linux-amd64" \
 GINKGO_LABELS="${GINKGO_LABELS}" \
+STORAGE_CLASS_FILE="${storage_class_file}" \
 FAIL_FAST="${FAIL_FAST}" \
 make -C "${repo_root}/test" run-e2e
