@@ -1,0 +1,1 @@
+Retry transient API errors when patching a backup to InProgress so it is not left stuck in InProgress
