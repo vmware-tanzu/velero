@@ -1214,3 +1214,32 @@ func TestDeleteMovedSnapshots(t *testing.T) {
 		})
 	}
 }
+
+func TestIsTarballNotFoundError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil error", nil, false},
+		{"generic not found", errors.New("not found"), true},
+		{"generic does not exist", errors.New("does not exist"), true},
+		{"aws s3 nosuchkey", errors.New("nosuchkey"), true},
+		{"azure blobnotfound", errors.New("blobnotfound"), true},
+		{"gcs objectnotexist", errors.New("objectnotexist"), true},
+		{"gcs object doesn't exist", errors.New("storage: object doesn't exist"), true},
+		{
+			"gcs object doesn't exist in wrapped error",
+			errors.New("error downloading backup tarball, CSI snapshot cleanup was skipped: rpc error: code = Unknown desc = storage: object doesn't exist"),
+			true,
+		},
+		{"transient network error", errors.New("connection refused"), false},
+		{"auth failure", errors.New("access denied"), false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, isTarballNotFoundError(tc.err))
+		})
+	}
+}
