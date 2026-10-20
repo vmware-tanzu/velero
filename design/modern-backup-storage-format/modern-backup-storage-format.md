@@ -463,6 +463,8 @@ Below diagram shows what happens during BSL initializaiton.
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+BSL initialization can happen in one cluster only. Therefore, RSD initialization must use atomic create-if-absent and must never overwrite an existing RSD. If the RSD already exists in the backup storage, the BSL initialization automatically switches to BSL Sync.  
+
 Parameters should be added to `velero backup-location create` and `velero backup-location delete` CLI accordingly.  
 
 ### BSL Sync
