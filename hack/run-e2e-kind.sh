@@ -44,6 +44,12 @@ MINIO_CONTAINER="${MINIO_CONTAINER:-minio-${KIND_CLUSTER}}"
 # has to be present already, or named explicitly. Checked before anything is
 # created, since a pull failure three minutes into a run is a poor way to find out.
 MINIO_IMAGE="${MINIO_IMAGE:-minio/minio:latest}"
+# The image's own entrypoint is left to run by default, which is what CI relies
+# on: its bitnami image starts the server itself and would fail if a command
+# replaced that, since it runs as UID 1001 and cannot create a data directory at
+# the filesystem root. Upstream minio/minio needs an explicit command instead,
+# so set MINIO_ARGS="server /data" for that one.
+MINIO_ARGS="${MINIO_ARGS:-}"
 MINIO_ROOT_USER="${MINIO_ROOT_USER:-minio}"
 MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-minio123}"
 BSL_BUCKET="${BSL_BUCKET:-bucket}"
@@ -86,6 +92,10 @@ export KUBECONFIG="${work_dir}/kubeconfig"
 creds_file="${work_dir}/credentials"
 
 minio_started=false
+# Ownership, not just existence. Teardown removes the cluster only if this run
+# created it, for the same reason it refuses to remove a MinIO container it did
+# not create.
+cluster_created=false
 
 # Printed whenever the test bed is deliberately left behind, so the caller is
 # never left guessing what to remove.
@@ -110,7 +120,9 @@ cleanup() {
     return
   fi
   echo "==> Removing the test bed"
-  kind delete cluster --name "${KIND_CLUSTER}" > /dev/null 2>&1 || true
+  if [ "${cluster_created}" = "true" ]; then
+    kind delete cluster --name "${KIND_CLUSTER}" > /dev/null 2>&1 || true
+  fi
   if [ "${minio_started}" = "true" ]; then
     docker rm -f "${MINIO_CONTAINER}" > /dev/null 2>&1 || true
   fi
@@ -134,6 +146,13 @@ if ! docker image inspect "${MINIO_IMAGE}" > /dev/null 2>&1; then
   fi
 fi
 
+if kind get clusters 2>/dev/null | grep -qx "${KIND_CLUSTER}"; then
+  echo "ERROR: a kind cluster named ${KIND_CLUSTER} already exists, and this script" >&2
+  echo "       will not delete one it did not create. Remove it yourself, or set" >&2
+  echo "       KIND_CLUSTER to a name that is free." >&2
+  exit 1
+fi
+
 if docker inspect "${MINIO_CONTAINER}" > /dev/null 2>&1; then
   echo "ERROR: a container named ${MINIO_CONTAINER} already exists, and this script" >&2
   echo "       will not remove one it did not create. Remove it yourself, or set" >&2
@@ -143,6 +162,9 @@ fi
 
 echo "==> Creating kind cluster ${KIND_CLUSTER}"
 # --kubeconfig keeps this out of the caller's kubeconfig entirely.
+# Set before the command rather than after, so a cluster left half created by a
+# failure part way through is still torn down.
+cluster_created=true
 if [ -n "${KIND_IMAGE}" ]; then
   kind create cluster --name "${KIND_CLUSTER}" --image "${KIND_IMAGE}" --kubeconfig "${KUBECONFIG}" --wait 120s
 else
@@ -154,10 +176,11 @@ echo "==> Starting MinIO"
 # running on the usual port does not stop the run. The port is published on all
 # interfaces because the cluster reaches it over the kind gateway, so this is a
 # throwaway store with throwaway credentials and nothing else should use it.
+# shellcheck disable=SC2086 # MINIO_ARGS is a command line and must word-split.
 docker run -d --name "${MINIO_CONTAINER}" -p 9000 \
   -e "MINIO_ROOT_USER=${MINIO_ROOT_USER}" \
   -e "MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}" \
-  "${MINIO_IMAGE}" server /data > /dev/null
+  "${MINIO_IMAGE}" ${MINIO_ARGS} > /dev/null
 minio_started=true
 minio_port="$(docker port "${MINIO_CONTAINER}" 9000/tcp | head -1 | sed 's/.*://')"
 
@@ -176,6 +199,11 @@ done
 if [ "${minio_ready}" != "true" ]; then
   echo "ERROR: MinIO did not become ready within 60s. Container logs:" >&2
   docker logs --tail 20 "${MINIO_CONTAINER}" >&2 || true
+  if [ -z "${MINIO_ARGS}" ]; then
+    echo >&2
+    echo "       If the logs show a usage message, this image needs an explicit" >&2
+    echo "       command. Upstream minio/minio does: MINIO_ARGS=\"server /data\"." >&2
+  fi
   exit 1
 fi
 docker exec "${MINIO_CONTAINER}" mc mb --ignore-existing \
@@ -195,14 +223,30 @@ aws_access_key_id=${MINIO_ROOT_USER}
 aws_secret_access_key=${MINIO_ROOT_PASSWORD}
 EOF
 
+# Strip only the final :tag, so a registry port survives: with %%:* the name
+# localhost:5000/velero:e2e-local would reduce to "localhost".
+velero_image_name="${VELERO_IMAGE%:*}"
+velero_image_tag="${VELERO_IMAGE##*:}"
+# The container target appends -<os>-<arch>, taken from go env when
+# BUILD_OUTPUT_TYPE is docker (Makefile, ALL_ARCH.linux). Hardcoding amd64 here
+# would load a tag that does not exist on an arm64 workstation.
+velero_image_platform="$(go env GOOS 2>/dev/null)-$(go env GOARCH 2>/dev/null)"
+if [ "${velero_image_platform}" = "-" ]; then
+  echo "ERROR: could not read the build platform from 'go env'. The image tag the" >&2
+  echo "       container target produces ends in -<os>-<arch>, so this script needs" >&2
+  echo "       go on PATH to know which tag to load." >&2
+  exit 1
+fi
+velero_image_built="${VELERO_IMAGE}-${velero_image_platform}"
+
 if [ "${SKIP_BUILD}" != "true" ]; then
   echo "==> Building the Velero CLI and image"
   make -C "${repo_root}" local
-  IMAGE="${VELERO_IMAGE%%:*}" VERSION="${VELERO_IMAGE##*:}" BUILD_OUTPUT_TYPE=docker \
+  IMAGE="${velero_image_name}" VERSION="${velero_image_tag}" BUILD_OUTPUT_TYPE=docker \
     make -C "${repo_root}" container
 fi
-echo "==> Loading ${VELERO_IMAGE}-linux-amd64 into the cluster"
-kind load docker-image "${VELERO_IMAGE}-linux-amd64" --name "${KIND_CLUSTER}"
+echo "==> Loading ${velero_image_built} into the cluster"
+kind load docker-image "${velero_image_built}" --name "${KIND_CLUSTER}"
 
 # The suite's own StorageClass comes from testdata/storage-class/<provider>.yaml
 # unless told otherwise, and the kind one provisions with rancher.io/local-path.
@@ -232,8 +276,7 @@ ADDITIONAL_OBJECT_STORE_PROVIDER=aws \
 ADDITIONAL_BSL_CONFIG="${bsl_config}" \
 ADDITIONAL_BSL_BUCKET="${ADDITIONAL_BSL_BUCKET}" \
 ADDITIONAL_CREDS_FILE="${creds_file}" \
-VELERO_IMAGE="${VELERO_IMAGE}-linux-amd64" \
 GINKGO_LABELS="${GINKGO_LABELS}" \
 STORAGE_CLASS_FILE="${storage_class_file}" \
 FAIL_FAST="${FAIL_FAST}" \
-make -C "${repo_root}/test" run-e2e
+make -C "${repo_root}/test" run-e2e VELERO_IMAGE="${velero_image_built}"
