@@ -2,17 +2,20 @@
 
 ## Abstract
 
-Add a supported way to cancel an in-progress Velero backup: stop further work where possible, and keep the Backup object and any artifacts for diagnosis.
-Today there is no cooperative cancellation path, so the only recourse is to delete or kill the workload — which strands child operations, leaves applications quiesced by pre-hooks, and produces unaccounted partial artifacts.
+Add a supported way to cancel an in-progress Velero backup. This involves two outcomes:
+1. stopping further work where possible before moving to a terminal phase, and
+2. keeping the Backup object and any artifacts for diagnosis.
+Velero currently does not have any cooperative cancellation path for backups.
 
 ## Background
 
-A backup moves through phases owned by different controllers: the queue controller advances `New -> Queued -> ReadyToStart`; the backup controller runs `InProgress` via one blocking `runBackup()` call, then hands off to plugin-operations, finalization, and a terminal phase.
-Cancellation is hard because a backup is not one unit of work — `runBackup()` does synchronous item collection/archiving, waits on asynchronous node-side children (pod-volume backups and CSI data uploads), and starts durable asynchronous plugin operations polled by a separate controller.
-A busy reconcile cannot be interrupted by another event for the same object, so stopping a backup needs cooperative checkpoints inside the running work plus durable intent that survives restarts — not just a controller watching a request.
+A backup moves through phases owned by different controllers: 
+- the queue controller advances `New -> Queued -> ReadyToStart`; 
+- the backup controller runs `InProgress` via one blocking `runBackup()` call, then hands off to
+- plugin-operations, finalization, and a terminal phase.  
 
-A prototype exists on the `backup-cancellation` branch (design PR [#9284](https://github.com/velero-io/velero/pull/9284)): it added `spec.cancel`, cancellation phases, engine checkpoints, and a reconciler, but predates main's queueing, per-request worker pools, and PVB timeout fixes.
-This design takes its lessons rather than adopting it directly.
+Cancellation is complex because a backup is not one unit of work; for instance, `runBackup()` does synchronous item collection/archiving, waits on asynchronous node-side children (pod-volume backups and CSI data uploads), and starts durable asynchronous plugin operations polled by a separate controller.  
+While a reconciler is blocked inside `runBackup()`, no watch event can re-enter for that object, so the work itself must poll for a cancellation signal at cooperative points. That signal must also live on the persisted Backup object: if the process restarts mid-teardown, the restarted controller must see it and continue tearing down, not silently resume the backup.
 
 ## Goals
 
@@ -29,13 +32,11 @@ This design takes its lessons rather than adopting it directly.
 
 ## High-Level Design
 
-- **Intent is a CR.** Users create a `BackupCancellationRequest` rather than patching the Backup. It names a target Backup, binds to that Backup's UID (so a name reuse cannot satisfy it), and carries configuration plus request/accepted/rejected outcomes.
-- **The signal is `spec.cancel`.** The request controller translates an accepted request into `Backup.spec.cancel`, the internal signal phase owners observe. Users do not set it directly.
+- **User Intent is a CR.** Users create a `BackupCancellationRequest` rather than patching the Backup. It names a target Backup, binds to that Backup's UID (so a name reuse cannot satisfy it), and carries configuration.
+- **The internal signal is `spec.cancel`.** The request controller translates an accepted request into `Backup.spec.cancel`, the internal signal phase owners observe. Users do not set it directly.
 - **Acceptance is authoritative.** A backup is not canceled until a phase owner records acceptance (`Canceling`) on the Backup; once accepted, it cannot be resumed.
-- **Teardown is observer-owned.** Phases are owned by different controllers; whichever owns the current phase observes `spec.cancel`, tears down its in-flight work, records `Canceling` plus status, and drives the Backup to terminal `Canceled`. There is no central coordinator.
-- **Timeout is tentative.** Cancellation may carry a configurable timeout (server default plus per-request override) recorded as a deadline. Whether and how to enforce it is unresolved (see Open Issues); the design only leaves room for it.
+- **Teardown is observer-owned.** Since phases are owned by different controllers, whichever owns the current phase observes `spec.cancel`, tears down its in-flight work, records `Canceling` plus status, and drives the Backup to terminal `Canceled`. There is no central coordinator.
 
-Cancellation is accepted through `WaitingForPluginOperations`; at `Finalizing` and beyond it is rejected.
 The `PartiallyFailed` variants (`WaitingForPluginOperationsPartiallyFailed`, `FinalizingPartiallyFailed`) behave like their siblings and are omitted below for readability.
 
 ```mermaid
@@ -52,11 +53,11 @@ stateDiagram-v2
     Completed --> [*]
     PartiallyFailed --> [*]
 
-    New --> Canceling: spec.cancel
-    Queued --> Canceling: spec.cancel
-    ReadyToStart --> Canceling: spec.cancel
-    InProgress --> Canceling: spec.cancel
-    WaitingForPluginOperations --> Canceling: spec.cancel
+    New --> Canceling
+    Queued --> Canceling
+    ReadyToStart --> Canceling
+    InProgress --> Canceling
+    WaitingForPluginOperations --> Canceling
     Canceling --> Canceled
     Canceled --> [*]
 
@@ -70,24 +71,20 @@ stateDiagram-v2
     class Canceling,Canceled cancel
 ```
 
+*Figure: Backup phase transitions*
+
 ## Detailed Design
 
 ### API: BackupCancellationRequest CRD
 
 A namespaced CR in `velero.io/v1`, shaped like `DeleteBackupRequest`/`DownloadRequest`.
 Its spec names the target; its status carries the request phase, the bound UID, a rejection reason, and a message.
-Authoritative cancellation detail (acceptance time, accepted-from phase, outcome reason, bounded counts) lives on the parent's `status.cancellation` (next section) — the request controller reflects it, not duplicates it.
 
 ```go
 // BackupCancellationRequestSpec is the specification for a request to cancel a backup.
 type BackupCancellationRequestSpec struct {
 	// BackupName is the name of the backup to cancel.
 	BackupName string `json:"backupName"`
-
-	// TimeoutSeconds optionally overrides the server-level cancellation timeout. Tentative:
-	// may be ignored until the deadline mechanism is designed (still open).
-	// +optional
-	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty"`
 
 	// DeleteBackup, when true, requests deletion after cancellation completes successfully: the
 	// request controller creates a DeleteBackupRequest once the backup reaches Canceled. Not
@@ -182,7 +179,7 @@ Binding: on first observation, resolve the named Backup and record its UID in `s
 
 ### Parent Backup status and phases
 
-Two authoritative phases are added to `BackupPhase`:
+Two phases are added to `BackupPhase`:
 
 ```go
 // BackupPhaseCanceling means cancellation has been accepted for an in-progress backup and the
@@ -195,10 +192,9 @@ BackupPhaseCanceled BackupPhase = "Canceled"
 ```
 
 - `Canceling` is recorded by whichever controller owns the accepting phase; recording it is what makes cancellation authoritative. `Canceled` is terminal.
-- Parent spellings `Canceling`/`Canceled` match the existing child spellings (DataUpload, PodVolumeBackup already use `Canceling`/`Canceled`), so no adapter is needed to reconcile them.
+- Parent spellings `Canceling`/`Canceled` match the existing child spellings (DataUpload, PodVolumeBackup already use `Canceling`/`Canceled`).
 
 A `cancellation` struct is added to `BackupStatus`, set only after acceptance.
-It holds **only fixed-size fields** (bounded counts): a backup can start thousands of child operations, so an open-ended per-operation list risks the Kubernetes object size limit — the same reason Velero already keeps per-operation detail off the Backup (counts on status, detail in an object-storage artifact). `completionTimestamp` is reused for the final time.
 
 ```go
 // Cancellation records the outcome of a cancellation. Set only once accepted (phase Canceling
@@ -216,12 +212,6 @@ type BackupCancellationStatus struct {
 	// +nullable
 	AcceptedAt *metav1.Time `json:"acceptedAt,omitempty"`
 
-	// Deadline is when cancellation orchestration is intended to finish. Tentative: the deadline
-	// mechanism is not yet designed, so this may be unset (still open).
-	// +optional
-	// +nullable
-	Deadline *metav1.Time `json:"deadline,omitempty"`
-
 	// Reason is a short, human-readable summary of the outcome (e.g. noting unconfirmed teardown).
 	// +optional
 	Reason string `json:"reason,omitempty"`
@@ -230,29 +220,16 @@ type BackupCancellationStatus struct {
 	// +optional
 	AcceptedFromPhase BackupPhase `json:"acceptedFromPhase,omitempty"`
 
-	// ActionsAttempted is how many teardown actions cancellation tried.
-	// +optional
-	ActionsAttempted int `json:"actionsAttempted,omitempty"`
-
-	// ActionsConfirmed is how many of those Velero confirmed completed.
-	// +optional
-	ActionsConfirmed int `json:"actionsConfirmed,omitempty"`
-
-	// ActionsUnconfirmed is how many Velero could not verify actually stopped the work.
-	// +optional
-	ActionsUnconfirmed int `json:"actionsUnconfirmed,omitempty"`
 }
 ```
 
-Per-action detail (each step's name and whether it was confirmed/skipped/failed/unconfirmed) goes to the backup log, not the object (see Diagnostics).
-`ActionsUnconfirmed` keeps the safety goal honest: a successful `Cancel` call is counted as *attempted*, not as proof that remote work stopped.
-
 ### Cancellation across controllers
 
-`spec.cancel` is the signal; each phase owner observes it and runs **observer-owned teardown** (no coordinator): record `Canceling` -> tear down in-flight work -> record `Canceled`.
-Teardown grows with lifecycle progress — nothing before work starts, up to child and operation teardown once work is in flight.
+`spec.cancel` is the signal; each phase owner observes it and runs **observer-owned teardown** (no coordinator):  
+record `Canceling` -> tear down in-flight work -> record `Canceled`.  
+Teardown grows with lifecycle progress: ranging from nothing before work starts, up to child and operation teardown once work is in flight.
 
-| Phase | Owner | Teardown |
+| Phase | Controller | Teardown |
 |---|---|---|
 | New / Queued | queue | none (bookkeeping only) |
 | ReadyToStart | backup | release tracker reservation |
@@ -263,9 +240,8 @@ Teardown grows with lifecycle progress — nothing before work starts, up to chi
 Rules that apply to every owner:
 
 - **Guarded transitions.** Every phase write is a fresh read plus an optimistic-lock (resourceVersion) update, recomputing on conflict, so exactly one transition wins and a stale write cannot overwrite acceptance. The replay-prone helpers (`kube.PatchResource`, `PatchResourceWithRetriesOnErrors`) must **not** be used here. This is the safety mechanism.
-- **Shared vs. local teardown.** Only plugin-operation cancellation (`bia.Cancel()` on recorded operation IDs) is shared — the backup and operations controllers call one helper. PVB teardown is engine-only (PVBs exist and are tracked only inside the engine, and are terminal by later phases). Observer-owned means each owner *triggers and transitions*, not that each reimplements teardown.
+- **Shared vs. local teardown.** Only plugin-operation cancellation (`bia.Cancel()` on recorded operation IDs) is shared: backup and operations controllers call one helper. PVB teardown is engine-only (PVBs exist and are tracked only inside the engine, and are terminal by later phases).
 - **Acceptance boundary.** Accepted through `WaitingForPluginOperations`; `Finalizing`/terminal -> `Rejected` (`TooLate` for `Finalizing`*, `AlreadyTerminal` otherwise).
-- **Fast, request-based `Canceled`.** `Canceled` means teardown was *requested*, not proven stopped. PVBs are confirmed (the engine waits for `Canceled`); plugin ops are `Unconfirmed`. So `Canceling` is usually brief (dominated by the PVB wait) and may go unseen — but it is a real persisted phase: the atomicity point that wins the guarded race, and the crash-recovery anchor that tells a restart to finish teardown rather than resume.
 
 Rationale for observer-owned vs. central coordinator, and request-based vs. confirmation-based, is in Alternatives. Per-controller detail follows.
 
@@ -311,7 +287,7 @@ flowchart TD
     B2 -- no --> Normal[Engine completes normally]
     Hybrid --> B3
     Normal --> B3{"Boundary 3 — phase-selection switch"}
-    B3 -- cancel observed --> Sweep["Shared sweep: bia.Cancel on unfinished<br/>operation IDs; record counts + log ledger"]
+    B3 -- cancel observed --> Sweep["Shared sweep: bia.Cancel on unfinished<br/>operation IDs; log each outcome"]
     Sweep --> CW["Guarded write: Canceling -> Canceled<br/>(persistence branches on phase)"]
     CW --> End2([done])
     B3 -- fatal errors --> F1[Failed]
@@ -334,10 +310,8 @@ The engine (`pkg/backup/backup.go`) re-reads `spec.cancel` itself (rate-limited;
 
 **3. Phase-selection transition.**
 After the engine returns, `runBackup()` picks the handoff phase in a `switch`. Cancellation must be a first-class case evaluated *ahead* of the error and operation cases — otherwise in-flight plugin operations route to `WaitingForPluginOperations`, which would *wait for* the canceled work.
-The controller already holds the plugin manager and operation list (`getBackupItemOperationProgress`), so it runs the shared op sweep (`bia.Cancel()` per unfinished operation ID) in place, records counts plus log detail, and transitions toward `Canceled`.
+The controller already holds the plugin manager and operation list (`getBackupItemOperationProgress`), so it runs the shared op sweep (`bia.Cancel()` per unfinished operation ID) in place, logs each action's outcome, and transitions toward `Canceled`.
 Persistence must branch on the phase (so no usable terminal metadata is published), the write must be guarded (not `PatchResourceWithRetriesOnErrors`), and the deferred tracker handling must gain `Canceling`/`Canceled` cases so the entry is not leaked.
-
-*(Two refinements were deprioritized: a check before `BackupWithResolvers` — redundant given the pre-start gate and engine checks — and a separate pre-upload check — folded into phase-selection persistence.)*
 
 #### Operations controller (WaitingForPluginOperations)
 
@@ -360,7 +334,7 @@ flowchart TD
 ```
 
 Cancellation reuses that exact sweep, triggered by `spec.cancel` instead of the timeout — a new trigger, not new logic.
-It `Cancel()`s each unfinished operation and keeps polling `Progress()` rather than trusting a successful `Cancel()` return (the interface permits unsupported cancellation to succeed); such cases are `ActionsUnconfirmed` and logged.
+It `Cancel()`s each unfinished operation and keeps polling `Progress()` rather than trusting a successful `Cancel()` return (the interface permits unsupported cancellation to succeed); such cases are logged as unconfirmed.
 Modes with no real cancel path (e.g. native snapshots) stop new calls and record the work unconfirmed.
 When no operations remain in progress: guarded `Canceling` (`acceptedFromPhase: WaitingForPluginOperations`) -> `Canceled`.
 
@@ -368,7 +342,7 @@ When no operations remain in progress: guarded `Canceling` (`acceptedFromPhase: 
 
 *Owns `Finalizing`: data is already captured and async operations are already complete; only results and the final artifact upload remain.*
 
-**Does not accept cancellation** — it is past the acceptance boundary, and abandoning a near-done backup yields a half-finalized artifact for no benefit.
+**Does not accept cancellation** — abandoning a near-done backup yields a half-finalized artifact for no benefit.
 No finalizer code is needed: boundary 3 already makes `Canceling` win ahead of the `Finalizing` case, so a backup only reaches `Finalizing` with `spec.cancel` set if the signal arrived *after* it entered `Finalizing`.
 Then no `Canceling` write happens, the backup finalizes normally to its terminal phase, and the request controller sees the non-`Canceling` outcome -> `Rejected`/`TooLate`.
 
@@ -414,17 +388,11 @@ flowchart TD
 - **Dedupe.** Collapse redundant requests for the same bound Backup (DeleteBackupRequest convention).
 - **Translate.** If still cancellable (before `Finalizing`), set `spec.cancel` once, idempotently. Setting it is not acceptance — acceptance is a phase owner recording `Canceling`.
 - **Reject past the boundary.** `Finalizing`* -> `TooLate`; terminal -> `AlreadyTerminal` (exact phase in `Message`).
-- **Project.** Watch the parent: `Canceling` -> request `Accepted`, `Canceled` -> request `Completed`. Reading the outcome from the parent (not at signal-set time) resolves the set-time race: if the backup slips to `Finalizing` first, it finalizes and the request lands `Rejected`/`TooLate`.
-
-Teardown remains observer-owned by the phase controllers.
-
-### Diagnostics and artifacts
-
-- **Ledger in the log.** Each teardown step is logged with its name, outcome (`Done`/`Skipped`/`Failed`/`Unconfirmed`), and a message. The Backup keeps only the bounded `ActionsAttempted`/`Confirmed`/`Unconfirmed` counts — summary on the object, detail in the log (already in object storage).
-- **Artifacts retained, non-restorable.** Partial artifacts are kept for diagnosis, but `Canceled` marks them diagnostic-only. A canceled backup still uploads its log and metadata, but persistence branches on the phase (boundary 3) so it publishes no usable terminal or restorable metadata.
+- **Project.** Once `spec.cancel` is set, the request controller watches the parent Backup and maps its phase onto the request: `Canceling` → `Accepted`, `Canceled` → `Completed`. It reads from the parent's actual phase rather than assuming acceptance the moment it sets the signal — this handles the race where the backup slips past `Finalizing` before any phase owner checks `spec.cancel`. In that case the backup finalizes normally and the request ends up `Rejected`/`TooLate`.
 
 ### Cleanup
 
+- **Artifacts retained, non-restorable.** Partial artifacts are kept for diagnosis, but `Canceled` marks them diagnostic-only. A canceled backup still uploads its log and metadata, but persistence branches on the phase (boundary 3) so it publishes no usable terminal or restorable metadata.
 - Cancellation does not delete artifacts itself (Non Goals). Deletion is opt-in via `spec.deleteBackup`: when set, the request controller creates a `DeleteBackupRequest` once the backup reaches `Canceled` (request `Completed`), reusing the existing deletion machinery. It fires only on successful cancellation — a `Rejected` request triggers no deletion.
 - Process-local resources (temp tarball, worker pool, plugin processes) need no special cleanup: the existing deferred teardown (`StopWorkerPool`, plugin-manager cleanup, temp-file removal) runs regardless of how `runBackup` returns.
 
@@ -436,8 +404,7 @@ So a started block always runs its pre-hooks, items, and paired post-hooks toget
 ### CLI, metrics, and sync
 
 - `velero backup cancel BACKUP_NAME` creates a `BackupCancellationRequest`; `--wait` blocks to a terminal request phase (`Completed`/`Rejected`), `--delete` sets `spec.deleteBackup` (`--timeout` if the tentative timeout lands).
-- `velero backup describe` shows the `Canceling`/`Canceled` phase and `status.cancellation` counts; `velero backup logs` includes the ledger.
-- Metrics: at least a canceled-backups counter, labeled by `acceptedFromPhase` to show where cancellations land.
+- `velero backup describe` shows the `Canceling`/`Canceled` phase; `velero backup logs` includes the ledger.
 - Backup sync treats `Canceled` as terminal and non-restorable: synced for visibility/audit, not offered as a restore source (see Compatibility).
 
 ## Alternatives Considered
@@ -453,10 +420,6 @@ Observer-owned keeps teardown next to the code that understands it and makes tra
 **Hard abort instead of drain-then-stop.**
 Rejected: the worker result send is blocking and unguarded, so interrupting mid-flight risks deadlocking shutdown — and aborting local work buys little, since the cost is the remote copy.
 Drain-then-stop uses an atomic flag; a context is used only for the PVB wait, where interrupting is what triggers the existing cancel sweep.
-
-**Inline `actions[]` on status instead of counts.**
-Rejected: thousands of child operations could exceed the Kubernetes object size limit (the reason per-operation data is already off the Backup).
-Status carries bounded counts; detail goes to the log.
 
 **Confirmation-based `Canceled` instead of fast/request-based.**
 Rejected as default: holding `Canceling` until every child/operation is confirmed terminal depends on work Velero cannot always confirm (a no-op `Cancel`, native snapshots) and would need a bounding timeout.
@@ -475,13 +438,11 @@ Instead `Canceled` means *requested*: PVBs confirmed, plugin operations `Unconfi
 
 ## Implementation
 
-Builds on the `backup-cancellation` prototype but reworked for main's queueing, per-request worker pools, and PVB timeout handling.
-
 **Ordering principle (why it is safe to land in pieces):** `spec.cancel` defaults to false and no request exists until a user creates one, so every observer added before the request path is **inert** — it changes behavior only once something sets `spec.cancel`.
 So teardown lands first (tested by setting `spec.cancel` directly), and the request path — which turns the feature *on* — lands last, after every phase has an observer, so no user can file a request that a phase silently ignores.
 
 **Phase 1 — Foundations (inert plumbing)**
-1. API types: `spec.cancel` on `BackupSpec`, the `Canceling`/`Canceled` phases, `BackupCancellationStatus` (counts-only), and the `BackupCancellationRequest` CRD with generated clients and manifests.
+1. API types: `spec.cancel` on `BackupSpec`, the `Canceling`/`Canceled` phases, `BackupCancellationStatus`, and the `BackupCancellationRequest` CRD with generated clients and manifests.
 2. Guarded phase-transition helper (fresh read + optimistic lock), replacing the replay-prone patch helpers for these transitions.
 
 **Phase 2 — Teardown observers (inert until `spec.cancel` is set)**
@@ -494,11 +455,8 @@ So teardown lands first (tested by setting `spec.cancel` directly), and the requ
 7. BackupCancellationRequest controller: bind/UID, translate, dedupe, project, rejection reasons, and the `deleteBackup` follow-up. Lands only after Phase 2.
 8. CLI, metrics, backup sync, and the restore-gate message.
 
-One PR per step (5 and 6 can combine). Contributors and timeline TBD.
-
 ## Open Issues
 
 - **Timeout/deadline:** whether to implement it, and how to enforce it at the deadline. The fast transition reduces its need (no blocking on unconfirmable work), so it may stay an optional bound. `spec.timeoutSeconds` and `status.cancellation.deadline` are tentative pending this.
 - **Direct `spec.cancel` edits:** add a validating webhook to force cancellation through the CR, or accept Backup-write as cancellation access.
-- **Metrics:** exact shape and cardinality.
 - **`deleteBackup` failure:** behavior when the follow-up `DeleteBackupRequest` fails or is rejected (retry, surface on the request, or leave to the deletion-request lifecycle).
