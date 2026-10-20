@@ -680,63 +680,93 @@ type BSLKeyRotationRequestStatus struct {
 }
 ```
 
-Below is the diagram for password rotation:  
+#### Admission and State Transition
+
+A `New` request is admitted only for an `Available`, `ReadWrite` BSL with no other active rotation request.  
+An `InProgress` request resumes without requiring the BSL to be `Available`. The BSL must remain writable.  
+
+Multiple rotation request for the same BSL is not allowed, the controller will:  
+- If an `InProgress` request exists, continue it and reject additional `New` requests as Failed
+- If several `New` requests exist, choose one by creation timestamp, then reject the others as Failed
+
+An annotation `velero.io/key-rotation-in-progress: "true"` is introduced. It prevents BSL sync from processing the BSL and signals that rotation reconciliation should continue. Reconciliation sets it before changing storage.  
+
+There is an admission stage before modifying the RSD or BSL.  
+
+For `New` request, the admission does below things:
+- Verify the BSL is Available and ReadWrite, with no active rotation
+- Read the BSL’s `active-password` and validate the storage RSD using that password, including headerchecksum and BMK fingerprint check
+- Update the request status `Phase` to `InProgress`
+
+For `InProgress` request, the admission does below things:
+- Verify the BSL is ReadWrite
+- Read the BSL’s `active-password` and validate the storage RSD using that password, including headerchecksum and BMK fingerprint check
+- If the verification with `active-password` fails, do the same verification with `target-password`
+- Update the request status `Phase` to `InProgress`
+
+On verification failure during the admission, the controller removes the `velero.io/key-rotation-in-progress` annotation from the BSL and then
+set the rotation request as `Failed`.  
+On transient errors during the admission, the controller will retry the rotation request.  
+
+The BSL is updated in an atomic operation, so it never happens that the BSL fields are in inconsistent states.  
+However, BSL may be inconsistent with backup storage when the upload succeeds but BSL update fails, in this case, admission could still pass using the `target-password` and rotation could continue.  
+
+#### Rotation Workflow
+
+Below is the diagram for password rotation workflow:
 
 ```text
-Admin / CI-CD             API Server           BSL CR                     Controller                  Backup Storage
-      |                       |                  |                             |                             |
-      |--- Create Secret ---->|                  |                             |                             |
-      |       (creds-v2)      |                  |                             |                             |
-      |                       |                  |                             |                             |
-      |--- Create CR -------->|                  |                             |                             |
-      | BSLKeyRotationRequest |                  |                             |                             |
-      |                       |                  |                             | Check BSL status:           |
-      |                       |                  |                             |    - Phase == Available     |
-      |                       |                  |                             |    - AccessMode == ReadWrite|
-      |                       |                  |                             |                             |
-      |                       |<--- Set Phase ---|-----------------------------| (If BSL check fails:        |
-      |                       |     "Failed"     |                             |  mark Failed & STOP)        |
-      |                       |                  |                             |                             |
-      |                       |                  |                             |----------- Get RSD -------->|
-      |                       |                  |                             |<----------- RSD ------------|
-      |                       |                  |                             |                             |
-      |                       |                  |                             | Unwrap BMK (v1) & verify    |
-      |                       |                  |                             |                             |
-      |                       |<--- Set Phase ---|-----------------------------| (If unwrap or check fails:  |
-      |                       |     "Failed"     |                             |  mark Failed & STOP)        |
-      |                       |                  |                             |                             |
-      |                       |<- Read creds-v2 -|-----------------------------|                             |
-      |                       |-- Return Secret -|---------------------------->|                             |
-      |                       |                  |                             | Fresh salt_new              |
-      |                       |                  |                             | PBKDF2(v2)->KEK             |
-      |                       |                  |                             | Wrap BMK (v2)               |
-      |                       |                  |                             | Generate RSD (v2)           |
-      |                       |                  |                             |                             |
-      |                       |                  |<-------- Lock BSL ----------|                             |
-      |                       |                  |    status = "Unavailable"   |                             |
-      |                       |                  |   add rotation annotation   |                             |
-      |                       |                  |                             |                             |
-      |                       |                  |                             |--------- Put RSD (v2) ----->|
-      |                       |                  |                             |                             |
-      |                       |<--- Set Phase ---|-----------------------------| (If Put fails:              |
-      |                       |     "Failed"     |                             |  mark request Failed & STOP)|
-      |                       |                  |                             |                             |
-      |                       |                  |<------- Update BSL ---------|                             |
-      |                       |                  |   SecretKeyRef = creds-v2   |                             |
-      |                       |                  |     RSD clone = RSD (v2)    |                             |
-      |                       |                  |    status = "Available"     |                             |
-      |                       |                  |  remove rotation annotation |                             |
-      |                       |                  |                             |                             |
-      |                       |<--- Set Phase ---|-----------------------------|                             |
-      |                       |    "Completed"   |                             |                             |
-      |--- Delete Secret ---->|                  |                             |                             |
-      |       (creds-v1)      |                  |                             |                             |
-      |                       |                  |                             |                             |      
+                       Reconcile rotation request
+                                  |
+                         Check request phase
+                                  |
+                 +----------------+---------------+
+                 |                                |
+            New request                     InProgress request
+                 |                                |
+                 +---------- ADMISSION -----------+
+                 |                                |
+                 |   Verification failure: stop   |
+                 |   Transient error: retry        |
+                 |                                |
+        Set phase InProgress                      |
+                 |                                |
+                 +---- Verified RSD and BMK -------+
+                          |
+             BSL already fully finalized?
+             - Active reference = target reference
+             - Clone matches verified storage RSD
+             - Available; no rotation annotation
+                    /                    \
+                  Yes                    No
+                   |                      |
+                   |          Set or retain rotation annotation
+                   |               Set BSL Unavailable
+                   |                      |
+                   |          Verified using target credential?
+                   |                 /                 \
+                   |               Yes                 No
+                   |                |                   |
+                   |           Skip upload     Read target password
+                   |                |          Wrap BMK; upload RSD
+                   |                |                   |
+                   |                |          Success / transient error
+                   |                |              |           |
+                   |                +--------------+     Retry as InProgress
+                   |                      |
+                   |          Update BSL atomically:
+                   |          - Secret reference and RSD clone
+                   |          - Set Available; remove annotation
+                   |                      |
+                   |               Success / API error
+                   |                  |          |
+                   |                  |    Retry as InProgress
+                   +------------------+
+                          |
+                 Mark request Completed
+                          |
+                  API error: retry as InProgress
 ```
-
-Password rotation is only commenced for `available` BSLs.  
-Preparations are done in memory, including unwrap BMK with current password (creds-v1) and wrap it again with new password (creds-v2). After the preparation is done, the BSL is set as `unavailable` before updating RSD in backup storage. If the update fails, the BSL keeps in `unavailable` status and it is expected to be fixed by BSL sync.   
-A new BSL annotation `velero.io/key-rotation-in-progress` is introduced, so as to prevent BSL sync when password rotation sets the BSL as `unavailable`.   
 
 ### Compression
 
