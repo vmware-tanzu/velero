@@ -440,9 +440,11 @@ Below diagram shows what happens during BSL initializaiton.
 │        │                     │                                   │  • bslID = UUID                            │             │
 │        │                     │                                   │  • BMK = 256-bit random bytes              │             │
 │        │                     │                                   │  • Salt = 16-byte random bytes             │             │
+│        │                     │                                   │  • AAD = RSD header                        │             │
 │        │                     │                                   │  • iter = 600000                           │             │
 │        │                     │                                   │  • KEK = PBKDF2(Passphrase, Salt, iter)    │             │
-│        │                     │                                   │  • wrappedKey = AES-GCM-Encrypt(KEK, BMK)  │             │
+│        │                     │                                   │  • wrappedKey =                            │             │
+│        │                     │                                   │    AES-GCM-Encrypt(KEK, BMK, AAD)          │             │
 │        │                     │                                   │  • keyFingerprint =                        │             │
 │        │                     │                                   │    "sha256:" + Hex(SHA256(BMK))            │             │
 │        │                     │                                   │  • headerChecksum =                        │             │
@@ -509,7 +511,8 @@ The workflow for BSL sync (for either periodical sync or on demand sync) is as b
 │           │                                        │                                                │                      │
 │           │                                        │  Key Unwrapping                                │                      │
 │           │                                        │  • KEK = PBKDF2(Pass, salt, iter)              │                      │
-│           │                                        │  • BMK = AES-256-GCM-Decrypt(KEK, wrappedKey)  │                      │
+│           │                                        │  • BMK =                                       │                      │
+│           │                                        │    AES-256-GCM-Decrypt(KEK, wrappedKey, AAD)   │                      │
 │           │                                        │                                                │                      │
 │           │                                        │  ┌─────────────────────────────────────────────┤                      │
 │           │                                        │  │ Decryption Succeeded?                       │                      │
@@ -619,15 +622,15 @@ Below diagram takes data mover pods for example to show the sequence of backup r
 │              │                                  │                        Returns: user passphrase                     │              │
 │              │                                  │────────────────────────────────────────────────────────────────────►│              │
 │              │                                  │                                  │                                  │              │
-│              │                      ┌────────────────────────────────────────────────────────┐                        │              │
-│              │                      │ IN-MEMORY KEY DERIVATION:                              │                        │              │
-│              │                      │ • KEK = PBKDF2(passphrase, salt, iterations)           │                        │              │
-│              │                      │ • BMK = AES-256-GCM-Decrypt(KEK, wrappedMasterKey)     │                        │              │
-│              │                      │ • Assert SHA256(BMK) == BSL.Status.keyFingerprint      │                        │              │
-│              │                      │ • (Fail if no match)                                   │                        │              │    │              │                      │                                                        │                        │              │
-│              │                      │ • DEK_repo = HKDF-Expand(HKDF(salt=bslID, BMK), repo)  │                        │              │
-│              │                      │ • memclr(BMK, KEK, passphrase)                         │                        │              │
-│              │                      └────────────────────────────────────────────────────────┘                        │              │
+│              │                      ┌─────────────────────────────────────────────────────────┐                       │              │
+│              │                      │ IN-MEMORY KEY DERIVATION:                               │                       │              │
+│              │                      │ • KEK = PBKDF2(passphrase, salt, iterations)            │                       │              │
+│              │                      │ • BMK = AES-256-GCM-Decrypt(KEK, wrappedMasterKey, AAD) │                       │              │
+│              │                      │ • Assert SHA256(BMK) == BSL.Status.keyFingerprint       │                       │              │
+│              │                      │ • (Fail if no match)                                    │                       │              │    │              │                      │                                                         │                       │              │
+│              │                      │ • DEK_repo = HKDF-Expand(HKDF(salt=bslID, BMK), repo)   │                       │              │
+│              │                      │ • memclr(BMK, KEK, passphrase)                          │                       │              │
+│              │                      └─────────────────────────────────────────────────────────┘                       │              │
 │              │                                  │                                  │                                  │              │
 │              │                                            Connect to Backup Repo                                      │              │
 │              │◄───────────────────────────────────────────────────────────────────────────────────────────────────────│              │
