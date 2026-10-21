@@ -161,6 +161,8 @@ Root Storage Descriptor (`velero-storage.json`) is a new file added to the backu
 The implementation for Format 1.x is kept as is. And a new implementation for Format 2.0 is added.  
 In Root Storage Descriptor, a piece of format version information is recorded, so if Format version 2.0, the new implementation is called; otherwise, it fallbacks the old implemntation.  
 
+The same format version also exists in BSL spec, so the value in BSL must match the truth of the data in the backup storage, otherwise, the BSL goes to `Unavailable`.   
+
 ### Unified Encryption Password
 
 In the normal workflow, a single password configured in a Kubernetes Secret is provided by users. Velero use this password for all data encryption, i.e., resource data, metadata, volume data.  
@@ -381,7 +383,7 @@ type BackupStorageLocationSpec struct {
     // Supported values:
     // - "1.x": Legacy format (gzip compression, unencrypted manifests, no RSD).
     // - "2.0": Modern format (zstd compression, AES-256-GCM client-side encryption, RSD).
-    // If omitted, defaults to "2.0" for brand new backup storage, or auto-detects from existing backup storage.
+    // If omitted, defaults to "2.0" for brand new backup storage.
     // +optional
     StorageFormat string `json:"storageFormat,omitempty"`
 
@@ -505,6 +507,8 @@ The workflow for BSL sync (for either periodical sync or on demand sync) is as b
 │           │                                        │                    velero-storage.json         │                      │
 │           │                                        │                                                │                      │
 │           │                                        │  Fast Integrity Check                          │                      │
+│           │                                        │  • Assert BSL format vs. RSD format            │                      │
+│           │                                        │  • (Fail BSL Sync if mismatch)                 │                      │
 │           │                                        │  • Compute SHA256                              │                      │
 │           │                                        │  • Assert with headerChecksum                  │                      │
 │           │                                        │  • (Fail BSL Sync if corrupted)                │                      │
