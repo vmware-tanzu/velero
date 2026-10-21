@@ -313,17 +313,17 @@ func installKibishii(
 	workerOS string,
 ) error {
 	if strings.EqualFold(cloudPlatform, Azure) &&
-		strings.EqualFold(veleroFeatures, FeatureCSI) {
+		FeatureEnabled(veleroFeatures, FeatureCSI) {
 		cloudPlatform = AzureCSI
 	}
 	if strings.EqualFold(cloudPlatform, AWS) &&
-		strings.EqualFold(veleroFeatures, FeatureCSI) {
+		FeatureEnabled(veleroFeatures, FeatureCSI) {
 		cloudPlatform = AwsCSI
 	}
 	// Keep this in step with KibishiiVolumesAreHostPath above, which is its
 	// inverse: the cases skip exactly when this branch does not fire.
 	if strings.EqualFold(cloudPlatform, Kind) &&
-		strings.EqualFold(veleroFeatures, FeatureCSI) {
+		FeatureEnabled(veleroFeatures, FeatureCSI) {
 		cloudPlatform = KindCSI
 	}
 
