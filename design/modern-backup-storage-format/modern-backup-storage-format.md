@@ -169,7 +169,7 @@ In the normal workflow, a single password configured in a Kubernetes Secret is p
 Velero never transfer or copy the Kubernetes Secret to other persistent location.  
 A Key Encryption Key (KEK) is derived from the user password. The KEK then encrypts a per-BSL Master Key (BMK). From this Master Key, Velero deterministically derives:
 - **Resource Data Encryption Key (`DEK_resource`)**: A 256-bit Data Encryption Key derived per BSL via HKDF with domain separation to encrypt Kubernetes resource backup data and Velero metadata files with AES-256-GCM.
-- **Backup Repository Passwords (`DEK_repo`)**: Backup repository passwords derived per BSL and scoped to repository names via HKDF with strict domain separation. The password is provided to the backup repository through the existing workflow of Unified Repo. How the password is used is decided by the specific backup repository.  
+- **Backup Repository Passwords (`DEK_repo`)**: Backup repository passwords derived per backup repository via HKDF with strict domain separation. The password is provided to the backup repository through the existing workflow of Unified Repo. How the password is used is decided by the specific backup repository.  
 
 The Kubernetes Secret is provided by callers, e.g., users, or ESO/Gitops tools. The secret should be in Velero namespace.  
 BMK is a 256 bits random key generated during BSL initialization, after that, BMK is never changed.
