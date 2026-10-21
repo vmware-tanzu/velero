@@ -2,9 +2,9 @@
 
 ## Glossary & Abbreviation
 **Backup Storage**: The storage to persist the backup data and metadata.  
-**BSL**: BackupStorageLocation. The Velero custom resource defining the Backup Storage.
-**Backup Storage Format**: The layout and format of the data in the Backup Storage.
-**Backup Repository**: Backup repository is layered between BR data movers and Backup Storage to provide BR related features for volume data. It is introduced in [Unified Repository design][1]. 
+**BSL**: BackupStorageLocation. The Velero custom resource defining the Backup Storage.  
+**Backup Storage Format**: The layout and format of the data in the Backup Storage.  
+**Backup Repository**: Backup repository is layered between BR data movers and Backup Storage to provide BR related features for volume data. It is introduced in [Unified Repository design][1].  
 **AEAD**: Authenticated Encryption with Associated Data. A cryptographic encryption mode that simultaneously guarantees confidentiality, integrity, and authenticity of data (e.g., AES-256-GCM).  
 **AAD**: Additional Authenticated Data. Plaintext context data bound to the AEAD ciphertext and authenticated by the tag without being encrypted.  
 **ESO**: External Secrets Operator. A Kubernetes operator that synchronizes secrets from external APIs (like HashiCorp Vault, AWS Secrets Manager, Azure Key Vault) into native Kubernetes `Secret` resources.  
@@ -18,67 +18,67 @@
 
 Velero persists backup data of Kubernetes resources and volumes, metadata, and logs into backup storages configured via BackupStorageLocation (BSL). Currently, the Backup Storage Format has several critical architectural and security limitations:
 
-- **Lack of Complete Client-Side Encryption**:
+- **Lack of Complete Client-Side Encryption**  
    Backup data of Kuberentes resoruces are unencrypted. While backup storage providers may offer server-side encryption (SSE), Velero does not protect against compromised backup storage, rogue backup storage admins, or untrusted backup storage targets. Kubernetes `Secret` objects, private keys, tokens, and container environment variables reside in plaintext inside the archive.
 
-- **Vulnerability to Malicious Data Injection ("Poisoned Backup" Attacks)**:
+- **Vulnerability to Malicious Data Injection ("Poisoned Backup" Attacks)**  
    Because Velero runs with `cluster-admin` privileges in Kubernetes and holds cloud provider IAM credentials:
    - An attacker with write access to the backup storage can modify `<backup-name>.tar.gz` to inject privileged containers, backdoors, or `restore.velero.io/exec` annotations, achieving Remote Code Execution (RCE) in the cluster upon restore.
    - An attacker can modify snapshot IDs in `<backup-name>-volumesnapshots.json.gz`. During backup deletion/garbage collection, Velero's `backup_deletion_controller` will call the cloud provider API to delete those snapshot IDs, acting as a "Deletion Oracle" to delete live, critical production snapshots.
    - An attacker can inject a forged `velero-backup.json`. The `backup_sync_controller` will adopt it into the cluster as a valid, completed backup ready for automated restore.
 
-- **Inconsistent and Unsafe Public Exposure for Third Parties**:
+- **Inconsistent and Unsafe Public Exposure for Third Parties**  
    Third-party systems (dashboards, audit engines, and reporting tools) integrating with Velero frequently need to inspect volume backup progress, status, and size metrics. Currently, all metadata files are mixed together, and internal files contain raw infrastructure handles (e.g., `snapshotHandle`, `volumeHandle`) that pose security risks if exposed.
 
-- **Slow Decompression Throughput with Gzip**:
+- **Slow Decompression Throughput with Gzip**  
    All files currently use single-threaded `compress/gzip`. Decompressing large manifest archives during disaster recovery can become a bottleneck, increasing Recovery Time Objective (RTO).
 
-- **Lack of Key Management**:
+- **Lack of Key Management**  
    The backup repository already uses client-side encryption with a password stored in `velero-repo-credentials`. However, the password is not configurable after the backup repository is created. And it also lacks of an end to end key management to cover the whole lifecycle of a password.
 
 
 ## Goals
 
-- **Deliver Backup Storage Format 2.0**:
+- **Deliver Backup Storage Format 2.0**  
    Establish a modernized, secure, and authenticated storage layout for Velero backups.
 
-- **End-to-End Client-Side Authenticated Encryption**:
+- **End-to-End Client-Side Authenticated Encryption**  
    Encrypt all internal resource backup data before uploading to the backup storage, using AEAD with Additional Authenticated Data (AAD) to prevent exfiltration, tampering, file swapping, and truncation attacks.
 
-- **Unified Encryption Password for Resources and Volumes**:
+- **Unified Encryption Password for Resources and Volumes**  
    Share the encryption password between the resource backup engine and the volume backup engine (backup repository) under a single secret configuration and key management.
 
-- **Vault-Ready Secret Architecture with Dynamic Lifecycle**:
+- **Vault-Ready Secret Architecture with Dynamic Lifecycle**  
    Allow the encryption password to be configured during BSL creation or modified/rotated afterwards via a Kubernetes Secret in the Velero namespace. Ensure compatibility with External Secrets Operator (ESO).
 
-- **Auxiliary Data Classification and Optional Encryption**:
+- **Auxiliary Data Classification and Optional Encryption**  
    Establish a formal classification and separation for Auxiliary Data distinct from unconditionally encrypted Core Data. Support optional, user-configurable encryption for sensitive auxiliary files. Strictly enforced as write-only for Velero core workflow to safely fulfill third-party observability without workflow tampering risks.
 
-- **Modernize Compression with Zstandard (`zstd`)**:
+- **Modernize Compression with Zstandard (`zstd`)**  
    Adopt Zstandard compression across all compressed artifacts for 3x–5x faster decompression during disaster recovery restores.
 
-- **Dual-Suite Persistence Architecture**:
+- **Dual-Suite Persistence Architecture**  
    Implement Backup Storage Format 2.0 cleanly as a separate implementation alongside the frozen legacy store behind the existing `BackupStore` interface, avoiding invasive changes across controllers and making future legacy deprecation trivial.
 
-- **Backward Compatibility**:
+- **Backward Compatibility**  
    Ensure Velero can switch between new and legacy Backup Storage Format implementations so as to seamlessly restore legacy Format backups.
 
 
 ## Non-Goals
 
-- **Backup Storage Format 2.0 implementation supports legacy backup format**:
+- **Backup Storage Format 2.0 implementation supports legacy backup format**  
   Backup Storage Format 2.0 is aimed to replace legacy format gradually, so there is no plan to support legacy format (Format 1.x) in Backup Storage Format 2.0 implementation.
 
-- **File Regulation or Modernization**
+- **File Regulation or Modernization**  
   All existing files are kept as is in the backup storage. Files may be consolidated to remove redundancy or file names may be better regulated, this could be done with a future design.
 
-- **Extend Unified Repo interface for data integrity check**
+- **Extend Unified Repo interface for data integrity check**  
   Velero expects backup repository providers to use AEAD encryption to guarantee the data integrity, so there is no plan to extend Unified Repo interface to support extra data integrity check workflows.
 
-- **WORM Support**
+- **WORM Support**  
   Velero at present doesn't support WORM (Write Only Read Many) backup storage, this design has no goal to fix this gap.
 
-- **File Deletion Detection**
+- **File Deletion Detection**  
   Files may be deleted from the backup storage by accident or attack, missing files may cause Velero behaves erroneously. This design won't aim to solve this file omission problem considering the architecture flexibility, object storage characteristic. If it becomes a concern, a separate design is required to solve it.  
   
 
@@ -166,7 +166,9 @@ The same format version also exists in BSL spec, so the value in BSL must match 
 ### Unified Encryption Password
 
 In the normal workflow, a single password configured in a Kubernetes Secret is provided by users. Velero use this password for all data encryption, i.e., resource data, metadata, volume data.  
+
 Velero never transfer or copy the Kubernetes Secret to other persistent location.  
+
 A Key Encryption Key (KEK) is derived from the user password. The KEK then encrypts a per-BSL Master Key (BMK). From this Master Key, Velero deterministically derives:
 - **Resource Data Encryption Key (`DEK_resource`)**: A 256-bit Data Encryption Key derived per BSL via HKDF with domain separation to encrypt Kubernetes resource backup data and Velero metadata files with AES-256-GCM.
 - **Backup Repository Passwords (`DEK_repo`)**: Backup repository passwords derived per backup repository via HKDF with strict domain separation. The password is provided to the backup repository through the existing workflow of Unified Repo. How the password is used is decided by the specific backup repository.  
@@ -286,7 +288,9 @@ To use Teir-2 and Teir-3 redundency, BSL is either avialable or restored from Ve
 The Recover Root Storage Descriptor in the backup storage is always the source of truth, so Velero won't sync it back to the backup storage automatically.  
 
 ### Modernize Compression
+
 gzip is not performing well in compression ratio for Velero resource backup tarballs, the sliding window size is only 32KB, so Kubernetes resources which are tipically several or dozens of KB in size and there are duplicated data among resources, the compression ratio is poor.  
+
 For Format 2.0, Zstd is used for compression. Zstd is a modern compression method with much larger sliding window size, so brings much better compression/decompression throughput, compression ratio, and is also optimized for modern CPU and Kubernetes environments. Below is a detailed compression between gzip and Zstd:  
 
 | Feature / Dimension | gzip | Zstandard |
@@ -481,6 +485,7 @@ BSL is synced and verified against the existing backup storage in below cases:
 3. A periodical sync time reaches 
 
 In normal cases, the BSL is either set as `Unavailable` so a sync starts immediately or the RSD in the BSL is still useable so an immediate sync is not required.  
+
 The periodical sync is used to take case of below cases:
 - Immediate sync is not required as the RSD is still usable but in long term, make it synced with the backup storage
 - Fix the BSL for any abnormal cases (e.g., unexpected update of BSL) that RSD in BSL is not working but BSL keeps in `Available` state
@@ -824,7 +829,7 @@ For symentric consideration, another CLI `velero repo disconnect` is provided to
 
 ### Auxiliary Data Isolation
 
-Rule: Auxiliary Data must be write-only to Velero core workflow.  
+**Rule: Auxiliary Data must be write-only to Velero core workflow.**  
 This rule should be strictly followed Format V2 and it is also helpful for Format V1.x. Therefore, below code needs to be refactored to keep this rule:  
 - In restore-finalizer, it visits the restore resource-list to identify the restored PVC, while resource-list is a Auxiliary Data. This is actually a fault of the existing code, it is more reasonable to visit volume-info instead of resource-list to fulfill this purpose.
 
@@ -928,7 +933,6 @@ The fields in these structs are sanitized, so that no highly sensitive informati
 
 The fields still include `Warnings` and `Errors` which are regarded as sensitive information in some way, because they may expose in-cluster information, e.g., secret or configmap names. Including these fields are a trade-off for observability, most observability secnarios require to know the result of the backup/restore and `Warnings` and `Errors` are important parts of them which could help users to validate if the backup/restore is useful.  
 In future, if this is still concerned, a dedicated desensitization operation could be introduced to remove the sensitive data from `Warnings` and `Errors`.  
-
 
 The existing backup/restore describe CLI should be refactored to use the information from the public interface of backup storage only, if the data is there.   
 Additionally, below information should be removed from backup/restore describe since they are highly sensitive information and not helpful for observation or troubleshooting:
