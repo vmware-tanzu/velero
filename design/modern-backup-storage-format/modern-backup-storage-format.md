@@ -564,8 +564,7 @@ Before using the BSL clone RSD, verification should be done first, the verificat
 |  Get BSL from cluster                                                                  |
 |         │                                                                              |
 |         ▼ PASS                                                                         |
-|  [Check 2: Controller Validation State]                                                |
-|  Check BSL status as `available`                                                       |
+|  [Check 2: Check clone RSD availablility from BSL]                                     |
 |         │                                                                              |
 |         ▼ PASS                                                                         |
 |  [Check 3: Structural Completeness]                                                    |
