@@ -24,20 +24,22 @@ import (
 	"github.com/cockroachdb/errors"
 	cron "github.com/netresearch/go-cron"
 	"github.com/sirupsen/logrus"
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clocks "k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	bld "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/constant"
-	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	velerov1 "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/constant"
+	"github.com/velero-io/velero/pkg/metrics"
+	"github.com/velero-io/velero/pkg/util/kube"
 )
 
 const (
@@ -111,7 +113,11 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	original := schedule.DeepCopy()
 
 	if schedule.Spec.SkipImmediately == nil {
-		schedule.Spec.SkipImmediately = &c.skipImmediately
+		// Copy the value rather than aliasing &c.skipImmediately: c is a long-lived
+		// singleton reconciler, and the block below can write through this pointer,
+		// which would otherwise mutate the reconciler's shared default field.
+		skipImmediately := c.skipImmediately
+		schedule.Spec.SkipImmediately = &skipImmediately
 	}
 	if schedule.Spec.SkipImmediately != nil && *schedule.Spec.SkipImmediately {
 		*schedule.Spec.SkipImmediately = false
@@ -145,12 +151,12 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		errStringArr = append(errStringArr, fmt.Sprintf("phase to %s", schedule.Status.Phase))
 	}
 	// update spec.SkipImmediately if it's changed
-	if original.Spec.SkipImmediately != schedule.Spec.SkipImmediately {
+	if !ptr.Equal(original.Spec.SkipImmediately, schedule.Spec.SkipImmediately) {
 		scheduleNeedsPatch = true
 		errStringArr = append(errStringArr, fmt.Sprintf("spec.skipImmediately to %v", schedule.Spec.SkipImmediately))
 	}
 	// update status if it's changed
-	if original.Status.LastSkipped != schedule.Status.LastSkipped {
+	if !equality.Semantic.DeepEqual(original.Status.LastSkipped, schedule.Status.LastSkipped) {
 		scheduleNeedsPatch = true
 		errStringArr = append(errStringArr, fmt.Sprintf("last skipped to %v", schedule.Status.LastSkipped))
 	}

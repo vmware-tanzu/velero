@@ -30,8 +30,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/mocks"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
+	"github.com/velero-io/velero/pkg/repository/udmrepo/mocks"
 )
 
 func TestShimRepo(t *testing.T) {
@@ -81,7 +81,7 @@ func TestOpenObject(t *testing.T) {
 			name: "Success",
 			backupRepo: func() *mocks.BackupRepo {
 				backupRepo := &mocks.BackupRepo{}
-				backupRepo.On("OpenObject", mock.Anything, mock.Anything).Return(&shimObjectReader{}, nil)
+				backupRepo.On("OpenObject", mock.Anything, mock.Anything, mock.Anything).Return(&shimObjectReader{}, nil)
 				return backupRepo
 			}(),
 		},
@@ -89,7 +89,7 @@ func TestOpenObject(t *testing.T) {
 			name: "Open object error",
 			backupRepo: func() *mocks.BackupRepo {
 				backupRepo := &mocks.BackupRepo{}
-				backupRepo.On("OpenObject", mock.Anything, mock.Anything).Return(&shimObjectReader{}, errors.New("Error open object"))
+				backupRepo.On("OpenObject", mock.Anything, mock.Anything, mock.Anything).Return(&shimObjectReader{}, errors.New("Error open object"))
 				return backupRepo
 			}(),
 			isOpenObjectError: true,
@@ -98,7 +98,7 @@ func TestOpenObject(t *testing.T) {
 			name: "Get nil reader",
 			backupRepo: func() *mocks.BackupRepo {
 				backupRepo := &mocks.BackupRepo{}
-				backupRepo.On("OpenObject", mock.Anything, mock.Anything).Return(nil, nil)
+				backupRepo.On("OpenObject", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 				return backupRepo
 			}(),
 			isReaderNil: true,

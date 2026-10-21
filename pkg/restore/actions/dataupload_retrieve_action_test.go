@@ -27,12 +27,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/label"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerov1 "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerov2alpha1 "github.com/velero-io/velero/pkg/apis/velero/v2alpha1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/label"
+	"github.com/velero-io/velero/pkg/plugin/velero"
+	velerotest "github.com/velero-io/velero/pkg/test"
 )
 
 func TestDataUploadRetrieveActionExectue(t *testing.T) {
@@ -65,6 +65,29 @@ func TestDataUploadRetrieveActionExectue(t *testing.T) {
 				builder.ForBackup("velero", "testBackup").StorageLocation("testLocation").Result(),
 			},
 			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "testNamespace.testPVC", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"testLocation","snapshotID":"fake-id","sourceNamespace":"testNamespace","snapshotSize":1000}`).Result(),
+		},
+		{
+			name: "DataUploadRetrieve Action test with optional fields",
+			dataUpload: func() *velerov2alpha1.DataUpload {
+				du := builder.ForDataUpload("velero", "testDU").
+					SourceNamespace("testNamespace").
+					SourcePVC("testPVC").
+					SnapshotID("fake-id").
+					TotalBytes(1000).
+					DataMover("velero").
+					NodeOS("linux").
+					CSISnapshot(&velerov2alpha1.CSISnapshotSpec{SnapshotClass: "testClass"}).
+					Result()
+				du.Status.DataMoverResult = &map[string]string{"key": "value"}
+				du.Spec.SourceFSType = "ext4"
+				return du
+			}(),
+			restore:       builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("testingUID")).Backup("testBackup").Result(),
+			runtimeScheme: scheme,
+			veleroObjs: []runtime.Object{
+				builder.ForBackup("velero", "testBackup").StorageLocation("testLocation").Result(),
+			},
+			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "testNamespace.testPVC", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"testLocation","datamover":"velero","snapshotID":"fake-id","sourceNamespace":"testNamespace","dataMoverResult":{"key":"value"},"nodeOS":"linux","snapshotSize":1000,"fsType":"ext4","snapshotClass":"testClass"}`).Result(),
 		},
 		{
 			name:          "Long source namespace and PVC name should also work",

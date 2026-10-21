@@ -23,6 +23,9 @@ import (
 
 type Metadata struct {
 	Labels map[string]string `json:"labels,omitempty"`
+	// +optional
+	// +nullable
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // BackupSpec defines the specification for a Velero backup.
@@ -176,7 +179,7 @@ type BackupSpec struct {
 	SnapshotMoveData *bool `json:"snapshotMoveData,omitempty"`
 
 	// DataMover specifies the data mover to be used by the backup.
-	// If DataMover is "" or "velero", the built-in data mover will be used.
+	// If DataMover is "" or "velero", the default built-in data mover will be used.
 	// +optional
 	DataMover string `json:"datamover,omitempty"`
 
@@ -517,6 +520,11 @@ type HookStatus struct {
 // +kubebuilder:rbac:groups=velero.io,resources=backups,verbs=create;delete;get;list;patch;update;watch
 // +kubebuilder:rbac:groups=velero.io,resources=backups/status,verbs=get;update;patch
 // +kubebuilder:resource:shortName=bak
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Backup status such as New/InProgress"
+// +kubebuilder:printcolumn:name="Errors",type="integer",JSONPath=".status.errors",description="Total number of errors logged during the backup"
+// +kubebuilder:printcolumn:name="Warnings",type="integer",JSONPath=".status.warnings",description="Total number of warnings logged during the backup"
+// +kubebuilder:printcolumn:name="Started",type="date",JSONPath=".status.startTimestamp",description="The time the backup was started"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Backup is a Velero resource that represents the capture of Kubernetes
 // cluster state at a point in time (API objects and associated volume state).

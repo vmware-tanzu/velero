@@ -25,17 +25,19 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/tools/cache"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
-	"github.com/vmware-tanzu/velero/pkg/util/collections"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/cmd"
+	"github.com/velero-io/velero/pkg/cmd/cli"
+	"github.com/velero-io/velero/pkg/cmd/util/flag"
+	"github.com/velero-io/velero/pkg/cmd/util/output"
+	"github.com/velero-io/velero/pkg/util/collections"
+	"github.com/velero-io/velero/pkg/util/kube"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -44,7 +46,21 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   use + " NAME",
 		Short: "Create a backup",
-		Args:  cobra.MaximumNArgs(1),
+		Args: func(c *cobra.Command, args []string) error {
+			if err := cobra.MaximumNArgs(1)(c, args); err != nil {
+				return err
+			}
+			fromSchedule, _ := c.Flags().GetString("from-schedule")
+			if fromSchedule == "" && len(args) == 0 {
+				return fmt.Errorf("a backup name is required, unless you are creating based on a schedule")
+			}
+			if len(args) == 1 {
+				if errs := validation.IsDNS1123Subdomain(args[0]); len(errs) > 0 {
+					return fmt.Errorf("invalid backup name %q: %s", args[0], strings.Join(errs, "; "))
+				}
+			}
+			return nil
+		},
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args, f))
 			cmd.CheckError(o.Validate(c, args, f))
@@ -74,6 +90,10 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	o.BindFromSchedule(c.Flags())
 	output.BindFlags(c.Flags())
 	output.ClearOutputFlagDefault(c)
+
+	_ = c.RegisterFlagCompletionFunc("from-schedule", cli.CompleteScheduleNames(f))
+	_ = c.RegisterFlagCompletionFunc("storage-location", cli.CompleteBackupStorageLocationNames(f))
+	_ = c.RegisterFlagCompletionFunc("volume-snapshot-locations", cli.CompleteVolumeSnapshotLocationNames(f))
 
 	return c
 }
@@ -186,11 +206,27 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return err
 	}
 
-	// Ensure that unless FromSchedule is set, args contains a backup name
-	if o.FromSchedule == "" && len(args) != 1 {
+	// Ensure that unless FromSchedule is set, a backup name is required
+	if o.FromSchedule == "" && o.Name == "" {
 		return fmt.Errorf("a backup name is required, unless you are creating based on a schedule")
 	}
-
+	// Validate the backup name format whenever a name is provided
+	if o.Name != "" {
+		if errs := validation.IsDNS1123Subdomain(o.Name); len(errs) > 0 {
+			return fmt.Errorf("invalid backup name %q: %s", o.Name, strings.Join(errs, "; "))
+		}
+	}
+	// When a backup name will be generated from the schedule (i.e. FromSchedule
+	// is set and no explicit name was given), ensure the schedule name leaves
+	// enough room for the generated timestamp suffix ("-" + 14-digit timestamp,
+	// 15 characters total) within the DNS1123 subdomain length limit.
+	if o.FromSchedule != "" && o.Name == "" {
+		const timestampSuffixLen = 15 // "-" + "20060102150405"
+		maxScheduleNameLen := validation.DNS1123SubdomainMaxLength - timestampSuffixLen
+		if len(o.FromSchedule) > maxScheduleNameLen {
+			return fmt.Errorf("schedule name %q is too long: must be %d characters or fewer to leave room for the generated timestamp suffix", o.FromSchedule, maxScheduleNameLen)
+		}
+	}
 	errs := collections.ValidateNamespaceIncludesExcludes(o.IncludeNamespaces, o.ExcludeNamespaces)
 	if len(errs) > 0 {
 		return kubeerrs.NewAggregate(errs)
@@ -237,11 +273,17 @@ func (o *CreateOptions) validateFromScheduleFlag(c *cobra.Command) error {
 	return nil
 }
 
+// validateBackupType check the backupType value and return the valid value.
 func (o *CreateOptions) validateBackupType() error {
-	backupType := strings.TrimSpace(o.BackupType)
+	// Allow full, and incremental from the CLI, and ignore case of the input string's case.
+	backupType := strings.ToLower(strings.TrimSpace(o.BackupType))
 
 	switch backupType {
-	case "", "Incremental", "Full":
+	case "":
+	case "incremental":
+		o.BackupType = string(velerov1api.BackupTypeIncremental)
+	case "full":
+		o.BackupType = string(velerov1api.BackupTypeFull)
 	default:
 		return fmt.Errorf("invalid backup type %s - valid values are 'Incremental', and 'Full'", backupType)
 	}
@@ -374,8 +416,19 @@ func ParseOrderedResources(orderMapStr string) (map[string]string, error) {
 			return nil, fmt.Errorf("invalid OrderedResources '%s'", entry)
 		}
 		kind := strings.TrimSpace(kv[0])
-		order := strings.TrimSpace(kv[1])
-		orderedResources[kind] = order
+		orderParts := strings.Split(kv[1], ",")
+		cleaned := make([]string, 0, len(orderParts))
+		for _, part := range orderParts {
+			name := strings.TrimSpace(part)
+			if name == "" {
+				continue
+			}
+			cleaned = append(cleaned, name)
+		}
+		if kind == "" || len(cleaned) == 0 {
+			return nil, fmt.Errorf("invalid OrderedResources '%s'", entry)
+		}
+		orderedResources[kind] = strings.Join(cleaned, ",")
 	}
 	return orderedResources, nil
 }

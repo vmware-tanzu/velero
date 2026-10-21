@@ -1,5 +1,9 @@
 name: Pull Request File Path Check
 on: [pull_request]
+
+permissions:
+  contents: read
+
 jobs:
 
   filepath-check:
@@ -9,7 +13,7 @@ jobs:
     steps:
 
     - name: Check out the code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Validate file paths for Go module compatibility
       run: |

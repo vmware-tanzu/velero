@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
-	"github.com/vmware-tanzu/velero/pkg/util/encode"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/cmd/util/flag"
+	"github.com/velero-io/velero/pkg/util/encode"
 )
 
 const (
@@ -247,4 +247,18 @@ func NewPrinter(cmd *cobra.Command) (printers.ResourcePrinter, error) {
 	printer := printers.NewTablePrinter(options)
 
 	return printer, nil
+}
+
+// formatTimestamp renders an optional timestamp for a table cell.
+//
+// Appending a nil *metav1.Time to a row prints "<nil>", which reaches the user
+// for any object that has not reached the phase that sets the field: a backup
+// that failed validation never gets a start time, and a restore that failed
+// validation gets neither a start nor a completion time. An unset timestamp
+// shows as "n/a" instead, matching humanReadableTimeFromNow in the same row.
+func formatTimestamp(t *metav1.Time) string {
+	if t == nil || t.IsZero() {
+		return "n/a"
+	}
+	return t.String()
 }

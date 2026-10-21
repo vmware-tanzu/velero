@@ -35,9 +35,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/cmd"
+	"github.com/velero-io/velero/pkg/cmd/cli"
 )
 
 //go:embed cshd-scripts/velero.cshd
@@ -171,6 +172,10 @@ specs of resources created by velero server, and optionally the logs of backup a
 		},
 	}
 	o.bindFlags(c.Flags())
+
+	_ = c.RegisterFlagCompletionFunc("backup", cli.CompleteBackupNames(f))
+	_ = c.RegisterFlagCompletionFunc("restore", cli.CompleteRestoreNames(f))
+
 	return c
 }
 

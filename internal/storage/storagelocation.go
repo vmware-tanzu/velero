@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
 )
 
 // DefaultBackupLocationInfo holds server default backup storage location information
@@ -96,7 +96,7 @@ func ListBackupStorageLocations(ctx context.Context, kbClient client.Client, nam
 func GetDefaultBackupStorageLocations(ctx context.Context, kbClient client.Client, namespace string) (*velerov1api.BackupStorageLocationList, error) {
 	locations := new(velerov1api.BackupStorageLocationList)
 	defaultLocations := new(velerov1api.BackupStorageLocationList)
-	if err := kbClient.List(context.Background(), locations, &client.ListOptions{Namespace: namespace}); err != nil {
+	if err := kbClient.List(ctx, locations, &client.ListOptions{Namespace: namespace}); err != nil {
 		return defaultLocations, errors.Wrapf(err, "failed to list backup storage locations in namespace %s", namespace)
 	}
 

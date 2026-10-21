@@ -22,17 +22,18 @@ import (
 
 	"github.com/cockroachdb/errors"
 	"github.com/sirupsen/logrus"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/cbtservice"
-	"github.com/vmware-tanzu/velero/pkg/repository"
-	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
-	repoProvider "github.com/vmware-tanzu/velero/pkg/repository/provider"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/velero-io/velero/internal/credentials"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/cbtservice"
+	"github.com/velero-io/velero/pkg/repository"
+	repokey "github.com/velero-io/velero/pkg/repository/keys"
+	repoProvider "github.com/velero-io/velero/pkg/repository/provider"
+	"github.com/velero-io/velero/pkg/uploader"
+	"github.com/velero-io/velero/pkg/uploader/provider"
+	"github.com/velero-io/velero/pkg/util/filesystem"
 )
 
 // InitParam define the input param for data path init
@@ -57,6 +58,16 @@ type BackupStartParam struct {
 	VolumeID       string
 	ChangeID       string
 	SnapshotID     string
+	CBTService     cbtservice.Service
+}
+
+// RestoreStartParam define the input param for restore start
+type RestoreStartParam struct {
+	Incremental             bool
+	VolumeSnapshotNamespace string
+	VolumeSnapshotName      string
+	VolumeID                string
+	CBTService              cbtservice.Service
 }
 
 type generalDataPath struct {
@@ -186,7 +197,7 @@ func (dp *generalDataPath) StartBackup(source AccessPoint, uploaderConfig map[st
 			dp.wgDataPath.Done()
 		}()
 
-		snapshotID, emptySnapshot, totalBytes, incrementalBytes, err := dp.uploaderProv.RunBackup(
+		snapshotID, emptySnapshot, totalBytes, incrementalBytes, sourceSize, fallback, err := dp.uploaderProv.RunBackup(
 			dp.ctx,
 			source.ByPath,
 			backupParam.RealSource,
@@ -199,6 +210,7 @@ func (dp *generalDataPath) StartBackup(source AccessPoint, uploaderConfig map[st
 					VolumeID: backupParam.VolumeID,
 					ChangeID: backupParam.ChangeID,
 				},
+				Service: backupParam.CBTService,
 			},
 			source.VolMode,
 			uploaderConfig,
@@ -214,19 +226,29 @@ func (dp *generalDataPath) StartBackup(source AccessPoint, uploaderConfig map[st
 			}
 			dp.callbacks.OnFailed(context.Background(), dp.namespace, dp.jobName, dataPathErr)
 		} else {
-			dp.callbacks.OnCompleted(context.Background(), dp.namespace, dp.jobName, Result{Backup: BackupResult{snapshotID, emptySnapshot, source, totalBytes, incrementalBytes}})
+			dp.callbacks.OnCompleted(context.Background(), dp.namespace, dp.jobName, Result{Backup: BackupResult{
+				SnapshotID:       snapshotID,
+				EmptySnapshot:    emptySnapshot,
+				Source:           source,
+				TotalBytes:       totalBytes,
+				IncrementalBytes: ptr.To(incrementalBytes),
+				SourceSize:       sourceSize,
+				FallbackFull:     fallback,
+			}})
 		}
 	}()
 
 	return nil
 }
 
-func (dp *generalDataPath) StartRestore(snapshotID string, target AccessPoint, uploaderConfigs map[string]string) error {
+func (dp *generalDataPath) StartRestore(snapshotID string, target AccessPoint, uploaderConfigs map[string]string, param any) error {
 	if !dp.initialized {
 		return errors.New("data path is not initialized")
 	}
 
 	dp.wgDataPath.Add(1)
+
+	restoreParam := param.(*RestoreStartParam)
 
 	go func() {
 		dp.log.Info("Start data path restore")
@@ -236,7 +258,14 @@ func (dp *generalDataPath) StartRestore(snapshotID string, target AccessPoint, u
 			dp.wgDataPath.Done()
 		}()
 
-		totalBytes, err := dp.uploaderProv.RunRestore(dp.ctx, snapshotID, target.ByPath, target.VolMode, uploaderConfigs, dp)
+		incrementalBytes, totalBytes, fallback, err := dp.uploaderProv.RunRestore(dp.ctx, snapshotID, target.ByPath, restoreParam.Incremental,
+			provider.CBTParam{
+				Source: cbtservice.SourceInfo{
+					Snapshot: restoreParam.VolumeSnapshotName,
+					VolumeID: restoreParam.VolumeID,
+				},
+				Service: restoreParam.CBTService,
+			}, target.VolMode, uploaderConfigs, dp)
 
 		if err == provider.ErrorCanceled {
 			dp.callbacks.OnCancelled(context.Background(), dp.namespace, dp.jobName)
@@ -247,7 +276,11 @@ func (dp *generalDataPath) StartRestore(snapshotID string, target AccessPoint, u
 			}
 			dp.callbacks.OnFailed(context.Background(), dp.namespace, dp.jobName, dataPathErr)
 		} else {
-			dp.callbacks.OnCompleted(context.Background(), dp.namespace, dp.jobName, Result{Restore: RestoreResult{Target: target, TotalBytes: totalBytes}})
+			dp.callbacks.OnCompleted(context.Background(), dp.namespace, dp.jobName, Result{Restore: RestoreResult{Target: target,
+				TotalBytes:       totalBytes,
+				IncrementalBytes: incrementalBytes,
+				FallbackFull:     fallback,
+			}})
 		}
 	}()
 
@@ -257,7 +290,11 @@ func (dp *generalDataPath) StartRestore(snapshotID string, target AccessPoint, u
 // UpdateProgress which implement ProgressUpdater interface to update progress status
 func (dp *generalDataPath) UpdateProgress(p *uploader.Progress) {
 	if dp.callbacks.OnProgress != nil {
-		dp.callbacks.OnProgress(context.Background(), dp.namespace, dp.jobName, &uploader.Progress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone})
+		dp.callbacks.OnProgress(context.Background(), dp.namespace, dp.jobName, &uploader.Progress{
+			TotalBytes: p.TotalBytes,
+			BytesDone:  p.BytesDone,
+			Message:    p.Message,
+		})
 	}
 }
 

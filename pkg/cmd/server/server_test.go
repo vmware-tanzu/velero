@@ -33,17 +33,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	"github.com/vmware-tanzu/velero/pkg/client/mocks"
-	"github.com/vmware-tanzu/velero/pkg/cmd/server/config"
-	"github.com/vmware-tanzu/velero/pkg/constant"
-	discovery_mocks "github.com/vmware-tanzu/velero/pkg/discovery/mocks"
-	"github.com/vmware-tanzu/velero/pkg/metrics"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/velero-io/velero/pkg/apis/velero/v2alpha1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/buildinfo"
+	"github.com/velero-io/velero/pkg/client/mocks"
+	"github.com/velero-io/velero/pkg/cmd/server/config"
+	"github.com/velero-io/velero/pkg/constant"
+	discovery_mocks "github.com/velero-io/velero/pkg/discovery/mocks"
+	"github.com/velero-io/velero/pkg/metrics"
+	velerotest "github.com/velero-io/velero/pkg/test"
+	"github.com/velero-io/velero/pkg/uploader"
 )
 
 func TestVeleroResourcesExist(t *testing.T) {

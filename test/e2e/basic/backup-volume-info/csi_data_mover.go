@@ -21,9 +21,9 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
-	. "github.com/vmware-tanzu/velero/test/util/providers"
-	. "github.com/vmware-tanzu/velero/test/util/velero"
+	. "github.com/velero-io/velero/test/e2e/test"
+	. "github.com/velero-io/velero/test/util/providers"
+	. "github.com/velero-io/velero/test/util/velero"
 )
 
 var CSIDataMoverVolumeInfoTest func() = TestFunc(&CSIDataMoverVolumeInfo{
@@ -55,7 +55,7 @@ func (c *CSIDataMoverVolumeInfo) Verify() error {
 		BackupObjectsPrefix+"/"+c.BackupName,
 	)
 
-	Expect(err).ShouldNot(HaveOccurred(), "Fail to get VolumeInfo metadata in the Backup Repository.")
+	Expect(err).ToNot(HaveOccurred(), "Fail to get VolumeInfo metadata in the Backup Repository.")
 
 	fmt.Printf("The VolumeInfo metadata content: %+v\n", *volumeInfo[0])
 	Expect(volumeInfo).ToNot(BeEmpty())

@@ -22,13 +22,13 @@ import (
 	"github.com/gobwas/glob"
 	"k8s.io/apimachinery/pkg/labels"
 
-	"github.com/vmware-tanzu/velero/internal/hook"
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	"github.com/vmware-tanzu/velero/internal/volume"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/itemoperation"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	"github.com/velero-io/velero/internal/hook"
+	"github.com/velero-io/velero/internal/resourcepolicies"
+	"github.com/velero-io/velero/internal/volume"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/itemoperation"
+	"github.com/velero-io/velero/pkg/plugin/framework"
+	"github.com/velero-io/velero/pkg/util/collections"
 )
 
 type itemKey struct {
@@ -83,11 +83,16 @@ type Request struct {
 	VolumeSnapshots           SynchronizedVSList
 	PodVolumeBackups          []*velerov1api.PodVolumeBackup
 	BackedUpItems             *backedUpItemsMap
-	itemOperationsList        *[]*itemoperation.BackupOperation
-	ResPolicies               *resourcepolicies.Policies
-	SkippedPVTracker          *skipPVTracker
-	VolumesInformation        volume.BackupVolumesInformation
-	WorkerPool                *ItemBlockWorkerPool
+	// MustIncludeAdditionalItemPVCs keeps track of PVCs that are returned as additionalItems
+	// by a BackupItemAction plugin with the must-include annotation. This is specifically
+	// used to ensure PodVolumeBackups (FSB) are created for these PVCs even when PVCs are
+	// excluded by global or fine-grained backup resource filters.
+	MustIncludeAdditionalItemPVCs *backedUpItemsMap
+	itemOperationsList            *[]*itemoperation.BackupOperation
+	ResPolicies                   *resourcepolicies.Policies
+	SkippedVolumeTracker          *skipVolumeTracker
+	VolumesInformation            volume.BackupVolumesInformation
+	WorkerPool                    *ItemBlockWorkerPool
 
 	// ClusterScopedFilterMap holds resolved global filters for cluster-scoped resources.
 	// Key is the resolved group-resource string.
@@ -134,13 +139,18 @@ func (r *Request) BackupResourceList() map[string][]string {
 }
 
 func (r *Request) FillVolumesInformation() {
-	skippedPVMap := make(map[string]string)
+	var skippedVolumes []volume.SkippedVolume
 
-	for _, skippedPV := range r.SkippedPVTracker.Summary() {
-		skippedPVMap[skippedPV.Name] = skippedPV.SerializeSkipReasons()
+	for _, skippedVolume := range r.SkippedVolumeTracker.Summary() {
+		skippedVolumes = append(skippedVolumes, volume.SkippedVolume{
+			PVName:       skippedVolume.PVName,
+			PVCName:      skippedVolume.PVCName,
+			PVCNamespace: skippedVolume.PVCNamespace,
+			Reasons:      skippedVolume.SerializeSkipReasons(),
+		})
 	}
 
-	r.VolumesInformation.SkippedPVs = skippedPVMap
+	r.VolumesInformation.SkippedVolumes = skippedVolumes
 	r.VolumesInformation.NativeSnapshots = r.VolumeSnapshots.Get()
 	r.VolumesInformation.PodVolumeBackups = r.PodVolumeBackups
 	r.VolumesInformation.BackupOperations = *r.GetItemOperationsList()

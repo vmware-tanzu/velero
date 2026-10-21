@@ -24,10 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
+	api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/cmd"
+	"github.com/velero-io/velero/pkg/cmd/cli"
+	"github.com/velero-io/velero/pkg/cmd/util/output"
 )
 
 func NewGetCommand(f client.Factory, use string) *cobra.Command {
@@ -57,7 +58,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 					selector, err = labels.Parse(listOptions.LabelSelector)
 					cmd.CheckError(err)
 				}
-				err = crClient.List(context.TODO(), repos, &ctrlclient.ListOptions{LabelSelector: selector})
+				err = crClient.List(context.TODO(), repos, &ctrlclient.ListOptions{LabelSelector: selector, Namespace: f.Namespace()})
 				cmd.CheckError(err)
 			}
 
@@ -66,6 +67,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 		},
 	}
 
+	c.ValidArgsFunction = cli.CompleteBackupRepositoryNames(f)
 	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "Only show items matching this label selector.")
 
 	output.BindFlags(c.Flags())

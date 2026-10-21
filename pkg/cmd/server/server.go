@@ -29,7 +29,7 @@ import (
 
 	logrusr "github.com/bombsimon/logrusr/v3"
 	"github.com/cockroachdb/errors"
-	volumegroupsnapshotv1beta2 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumegroupsnapshot/v1beta2"
+	volumegroupsnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumegroupsnapshot/v1"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -56,39 +56,40 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
-	"github.com/vmware-tanzu/velero/internal/hook"
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	"github.com/vmware-tanzu/velero/internal/storage"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
-	"github.com/vmware-tanzu/velero/pkg/backup"
-	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/server/config"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
-	"github.com/vmware-tanzu/velero/pkg/constant"
-	"github.com/vmware-tanzu/velero/pkg/controller"
-	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
-	"github.com/vmware-tanzu/velero/pkg/features"
-	"github.com/vmware-tanzu/velero/pkg/itemoperationmap"
-	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/nodeagent"
-	"github.com/vmware-tanzu/velero/pkg/persistence"
-	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
-	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"github.com/vmware-tanzu/velero/pkg/podvolume"
-	"github.com/vmware-tanzu/velero/pkg/repository"
-	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
-	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
-	"github.com/vmware-tanzu/velero/pkg/restore"
-	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	"github.com/velero-io/velero/internal/credentials"
+	"github.com/velero-io/velero/internal/hook"
+	"github.com/velero-io/velero/internal/resourcepolicies"
+	"github.com/velero-io/velero/internal/storage"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/velero-io/velero/pkg/apis/velero/v2alpha1"
+	"github.com/velero-io/velero/pkg/archive"
+	"github.com/velero-io/velero/pkg/backup"
+	"github.com/velero-io/velero/pkg/buildinfo"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/cmd"
+	"github.com/velero-io/velero/pkg/cmd/server/config"
+	"github.com/velero-io/velero/pkg/cmd/util/signals"
+	"github.com/velero-io/velero/pkg/constant"
+	"github.com/velero-io/velero/pkg/controller"
+	velerodiscovery "github.com/velero-io/velero/pkg/discovery"
+	"github.com/velero-io/velero/pkg/features"
+	"github.com/velero-io/velero/pkg/itemoperationmap"
+	"github.com/velero-io/velero/pkg/metrics"
+	"github.com/velero-io/velero/pkg/nodeagent"
+	"github.com/velero-io/velero/pkg/persistence"
+	"github.com/velero-io/velero/pkg/plugin/clientmgmt"
+	"github.com/velero-io/velero/pkg/plugin/clientmgmt/process"
+	"github.com/velero-io/velero/pkg/podexec"
+	"github.com/velero-io/velero/pkg/podvolume"
+	"github.com/velero-io/velero/pkg/repository"
+	repokey "github.com/velero-io/velero/pkg/repository/keys"
+	repomanager "github.com/velero-io/velero/pkg/repository/manager"
+	"github.com/velero-io/velero/pkg/restore"
+	velerotypes "github.com/velero-io/velero/pkg/types"
+	"github.com/velero-io/velero/pkg/uploader"
+	"github.com/velero-io/velero/pkg/util/filesystem"
+	"github.com/velero-io/velero/pkg/util/kube"
+	"github.com/velero-io/velero/pkg/util/logging"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -249,7 +250,7 @@ func newServer(f client.Factory, config *config.Config, logger *logrus.Logger) (
 		cancelFunc()
 		return nil, err
 	}
-	if err := volumegroupsnapshotv1beta2.AddToScheme(scheme); err != nil {
+	if err := volumegroupsnapshotv1.AddToScheme(scheme); err != nil {
 		cancelFunc()
 		return nil, err
 	}
@@ -669,7 +670,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.DefaultVolumesToFsBackup,
 			s.config.DefaultBackupTTL,
 			s.config.DefaultVGSLabelKey,
-			s.config.DefaultCSISnapshotTimeout,
+			s.config.DefaultBackupCSISnapshotTimeout,
 			s.config.ResourceTimeout,
 			s.config.DefaultItemOperationTimeout,
 			defaultVolumeSnapshotLocations,
@@ -879,10 +880,12 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupStoreGetter,
 			s.metrics,
 			s.config.LogFormat.Parse(),
+			s.config.DefaultRestoreCSISnapshotTimeout,
 			s.config.DefaultItemOperationTimeout,
 			s.config.DisableInformerCache,
 			s.crClient,
 			s.config.ResourceTimeout,
+			s.config.DefaultResourceModifierConfigMap,
 		)
 
 		if err = r.SetupWithManager(s.mgr); err != nil {
@@ -934,6 +937,11 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupQueue)
 		}
+	}
+
+	if s.config.MaxBackupExtractionSize > 0 {
+		s.logger.Infof("Setting backup data extraction cap as %v MB", s.config.MaxBackupExtractionSize)
+		archive.SetMaxExtractionSize(int64(s.config.MaxBackupExtractionSize) * 1024 * 1024)
 	}
 
 	s.logger.Info("Server starting...")

@@ -31,13 +31,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
-	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/constant"
-	"github.com/vmware-tanzu/velero/pkg/label"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	pkgbackup "github.com/velero-io/velero/pkg/backup"
+	veleroclient "github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/constant"
+	"github.com/velero-io/velero/pkg/label"
+	"github.com/velero-io/velero/pkg/util/kube"
+	veleroutil "github.com/velero-io/velero/pkg/util/velero"
 )
 
 const (
@@ -156,6 +156,10 @@ func (c *gcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 
 	if !veleroutil.BSLIsAvailable(*loc) {
 		log.Infof("BSL %s is unavailable, cannot gc backup", loc.Name)
+		backup.Labels[garbageCollectionFailure] = gcFailureBSLUnavailable
+		if err := c.Update(ctx, backup); err != nil {
+			log.WithError(err).Error("error updating backup labels")
+		}
 		return ctrl.Result{}, fmt.Errorf("bsl %s is unavailable, cannot gc backup", loc.Name)
 	}
 

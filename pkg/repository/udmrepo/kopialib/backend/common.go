@@ -18,7 +18,6 @@ package backend
 
 import (
 	"context"
-	"time"
 
 	"github.com/kopia/kopia/repo"
 	"github.com/kopia/kopia/repo/blob"
@@ -26,15 +25,15 @@ import (
 	"github.com/kopia/kopia/repo/content"
 	"github.com/kopia/kopia/repo/encryption"
 	"github.com/kopia/kopia/repo/format"
-	"github.com/kopia/kopia/repo/hashing"
 	"github.com/kopia/kopia/repo/splitter"
 
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
 )
 
 const (
-	DefaultCacheLimitMB    = 5000
-	maxCacheDurationSecond = 30
+	DefaultCacheLimitMB     = 5000
+	maxCacheDurationSecond  = 30
+	defaultHashingAlgorithm = "HMAC-SHA256-128"
 )
 
 func setupLimits(ctx context.Context, flags map[string]string) throttling.Limits {
@@ -51,7 +50,7 @@ func setupLimits(ctx context.Context, flags map[string]string) throttling.Limits
 func SetupNewRepositoryOptions(ctx context.Context, flags map[string]string) repo.NewRepositoryOptions {
 	return repo.NewRepositoryOptions{
 		BlockFormat: format.ContentFormat{
-			Hash:       optionalHaveStringWithDefault(udmrepo.StoreOptionGenHashAlgo, flags, hashing.DefaultAlgorithm),
+			Hash:       optionalHaveStringWithDefault(udmrepo.StoreOptionGenHashAlgo, flags, defaultHashingAlgorithm),
 			Encryption: optionalHaveStringWithDefault(udmrepo.StoreOptionGenEncryptAlgo, flags, encryption.DefaultAlgorithm),
 		},
 
@@ -82,7 +81,7 @@ func SetupConnectOptions(ctx context.Context, repoOptions udmrepo.RepoOptions) r
 			// hardLimit 100%
 			ContentCacheSizeLimitBytes:  dataCacheLimit << 10,
 			MetadataCacheSizeLimitBytes: metadataCacheLimit << 10,
-			MaxListCacheDuration:        content.DurationSeconds(time.Duration(maxCacheDurationSecond) * time.Second),
+			MaxListCacheDuration:        content.DurationSeconds(maxCacheDurationSecond),
 		},
 		ClientOptions: repo.ClientOptions{
 			Hostname:    optionalHaveString(udmrepo.GenOptionOwnerDomain, repoOptions.GeneralOptions),

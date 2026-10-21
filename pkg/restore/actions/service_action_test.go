@@ -27,10 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/plugin/velero"
+	velerotest "github.com/velero-io/velero/pkg/test"
 )
 
 func svcJSON(ports ...corev1api.ServicePort) string {
@@ -671,6 +671,44 @@ func TestServiceActionExecute(t *testing.T) {
 					HealthCheckNodePort:   0,
 					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeLocal,
 					Type:                  corev1api.ServiceTypeLoadBalancer,
+				},
+			},
+		},
+		{
+			name: "If a port name in last-applied-configuration is not a string, it should not crash.",
+			obj: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+					Annotations: map[string]string{
+						"kubectl.kubernetes.io/last-applied-configuration": `{"spec":{"ports":[{"nodePort":30001,"name":123}]}}`,
+					},
+				},
+				Spec: corev1api.ServiceSpec{
+					Type: corev1api.ServiceTypeNodePort,
+					Ports: []corev1api.ServicePort{
+						{
+							Name:     "http",
+							NodePort: 30001,
+						},
+					},
+				},
+			},
+			restore: builder.ForRestore(api.DefaultNamespace, "").PreserveNodePorts(false).Result(),
+			expectedRes: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+					Annotations: map[string]string{
+						"kubectl.kubernetes.io/last-applied-configuration": `{"spec":{"ports":[{"nodePort":30001,"name":123}]}}`,
+					},
+				},
+				Spec: corev1api.ServiceSpec{
+					Type: corev1api.ServiceTypeNodePort,
+					Ports: []corev1api.ServicePort{
+						{
+							Name:     "http",
+							NodePort: 0,
+						},
+					},
 				},
 			},
 		},

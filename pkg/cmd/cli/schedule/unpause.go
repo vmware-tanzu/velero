@@ -19,9 +19,9 @@ package schedule
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/cmd"
+	"github.com/velero-io/velero/pkg/cmd/cli"
 )
 
 // NewUnpauseCommand creates the command for unpause
@@ -49,6 +49,7 @@ func NewUnpauseCommand(f client.Factory, use string) *cobra.Command {
 		},
 	}
 
+	c.ValidArgsFunction = cli.CompleteScheduleNames(f)
 	o.BindFlags(c.Flags())
 	pauseOpts.BindFlags(c.Flags())
 

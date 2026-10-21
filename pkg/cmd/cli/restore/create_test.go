@@ -26,11 +26,11 @@ import (
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
-	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	factorymocks "github.com/velero-io/velero/pkg/client/mocks"
+	cmdtest "github.com/velero-io/velero/pkg/cmd/test"
+	velerotest "github.com/velero-io/velero/pkg/test"
 )
 
 func TestMostRecentBackup(t *testing.T) {
@@ -68,6 +68,8 @@ func TestCreateCommand(t *testing.T) {
 		includeNamespaces := "app1,app2"
 		excludeNamespaces := "pod1,pod2,pod3"
 		existingResourcePolicy := "none"
+		existingVolumeDataPolicy := "none"
+		allowExistingVolumeMismatch := "true"
 		includeResources := "sc,sts"
 		excludeResources := "job"
 		statusIncludeResources := "sc,sts"
@@ -80,6 +82,7 @@ func TestCreateCommand(t *testing.T) {
 		resourceModifierConfigMap := "modifier-cm"
 		ResourcePoliciesConfigMap := "policies-cm"
 		writeSparseFiles := "true"
+		deleteExtraFiles := "true"
 		parallel := 2
 		flags := new(pflag.FlagSet)
 		o := NewCreateOptions()
@@ -92,6 +95,8 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--labels", labels})
 		flags.Parse([]string{"--annotations", annotations})
 		flags.Parse([]string{"--existing-resource-policy", existingResourcePolicy})
+		flags.Parse([]string{"--existing-volume-data-policy", existingVolumeDataPolicy})
+		flags.Parse([]string{"--allow-existing-volume-mismatch", allowExistingVolumeMismatch})
 		flags.Parse([]string{"--include-namespaces", includeNamespaces})
 		flags.Parse([]string{"--exclude-namespaces", excludeNamespaces})
 		flags.Parse([]string{"--include-resources", includeResources})
@@ -105,7 +110,9 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--item-operation-timeout", itemOperationTimeout})
 		flags.Parse([]string{"--resource-modifier-configmap", resourceModifierConfigMap})
 		flags.Parse([]string{"--resource-policies-configmap", ResourcePoliciesConfigMap})
+		flags.Parse([]string{"--skip-default-resource-modifier"})
 		flags.Parse([]string{"--write-sparse-files", writeSparseFiles})
+		flags.Parse([]string{"--delete-extra-files", deleteExtraFiles})
 		flags.Parse([]string{"--parallel-files-download", "2"})
 		client := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
@@ -133,6 +140,8 @@ func TestCreateCommand(t *testing.T) {
 		require.Equal(t, includeNamespaces, o.IncludeNamespaces.String())
 		require.Equal(t, excludeNamespaces, o.ExcludeNamespaces.String())
 		require.Equal(t, existingResourcePolicy, o.ExistingResourcePolicy)
+		require.Equal(t, existingVolumeDataPolicy, o.ExistingVolumeDataPolicy)
+		require.Equal(t, allowExistingVolumeMismatch, o.AllowExistingVolumeMismatch.String())
 		require.Equal(t, includeResources, o.IncludeResources.String())
 		require.Equal(t, excludeResources, o.ExcludeResources.String())
 
@@ -145,8 +154,10 @@ func TestCreateCommand(t *testing.T) {
 		require.Equal(t, itemOperationTimeout, o.ItemOperationTimeout.String())
 		require.Equal(t, resourceModifierConfigMap, o.ResourceModifierConfigMap)
 		require.Equal(t, ResourcePoliciesConfigMap, o.ResourcePoliciesConfigMap)
+		require.True(t, o.SkipDefaultResourceModifier)
 		require.Equal(t, writeSparseFiles, o.WriteSparseFiles.String())
 		require.Equal(t, parallel, o.ParallelFilesDownload)
+		require.Equal(t, deleteExtraFiles, o.DeleteExtraFiles.String())
 	})
 
 	t.Run("create a restore from schedule", func(t *testing.T) {

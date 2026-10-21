@@ -17,6 +17,7 @@ package resourcepolicies
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -25,11 +26,14 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/scheme"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerotest "github.com/velero-io/velero/pkg/test"
+	"github.com/velero-io/velero/pkg/util/datamover"
 )
 
 func pvcVolumeMode(mode corev1api.PersistentVolumeMode) *corev1api.PersistentVolumeMode {
@@ -720,7 +724,7 @@ volumePolicies:
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			resPolicies, err := GetResourcePoliciesFromBackup(tc.backup, client, logger)
+			resPolicies, err := getResourcePoliciesFromBackup(tc.backup, client, logger)
 			if tc.expectedErr == "" {
 				require.NoError(t, err)
 				if tc.backup.Spec.ResourcePolicy != nil && tc.backup.Spec.ResourcePolicy.Kind == ConfigmapRefType {
@@ -2027,7 +2031,8 @@ namespacedFilterPolicies:
   resourceFilters:
   - kinds: ["Pod", "ConfigMap"]
     labelSelector:
-      app: web
+      matchLabels:
+        app: web
     names: ["app-*"]
   - kinds: ["Secret"]
     excludedNames: ["temp-*"]`,
@@ -2041,8 +2046,10 @@ namespacedFilterPolicies:
   resourceFilters:
   - kinds: ["Pod"]
     orLabelSelectors:
-    - env: prod
-    - env: staging`,
+    - matchLabels:
+        env: prod
+    - matchLabels:
+        env: staging`,
 			wantErr: false,
 		},
 		{
@@ -2084,7 +2091,8 @@ namespacedFilterPolicies:
   resourceFilters:
   - kinds: ["*"]
     labelSelector:
-      app: web`,
+      matchLabels:
+        app: web`,
 			wantErr: false,
 		},
 		{
@@ -2095,10 +2103,12 @@ namespacedFilterPolicies:
   resourceFilters:
   - kinds: ["*"]
     labelSelector:
-      app: web
+      matchLabels:
+        app: web
   - kinds: ["*"]
     labelSelector:
-      app: db`,
+      matchLabels:
+        app: db`,
 			wantErr: true,
 			errMsg:  "only one catch-all resource filter is allowed",
 		},
@@ -2110,10 +2120,12 @@ namespacedFilterPolicies:
   resourceFilters:
   - kinds: []
     labelSelector:
-      app: web
+      matchLabels:
+        app: web
   - kinds: ["*"]
     labelSelector:
-      app: db`,
+      matchLabels:
+        app: db`,
 			wantErr: true,
 			errMsg:  "only one catch-all resource filter is allowed",
 		},
@@ -2125,10 +2137,12 @@ namespacedFilterPolicies:
   resourceFilters:
   - kinds: []
     labelSelector:
-      app: web
+      matchLabels:
+        app: web
   - kinds: []
     labelSelector:
-      app: db`,
+      matchLabels:
+        app: db`,
 			wantErr: true,
 			errMsg:  "only one catch-all resource filter is allowed",
 		},
@@ -2141,7 +2155,8 @@ namespacedFilterPolicies:
   - kinds: []
     names: ["app-*"]
     labelSelector:
-      app: web`,
+      matchLabels:
+        app: web`,
 			wantErr: true,
 			errMsg:  "names or excludedNames cannot be specified for catch-all filters",
 		},
@@ -2154,7 +2169,8 @@ namespacedFilterPolicies:
   - kinds: []
     excludedNames: ["app-*"]
     labelSelector:
-      app: web`,
+      matchLabels:
+        app: web`,
 			wantErr: true,
 			errMsg:  "names or excludedNames cannot be specified for catch-all filters",
 		},
@@ -2186,9 +2202,11 @@ namespacedFilterPolicies:
   resourceFilters:
   - kinds: ["Pod"]
     labelSelector:
-      app: web
+      matchLabels:
+        app: web
     orLabelSelectors:
-    - env: prod`,
+    - matchLabels:
+        env: prod`,
 			wantErr: true,
 			errMsg:  "labelSelector and orLabelSelectors cannot co-exist",
 		},
@@ -2272,7 +2290,8 @@ namespacedFilterPolicies:
   resourceFilters:
   - kinds: ["Pod"]
     labelSelector:
-      app: web`
+      matchLabels:
+        app: web`
 
 	resPolicies, err := unmarshalResourcePolicies(&yamlData)
 	require.NoError(t, err)
@@ -2290,7 +2309,135 @@ namespacedFilterPolicies:
 
 	rf := policy.ResourceFilters[0]
 	assert.Equal(t, []string{"Pod"}, rf.Kinds)
-	assert.Equal(t, map[string]string{"app": "web"}, rf.LabelSelector)
+	assert.Equal(t, &PolicyLabelSelector{MatchLabels: map[string]string{"app": "web"}}, rf.LabelSelector)
+}
+
+func TestPolicyLabelSelectorSetBased(t *testing.T) {
+	t.Run("yaml decode matchLabels and matchExpressions", func(t *testing.T) {
+		yamlData := `version: v1
+namespacedFilterPolicies:
+- namespaces: ["ns1"]
+  resourceFilters:
+  - kinds: ["Pod"]
+    labelSelector:
+      matchLabels:
+        app: web
+      matchExpressions:
+      - key: environment
+        operator: In
+        values: [prod, staging]
+      - key: do-not-backup
+        operator: DoesNotExist`
+
+		resPolicies, err := unmarshalResourcePolicies(&yamlData)
+		require.NoError(t, err)
+
+		policies := &Policies{}
+		require.NoError(t, policies.BuildPolicy(resPolicies))
+		require.NoError(t, policies.Validate())
+
+		rf := policies.GetNamespacedFilterPolicies()[0].ResourceFilters[0]
+		require.NotNil(t, rf.LabelSelector)
+		assert.Equal(t, map[string]string{"app": "web"}, rf.LabelSelector.MatchLabels)
+		require.Len(t, rf.LabelSelector.MatchExpressions, 2)
+		assert.Equal(t, "environment", rf.LabelSelector.MatchExpressions[0].Key)
+		assert.Equal(t, "In", rf.LabelSelector.MatchExpressions[0].Operator)
+		assert.Equal(t, []string{"prod", "staging"}, rf.LabelSelector.MatchExpressions[0].Values)
+		assert.Equal(t, "do-not-backup", rf.LabelSelector.MatchExpressions[1].Key)
+		assert.Equal(t, "DoesNotExist", rf.LabelSelector.MatchExpressions[1].Operator)
+	})
+
+	t.Run("empty labelSelector is no filter", func(t *testing.T) {
+		yamlData := `version: v1
+namespacedFilterPolicies:
+- namespaces: ["ns1"]
+  resourceFilters:
+  - kinds: ["Pod"]
+    labelSelector: {}`
+
+		resPolicies, err := unmarshalResourcePolicies(&yamlData)
+		require.NoError(t, err)
+
+		policies := &Policies{}
+		require.NoError(t, policies.BuildPolicy(resPolicies))
+		require.NoError(t, policies.Validate())
+
+		rf := policies.GetNamespacedFilterPolicies()[0].ResourceFilters[0]
+		assert.False(t, IsPresentLabelSelector(rf.LabelSelector))
+	})
+
+	t.Run("invalid operator rejected", func(t *testing.T) {
+		yamlData := `version: v1
+namespacedFilterPolicies:
+- namespaces: ["ns1"]
+  resourceFilters:
+  - kinds: ["Pod"]
+    labelSelector:
+      matchExpressions:
+      - key: environment
+        operator: Equals
+        values: [prod]`
+
+		resPolicies, err := unmarshalResourcePolicies(&yamlData)
+		require.NoError(t, err)
+
+		policies := &Policies{}
+		require.NoError(t, policies.BuildPolicy(resPolicies))
+		err = policies.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid label selector")
+	})
+
+	t.Run("NotIn Exists operators validate", func(t *testing.T) {
+		yamlData := `version: v1
+clusterScopedFilterPolicy:
+  resourceFilters:
+  - kinds: ["ClusterRole"]
+    labelSelector:
+      matchExpressions:
+      - key: tier
+        operator: NotIn
+        values: [debug]
+      - key: managed-by
+        operator: Exists`
+
+		resPolicies, err := unmarshalResourcePolicies(&yamlData)
+		require.NoError(t, err)
+
+		policies := &Policies{}
+		require.NoError(t, policies.BuildPolicy(resPolicies))
+		require.NoError(t, policies.Validate())
+	})
+
+	t.Run("ToMetaV1LabelSelector and IsPresentLabelSelector", func(t *testing.T) {
+		assert.False(t, IsPresentLabelSelector(nil))
+		assert.False(t, IsPresentLabelSelector(&PolicyLabelSelector{}))
+		assert.True(t, IsPresentLabelSelector(&PolicyLabelSelector{MatchLabels: map[string]string{"a": "b"}}))
+
+		ls := ToMetaV1LabelSelector(&PolicyLabelSelector{
+			MatchLabels: map[string]string{"app": "web"},
+			MatchExpressions: []PolicyLabelSelectorRequirement{
+				{Key: "env", Operator: "In", Values: []string{"prod"}},
+			},
+		})
+		require.NotNil(t, ls)
+		assert.Equal(t, map[string]string{"app": "web"}, ls.MatchLabels)
+		require.Len(t, ls.MatchExpressions, 1)
+		assert.Equal(t, metav1.LabelSelectorOpIn, ls.MatchExpressions[0].Operator)
+
+		assert.Nil(t, ToMetaV1LabelSelector(nil))
+
+		sel, err := SelectorFromPolicyLabelSelector(&PolicyLabelSelector{
+			MatchLabels: map[string]string{"app": "web"},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, sel)
+		assert.True(t, sel.Matches(labels.Set{"app": "web"}))
+
+		emptySel, err := SelectorFromPolicyLabelSelector(&PolicyLabelSelector{})
+		require.NoError(t, err)
+		assert.Nil(t, emptySel)
+	})
 }
 
 func TestClusterScopedFilterPoliciesAccessor(t *testing.T) {
@@ -2335,6 +2482,279 @@ includeExcludePolicy:
 	require.NotNil(t, iePolicy)
 	assert.Equal(t, []string{"ClusterRole"}, iePolicy.IncludedClusterScopedResources)
 	assert.Equal(t, []string{"ClusterRoleBinding"}, iePolicy.ExcludedClusterScopedResources)
+}
+
+func TestIncludeExcludePolicyValidateNamespacesByLabel(t *testing.T) {
+	tests := []struct {
+		name    string
+		policy  IncludeExcludePolicy
+		wantErr string
+	}{
+		{
+			name:   "no label selector fields set is valid",
+			policy: IncludeExcludePolicy{},
+		},
+		{
+			name: "valid included and excluded selectors",
+			policy: IncludeExcludePolicy{
+				IncludedNamespacesByLabel: []string{"team=platform", "team=infra"},
+				ExcludedNamespacesByLabel: []string{"env=dev"},
+			},
+		},
+		{
+			name: "valid AND logic",
+			policy: IncludeExcludePolicy{
+				IncludedNamespacesByLabel: []string{"tier=critical", "compliance=pci"},
+				LabelSelectorLogic:        "AND",
+			},
+		},
+		{
+			name: "empty string in includedNamespacesByLabel is rejected",
+			policy: IncludeExcludePolicy{
+				IncludedNamespacesByLabel: []string{""},
+			},
+			wantErr: "includedNamespacesByLabel: label selector cannot be empty",
+		},
+		{
+			name: "whitespace-only string in excludedNamespacesByLabel is rejected",
+			policy: IncludeExcludePolicy{
+				ExcludedNamespacesByLabel: []string{"   "},
+			},
+			wantErr: "excludedNamespacesByLabel: label selector cannot be empty",
+		},
+		{
+			name: "invalid selector syntax is rejected",
+			policy: IncludeExcludePolicy{
+				IncludedNamespacesByLabel: []string{"=="},
+			},
+			wantErr: "includedNamespacesByLabel: invalid label selector",
+		},
+		{
+			name: "invalid operator is rejected",
+			policy: IncludeExcludePolicy{
+				ExcludedNamespacesByLabel: []string{"env >> prod"},
+			},
+			wantErr: "excludedNamespacesByLabel: invalid label selector",
+		},
+		{
+			name: "malformed 'in' clause without parens is rejected",
+			policy: IncludeExcludePolicy{
+				IncludedNamespacesByLabel: []string{"env in prod"},
+			},
+			wantErr: "includedNamespacesByLabel: invalid label selector",
+		},
+		{
+			name: "invalid labelSelectorLogic is rejected",
+			policy: IncludeExcludePolicy{
+				LabelSelectorLogic: "XOR",
+			},
+			wantErr: `labelSelectorLogic must be "OR" or "AND", got "XOR"`,
+		},
+		{
+			name: "lowercase labelSelectorLogic is accepted",
+			policy: IncludeExcludePolicy{
+				IncludedNamespacesByLabel: []string{"team=platform"},
+				LabelSelectorLogic:        "and",
+			},
+		},
+		{
+			name: "mixed-case labelSelectorLogic is accepted",
+			policy: IncludeExcludePolicy{
+				IncludedNamespacesByLabel: []string{"team=platform"},
+				LabelSelectorLogic:        "Or",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.policy.Validate()
+			if tc.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestResolveNamespacesByLabel(t *testing.T) {
+	nsWith := func(name string, labels map[string]string) *corev1api.Namespace {
+		return &corev1api.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels},
+		}
+	}
+
+	namespaces := []crclient.Object{
+		nsWith("platform-prod", map[string]string{"team": "platform", "env": "prod"}),
+		nsWith("platform-dev", map[string]string{"team": "platform", "env": "dev"}),
+		nsWith("infra", map[string]string{"team": "infra"}),
+		nsWith("confidential", map[string]string{"confidential": "true"}),
+		nsWith("unlabeled", nil),
+	}
+
+	newClient := func() crclient.Client {
+		return fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(namespaces...).Build()
+	}
+
+	t.Run("OR logic across included selectors", func(t *testing.T) {
+		included, excluded, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			[]string{"team=platform", "team=infra"}, nil, "")
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{"platform-prod", "platform-dev", "infra"}, included)
+		assert.Empty(t, excluded)
+	})
+
+	t.Run("AND logic across included selectors", func(t *testing.T) {
+		included, _, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			[]string{"team=platform", "env=prod"}, nil, "AND")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"platform-prod"}, included)
+	})
+
+	t.Run("AND logic across excluded selectors", func(t *testing.T) {
+		// labelSelectorLogic applies independently to each list - covers the excluded half
+		// of the contract, not just included (which the case above already covers).
+		_, excluded, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			nil, []string{"team=platform", "env=prod"}, "AND")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"platform-prod"}, excluded)
+	})
+
+	t.Run("AND logic matching is case-insensitive", func(t *testing.T) {
+		included, _, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			[]string{"team=platform", "env=prod"}, nil, "and")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"platform-prod"}, included)
+	})
+
+	t.Run("excluded resolved independently of included", func(t *testing.T) {
+		included, excluded, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			nil, []string{"confidential=true"}, "")
+		require.NoError(t, err)
+		assert.Empty(t, included)
+		assert.Equal(t, []string{"confidential"}, excluded)
+	})
+
+	t.Run("configured selector matching zero namespaces returns empty, not all", func(t *testing.T) {
+		included, _, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			[]string{"team=nonexistent"}, nil, "")
+		require.NoError(t, err)
+		assert.Empty(t, included)
+	})
+
+	t.Run("empty selector lists return empty sets", func(t *testing.T) {
+		included, excluded, err := ResolveNamespacesByLabel(context.Background(), newClient(), nil, nil, "")
+		require.NoError(t, err)
+		assert.Empty(t, included)
+		assert.Empty(t, excluded)
+	})
+
+	t.Run("selector on a label key no namespace carries at all resolves to empty", func(t *testing.T) {
+		included, _, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			[]string{"nonexistent-key=anything"}, nil, "")
+		require.NoError(t, err)
+		assert.Empty(t, included)
+	})
+
+	t.Run("existence-check selector (!key) matches namespaces missing that label", func(t *testing.T) {
+		included, _, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			[]string{"!confidential"}, nil, "")
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{"platform-prod", "platform-dev", "infra", "unlabeled"}, included)
+	})
+
+	// ResolveNamespacesByLabel is exported and does not itself call Validate() - the
+	// production path always validates first, but a malformed selector reaching this function
+	// directly must return an error, not a silent empty result. Silently treating a malformed
+	// *excluded* selector as "no matches" would be fail-open: a namespace meant to be excluded
+	// would be backed up instead.
+	t.Run("malformed included selector returns an error, not a silent empty result", func(t *testing.T) {
+		_, _, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			[]string{"=="}, nil, "")
+		require.Error(t, err)
+	})
+
+	t.Run("malformed excluded selector returns an error, not a silent empty result", func(t *testing.T) {
+		_, _, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			nil, []string{"=="}, "")
+		require.Error(t, err)
+	})
+
+	t.Run("empty-string included selector returns an error, not a silent match-everything", func(t *testing.T) {
+		// k8s labels.Parse("") succeeds and returns a selector that matches everything, so
+		// without validateLabelSelectors' explicit empty check, this would silently include
+		// every namespace instead of failing.
+		_, _, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			[]string{""}, nil, "")
+		require.Error(t, err)
+	})
+
+	t.Run("empty-string excluded selector returns an error, not a silent match-everything", func(t *testing.T) {
+		// Same gap as above, but fail-open for excludes: a silently-everything-matching
+		// excluded selector would exclude every namespace instead of failing loudly.
+		_, _, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			nil, []string{""}, "")
+		require.Error(t, err)
+	})
+
+	t.Run("invalid logic value returns an error, not a silent fall-through to OR", func(t *testing.T) {
+		// ResolveNamespacesByLabel is exported and does not itself call Validate() - a
+		// garbage logic value reaching this function directly must be rejected, not silently
+		// treated as OR (the exact-match comparison a garbage value would otherwise fail,
+		// widening an intended AND into an OR is fail-open the same way a swallowed selector
+		// parse error is).
+		_, _, err := ResolveNamespacesByLabel(context.Background(), newClient(),
+			[]string{"team=platform"}, nil, "XOR")
+		require.Error(t, err)
+	})
+}
+
+// TestResolveNamespacesByLabel_ManyNamespaces is a correctness-at-scale check against a
+// cluster with thousands of namespaces - not a timing assertion (BenchmarkResolveNamespacesByLabel
+// below covers actual performance).
+func TestResolveNamespacesByLabel_ManyNamespaces(t *testing.T) {
+	fakeClient := manyNamespacesClient()
+
+	included, _, err := ResolveNamespacesByLabel(context.Background(), fakeClient, []string{"team=platform"}, nil, "")
+
+	require.NoError(t, err)
+	assert.Len(t, included, manyNamespacesMatching)
+}
+
+// manyNamespacesTotal/manyNamespacesMatching/manyNamespacesClient back both
+// TestResolveNamespacesByLabel_ManyNamespaces (correctness at scale) and
+// BenchmarkResolveNamespacesByLabel (`go test -bench`, not part of a normal `go test` run and
+// so can't flake CI the way a fixed wall-clock assertion in a regular test can).
+const (
+	manyNamespacesTotal    = 5000
+	manyNamespacesMatching = 137
+)
+
+func manyNamespacesClient() crclient.Client {
+	objs := make([]crclient.Object, 0, manyNamespacesTotal)
+	for i := range manyNamespacesTotal {
+		nsLabels := map[string]string{"team": "other"}
+		if i < manyNamespacesMatching {
+			nsLabels = map[string]string{"team": "platform"}
+		}
+		objs = append(objs, &corev1api.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("ns-%d", i), Labels: nsLabels},
+		})
+	}
+
+	return fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(objs...).Build()
+}
+
+func BenchmarkResolveNamespacesByLabel(b *testing.B) {
+	fakeClient := manyNamespacesClient()
+
+	for range b.N {
+		if _, _, err := ResolveNamespacesByLabel(context.Background(), fakeClient, []string{"team=platform"}, nil, ""); err != nil {
+			b.Fatal(err)
+		}
+	}
 }
 
 func TestFirstMatchSemantics(t *testing.T) {
@@ -2394,7 +2814,8 @@ clusterScopedFilterPolicy:
   resourceFilters:
   - kinds: ["ClusterRole", "ClusterRoleBinding"]
     labelSelector:
-      app: my-app`,
+      matchLabels:
+        app: my-app`,
 			wantErr: false,
 		},
 		{
@@ -2404,8 +2825,10 @@ clusterScopedFilterPolicy:
   resourceFilters:
   - kinds: ["CustomResourceDefinition"]
     orLabelSelectors:
-    - app: my-app
-    - app: other-app`,
+    - matchLabels:
+        app: my-app
+    - matchLabels:
+        app: other-app`,
 			wantErr: false,
 		},
 		{
@@ -2443,7 +2866,8 @@ clusterScopedFilterPolicy:
   resourceFilters:
   - kinds: ["*"]
     labelSelector:
-      app: my-app`,
+      matchLabels:
+        app: my-app`,
 			wantErr: true,
 			errMsg:  "kinds must be specified",
 		},
@@ -2456,7 +2880,8 @@ clusterScopedFilterPolicy:
     names: ["my-app-*"]
   - kinds: ["ClusterRole"]
     labelSelector:
-      app: other`,
+      matchLabels:
+        app: other`,
 			wantErr: true,
 			errMsg:  `kind "ClusterRole" appears in both`,
 		},
@@ -2467,9 +2892,11 @@ clusterScopedFilterPolicy:
   resourceFilters:
   - kinds: ["ClusterRole"]
     labelSelector:
-      app: my-app
+      matchLabels:
+        app: my-app
     orLabelSelectors:
-    - app: other`,
+    - matchLabels:
+        app: other`,
 			wantErr: true,
 			errMsg:  "labelSelector and orLabelSelectors cannot co-exist",
 		},
@@ -2719,6 +3146,8 @@ volumePolicies:
 		globalCMName        string
 		globalCM            *corev1api.ConfigMap
 		backupRef           string
+		backupAnnotations   map[string]string
+		installNamespace    string
 		expectErr           bool
 		expectedGp2Action   VolumeActionType
 		expectedNumPolicies int
@@ -2757,6 +3186,15 @@ volumePolicies:
 			backupCM:            globalPolicyConfigMap("backup01", otherFsBackup),
 			globalCMName:        "global",
 			globalCM:            globalPolicyConfigMap("global", gp2Skip),
+			expectedGp2Action:   Skip, // only global matches gp2
+			expectedNumPolicies: 2,
+		},
+		{
+			name:                "merge - global from backup annotation with empty params",
+			backupRef:           "backup01",
+			backupCM:            globalPolicyConfigMap("backup01", otherFsBackup),
+			globalCM:            globalPolicyConfigMap("global", gp2Skip),
+			backupAnnotations:   map[string]string{velerov1api.GlobalBackupVolumePolicyConfigMapAnnotation: "global"},
 			expectedGp2Action:   Skip, // only global matches gp2
 			expectedNumPolicies: 2,
 		},
@@ -2800,8 +3238,15 @@ volumePolicies:
 			}
 
 			b := backupWithPolicy(tc.backupRef)
+			if tc.backupAnnotations != nil {
+				b.Annotations = tc.backupAnnotations
+			}
 
-			p, err := GetResourcePoliciesFromBackupWithGlobal(b, client, tc.globalCMName, "velero", logrus.New())
+			ns := tc.installNamespace
+			if ns == "" && tc.backupAnnotations == nil {
+				ns = "velero"
+			}
+			p, err := GetResourcePoliciesFromBackupWithGlobal(b, client, tc.globalCMName, ns, logrus.New())
 			if tc.expectErr {
 				require.Error(t, err)
 				return
@@ -2848,10 +3293,10 @@ namespacedFilterPolicies:
 
 func TestActionGetDataMover(t *testing.T) {
 	testCases := []struct {
-		name         string
-		action       *Action
-		expectedMove string
-		expectErr    bool
+		name              string
+		action            *Action
+		expectedDataMover string
+		expectErr         bool
 	}{
 		{
 			name:      "nil action",
@@ -2859,29 +3304,29 @@ func TestActionGetDataMover(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name:         "snapshot action without parameters returns default mover",
-			action:       &Action{Type: Snapshot},
-			expectedMove: "velero-fs",
+			name:              "snapshot action without parameters returns default mover",
+			action:            &Action{Type: Snapshot},
+			expectedDataMover: datamover.GetDefaultBuiltInDataMover(),
 		},
 		{
-			name:         "snapshot action without dataMover parameter returns default mover",
-			action:       &Action{Type: Snapshot, Parameters: map[string]any{"other": "value"}},
-			expectedMove: "velero-fs",
+			name:              "snapshot action without dataMover parameter returns default mover",
+			action:            &Action{Type: Snapshot, Parameters: map[string]any{"other": "value"}},
+			expectedDataMover: datamover.GetDefaultBuiltInDataMover(),
 		},
 		{
-			name:         "snapshot action with velero dataMover",
-			action:       &Action{Type: Snapshot, Parameters: map[string]any{"dataMover": "velero"}},
-			expectedMove: "velero",
+			name:              "snapshot action with velero dataMover",
+			action:            &Action{Type: Snapshot, Parameters: map[string]any{"dataMover": "velero"}},
+			expectedDataMover: datamover.GetDefaultBuiltInDataMover(),
 		},
 		{
-			name:         "snapshot action with velero-fs dataMover",
-			action:       &Action{Type: Snapshot, Parameters: map[string]any{"dataMover": "velero-fs"}},
-			expectedMove: "velero-fs",
+			name:              "snapshot action with velero-fs dataMover",
+			action:            &Action{Type: Snapshot, Parameters: map[string]any{"dataMover": datamover.DataMoverTypeVeleroFs}},
+			expectedDataMover: datamover.DataMoverTypeVeleroFs,
 		},
 		{
-			name:         "snapshot action with velero-block dataMover",
-			action:       &Action{Type: Snapshot, Parameters: map[string]any{"dataMover": "velero-block"}},
-			expectedMove: "velero-block",
+			name:              "snapshot action with velero-block dataMover",
+			action:            &Action{Type: Snapshot, Parameters: map[string]any{"dataMover": datamover.DataMoverTypeVeleroBlock}},
+			expectedDataMover: datamover.DataMoverTypeVeleroBlock,
 		},
 		{
 			name:      "non-snapshot action returns error",
@@ -2908,7 +3353,64 @@ func TestActionGetDataMover(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tc.expectedMove, dataMover)
+			assert.Equal(t, tc.expectedDataMover, dataMover)
+		})
+	}
+}
+
+func TestActionGetSnapshotClass(t *testing.T) {
+	testCases := []struct {
+		name          string
+		action        *Action
+		expectedClass string
+		expectErr     bool
+	}{
+		{
+			name:      "nil action",
+			action:    nil,
+			expectErr: true,
+		},
+		{
+			name:          "snapshot action without parameters",
+			action:        &Action{Type: Snapshot},
+			expectedClass: "",
+		},
+		{
+			name:          "snapshot action without snapshotClass parameter",
+			action:        &Action{Type: Snapshot, Parameters: map[string]any{"other": "value"}},
+			expectedClass: "",
+		},
+		{
+			name:          "snapshot action with snapshotClass",
+			action:        &Action{Type: Snapshot, Parameters: map[string]any{"snapshotClass": "my-vsc"}},
+			expectedClass: "my-vsc",
+		},
+		{
+			name:      "non-snapshot action returns error",
+			action:    &Action{Type: FSBackup, Parameters: map[string]any{"snapshotClass": "my-vsc"}},
+			expectErr: true,
+		},
+		{
+			name:      "snapshot action with non-string snapshotClass returns error",
+			action:    &Action{Type: Snapshot, Parameters: map[string]any{"snapshotClass": 123}},
+			expectErr: true,
+		},
+		{
+			name:          "snapshot action with both snapshotClass and dataMover",
+			action:        &Action{Type: Snapshot, Parameters: map[string]any{"snapshotClass": "my-vsc", "dataMover": "velero-fs"}},
+			expectedClass: "my-vsc",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			snapshotClass, err := tc.action.GetSnapshotClass()
+			if tc.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedClass, snapshotClass)
 		})
 	}
 }

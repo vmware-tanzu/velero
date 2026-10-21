@@ -19,7 +19,7 @@ package v2alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
+	"github.com/velero-io/velero/pkg/apis/velero/shared"
 )
 
 // DataUploadSpec is the specification for a DataUpload.
@@ -36,7 +36,7 @@ type DataUploadSpec struct {
 	SourcePVC string `json:"sourcePVC"`
 
 	// DataMover specifies the data mover to be used by the backup.
-	// If DataMover is "" or "velero", the built-in data mover will be used.
+	// If DataMover is "" or "velero", the built-in fs data mover will be used.
 	// +optional
 	DataMover string `json:"datamover,omitempty"`
 
@@ -64,6 +64,12 @@ type DataUploadSpec struct {
 	// SourceFSType is the file system type of the source volume.
 	// +optional
 	SourceFSType string `json:"sourceFSType,omitempty"`
+
+	// ParentSnapshot specifies the parent snapshot that current backup is based on.
+	// If its value is "" or "auto", the data mover finds the recent backup of the same volume as parent.
+	// If its value is "none", the data mover will do a full backup
+	// If its value is a specific snapshotID, the data mover finds the specific snapshot as parent.
+	ParentSnapshot string `json:"parentSnapshot,omitempty"`
 }
 
 type SnapshotType string
@@ -74,6 +80,10 @@ const (
 
 // CSISnapshotSpec is the specification for a CSI snapshot.
 type CSISnapshotSpec struct {
+	// VolumeSnapshotNamespace is the namespece of the volume snapshot to be backed up
+	// +optional
+	VolumeSnapshotNamespace string `json:"volumeSnapshotNamespace"`
+
 	// VolumeSnapshot is the name of the volume snapshot to be backed up
 	VolumeSnapshot string `json:"volumeSnapshot"`
 
@@ -87,6 +97,10 @@ type CSISnapshotSpec struct {
 	// Driver is the driver used by the VolumeSnapshotContent
 	// +optional
 	Driver string `json:"driver,omitempty"`
+
+	// CleanUp indicates request to clean up the volume snapshot after the backup/restore is completed.
+	// +optional
+	CleanUp bool `json:"cleanUp,omitempty"`
 }
 
 // DataUploadPhase represents the lifecycle phase of a DataUpload.
@@ -133,7 +147,7 @@ type DataUploadStatus struct {
 	// +nullable
 	DataMoverResult *map[string]string `json:"dataMoverResult,omitempty"`
 
-	// Message is a message about the DataUpload's status.
+	// Message is a message describing the DataUpload when it reaches to a terminal status.
 	// +optional
 	Message string `json:"message,omitempty"`
 
@@ -159,9 +173,17 @@ type DataUploadStatus struct {
 	// +optional
 	Progress shared.DataMoveOperationProgress `json:"progress,omitempty"`
 
-	// IncrementalBytes holds the number of bytes new or changed since the last backup
+	// IncrementalBytes holds the number of bytes new or changed since the last backup.
+	// A nil value means the uploader did not report a figure; a pointer to 0 means it
+	// reported zero, i.e. nothing changed and nothing was transferred. The two are
+	// distinct: erasing a measured zero makes a perfect incremental indistinguishable
+	// from a full transfer in every downstream report.
 	// +optional
-	IncrementalBytes int64 `json:"incrementalBytes,omitempty"`
+	IncrementalBytes *int64 `json:"incrementalBytes,omitempty"`
+
+	// SourceSize holds the total size of the source volume.
+	// +optional
+	SourceSize int64 `json:"sourceSize,omitempty"`
 
 	// Node is name of the node where the DataUpload is processed.
 	// +optional
@@ -180,6 +202,14 @@ type DataUploadStatus struct {
 	// +optional
 	// +nullable
 	AcceptedTimestamp *metav1.Time `json:"acceptedTimestamp,omitempty"`
+
+	// FallbackFull indicates whether the incremental backup has fallen back to full backup
+	FallbackFull bool `json:"fallbackFull,omitempty"`
+
+	// Activities contains one or more messages about what have been done for this DataUpload.
+	// +optional
+	// +nullable
+	Activities []string `json:"activities,omitempty"`
 }
 
 // TODO(2.0) After converting all resources to use the runttime-controller client,
@@ -262,4 +292,8 @@ type DataUploadResult struct {
 	// FSType is the file system type of the volume.
 	// +optional
 	FSType string `json:"fsType,omitempty"`
+
+	// SnapshotClass is the name of the snapshot class that the volume snapshot is created with
+	// +optional
+	SnapshotClass string `json:"snapshotClass,omitempty"`
 }

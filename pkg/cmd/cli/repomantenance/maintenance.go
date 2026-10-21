@@ -2,6 +2,7 @@ package repomantenance
 
 import (
 	"context"
+	"crypto/fips140"
 	"fmt"
 	"os"
 	"strings"
@@ -18,16 +19,16 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerocli "github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/repository"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	"github.com/velero-io/velero/internal/credentials"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerocli "github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/repository"
+	"github.com/velero-io/velero/pkg/util/filesystem"
+	"github.com/velero-io/velero/pkg/util/logging"
 
-	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
-	"github.com/vmware-tanzu/velero/pkg/repository/maintenance"
-	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
+	repokey "github.com/velero-io/velero/pkg/repository/keys"
+	"github.com/velero-io/velero/pkg/repository/maintenance"
+	repomanager "github.com/velero-io/velero/pkg/repository/manager"
 )
 
 type Options struct {
@@ -57,7 +58,10 @@ func NewCommand(f velerocli.Factory) *cobra.Command {
 		Hidden: true,
 		Short:  "VELERO INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
-			o.Run(f)
+			// Disable FIPS-140 compliance check, because Kopia doesn't support FIPS-140 yet.
+			fips140.WithoutEnforcement(func() {
+				o.Run(f)
+			})
 		},
 	}
 

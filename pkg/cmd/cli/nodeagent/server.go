@@ -27,6 +27,7 @@ import (
 
 	"github.com/bombsimon/logrusr/v3"
 	"github.com/cockroachdb/errors"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -47,23 +48,23 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
-	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
-	"github.com/vmware-tanzu/velero/pkg/constant"
-	"github.com/vmware-tanzu/velero/pkg/controller"
-	"github.com/vmware-tanzu/velero/pkg/datapath"
-	"github.com/vmware-tanzu/velero/pkg/exposer"
-	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/nodeagent"
-	repository "github.com/vmware-tanzu/velero/pkg/repository/manager"
-	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/velero-io/velero/pkg/apis/velero/v2alpha1"
+	"github.com/velero-io/velero/pkg/buildinfo"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/cmd"
+	"github.com/velero-io/velero/pkg/cmd/util/signals"
+	"github.com/velero-io/velero/pkg/constant"
+	"github.com/velero-io/velero/pkg/controller"
+	"github.com/velero-io/velero/pkg/datapath"
+	"github.com/velero-io/velero/pkg/exposer"
+	"github.com/velero-io/velero/pkg/metrics"
+	"github.com/velero-io/velero/pkg/nodeagent"
+	repository "github.com/velero-io/velero/pkg/repository/manager"
+	velerotypes "github.com/velero-io/velero/pkg/types"
+	"github.com/velero-io/velero/pkg/util/filesystem"
+	"github.com/velero-io/velero/pkg/util/kube"
+	"github.com/velero-io/velero/pkg/util/logging"
 )
 
 var (
@@ -77,6 +78,7 @@ const (
 	defaultResourceTimeout         = 10 * time.Minute
 	defaultDataMoverPrepareTimeout = 30 * time.Minute
 	defaultDataPathConcurrentNum   = 1
+	defaultPrepareQueueLength      = 5
 )
 
 type nodeAgentServerConfig struct {
@@ -172,6 +174,10 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		return nil, err
 	}
 	if err := storagev1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := snapshotv1api.AddToScheme(scheme); err != nil {
 		cancelFunc()
 		return nil, err
 	}
@@ -348,14 +354,7 @@ func (s *nodeAgentServer) run() {
 		}
 	}
 
-	if s.dataPathConfigs != nil && s.dataPathConfigs.LoadConcurrency != nil && s.dataPathConfigs.LoadConcurrency.PrepareQueueLength > 0 {
-		if counter, err := exposer.StartVgdpCounter(s.ctx, s.mgr, s.dataPathConfigs.LoadConcurrency.PrepareQueueLength); err != nil {
-			s.logger.WithError(err).Warnf("Failed to start VGDP counter, VDGP loads are not constrained")
-		} else {
-			s.vgdpCounter = counter
-			s.logger.Infof("VGDP loads are constrained with %d", s.dataPathConfigs.LoadConcurrency.PrepareQueueLength)
-		}
-	}
+	s.initVgdpCounter()
 
 	var cachePVCConfig *velerotypes.CachePVC
 	if s.dataPathConfigs != nil && s.dataPathConfigs.CachePVCConfig != nil {
@@ -377,6 +376,12 @@ func (s *nodeAgentServer) run() {
 	if s.dataPathConfigs != nil && len(s.dataPathConfigs.PodAnnotations) > 0 {
 		podAnnotations = s.dataPathConfigs.PodAnnotations
 		s.logger.Infof("Using customized pod annotations %+v", podAnnotations)
+	}
+
+	var tolerations []corev1api.Toleration
+	if s.dataPathConfigs != nil && len(s.dataPathConfigs.Tolerations) > 0 {
+		tolerations = s.dataPathConfigs.Tolerations
+		s.logger.Infof("Using customized tolerations %+v", tolerations)
 	}
 
 	if s.backupRepoConfigs != nil {
@@ -407,6 +412,7 @@ func (s *nodeAgentServer) run() {
 		privilegedFsBackup,
 		podLabels,
 		podAnnotations,
+		tolerations,
 	)
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
@@ -430,6 +436,7 @@ func (s *nodeAgentServer) run() {
 		s.repoConfigMgr,
 		podLabels,
 		podAnnotations,
+		tolerations,
 	)
 	if err := pvrReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
@@ -454,6 +461,7 @@ func (s *nodeAgentServer) run() {
 		podLabels,
 		podAnnotations,
 		csiSnapshotMetadataServiceConfigs,
+		tolerations,
 	)
 	if err := dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
@@ -484,6 +492,8 @@ func (s *nodeAgentServer) run() {
 		s.repoConfigMgr,
 		podLabels,
 		podAnnotations,
+		csiSnapshotMetadataServiceConfigs,
+		tolerations,
 	)
 
 	if err := dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
@@ -711,4 +721,20 @@ func (s *nodeAgentServer) validateCachePVCConfig(config velerotypes.CachePVC) er
 	}
 
 	return nil
+}
+
+var startVgdpCounterFunc = exposer.StartVgdpCounter
+
+func (s *nodeAgentServer) initVgdpCounter() {
+	prepareQueueLength := defaultPrepareQueueLength
+	if s.dataPathConfigs != nil && s.dataPathConfigs.LoadConcurrency != nil && s.dataPathConfigs.LoadConcurrency.PrepareQueueLength > 0 {
+		prepareQueueLength = s.dataPathConfigs.LoadConcurrency.PrepareQueueLength
+	}
+
+	if counter, err := startVgdpCounterFunc(s.ctx, s.mgr, prepareQueueLength); err != nil {
+		s.logger.WithError(err).Warnf("Failed to start VGDP counter with length %d, VDGP loads are not constrained", prepareQueueLength)
+	} else {
+		s.vgdpCounter = counter
+		s.logger.Infof("VGDP loads are constrained with %d", prepareQueueLength)
+	}
 }

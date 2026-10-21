@@ -45,29 +45,29 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/internal/hook"
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	"github.com/vmware-tanzu/velero/internal/volume"
-	"github.com/vmware-tanzu/velero/internal/volumehelper"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/discovery"
-	"github.com/vmware-tanzu/velero/pkg/itemblock"
-	"github.com/vmware-tanzu/velero/pkg/itemoperation"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/persistence"
-	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
-	ibav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/itemblockaction/v1"
-	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
-	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"github.com/vmware-tanzu/velero/pkg/podvolume"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/util/collections"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/velero-io/velero/internal/hook"
+	"github.com/velero-io/velero/internal/resourcepolicies"
+	"github.com/velero-io/velero/internal/volume"
+	"github.com/velero-io/velero/internal/volumehelper"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerov2alpha1 "github.com/velero-io/velero/pkg/apis/velero/v2alpha1"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/discovery"
+	"github.com/velero-io/velero/pkg/itemblock"
+	"github.com/velero-io/velero/pkg/itemoperation"
+	"github.com/velero-io/velero/pkg/kuberesource"
+	"github.com/velero-io/velero/pkg/persistence"
+	"github.com/velero-io/velero/pkg/plugin/clientmgmt"
+	"github.com/velero-io/velero/pkg/plugin/framework"
+	"github.com/velero-io/velero/pkg/plugin/velero"
+	biav2 "github.com/velero-io/velero/pkg/plugin/velero/backupitemaction/v2"
+	ibav1 "github.com/velero-io/velero/pkg/plugin/velero/itemblockaction/v1"
+	vsv1 "github.com/velero-io/velero/pkg/plugin/velero/volumesnapshotter/v1"
+	"github.com/velero-io/velero/pkg/podexec"
+	"github.com/velero-io/velero/pkg/podvolume"
+	"github.com/velero-io/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/util/collections"
+	"github.com/velero-io/velero/pkg/util/kube"
 )
 
 // BackupVersion is the current backup major version for Velero.
@@ -331,7 +331,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	// check if there are any namespaces included in the backup which are managed by argoCD
 	// We will check for the existence of a ArgoCD label in the includedNamespaces and add a warning
 	// so that users are at least aware about the existence of argoCD managed ns in their backup
-	// Related Issue: https://github.com/vmware-tanzu/velero/issues/7905
+	// Related Issue: https://github.com/velero-io/velero/issues/7905
 	if len(nsManagedByArgoCD) > 0 {
 		log.Warnf("backup operation may encounter complications and potentially produce undesirable results due to the inclusion of namespaces %v managed by ArgoCD in the backup.", nsManagedByArgoCD)
 	}
@@ -485,6 +485,8 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		return err
 	}
 
+	pvcMustInclusionTracker := NewPVCMustInclusionTracker(backupRequest.MustIncludeAdditionalItemPVCs)
+
 	volumeHelperImpl, err := volumehelper.NewVolumeHelperImplWithNamespaces(
 		backupRequest.ResPolicies,
 		backupRequest.Spec.SnapshotVolumes,
@@ -493,6 +495,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		boolptr.IsSetToTrue(backupRequest.Spec.DefaultVolumesToFsBackup),
 		!backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()),
 		namespaces,
+		pvcMustInclusionTracker,
 	)
 	if err != nil {
 		log.WithError(err).Error("Failed to build PVC-to-Pod cache for volume policy lookups")
@@ -743,10 +746,10 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress and hook status")
 	}
 
-	if skippedPVSummary, err := json.Marshal(backupRequest.SkippedPVTracker.Summary()); err != nil {
-		log.WithError(errors.WithStack(err)).Warn("Fail to generate skipped PV summary.")
+	if skippedVolumeSummary, err := json.Marshal(backupRequest.SkippedVolumeTracker.Summary()); err != nil {
+		log.WithError(errors.WithStack(err)).Warn("Fail to generate skipped volume summary.")
 	} else {
-		log.Infof("Summary for skipped PVs: %s", skippedPVSummary)
+		log.Infof("Summary for skipped volumes: %s", skippedVolumeSummary)
 	}
 
 	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: backedUpItems, ItemsBackedUp: backedUpItems}
@@ -1263,21 +1266,12 @@ func buildFinalTarball(tr *tar.Reader, tw tarWriter, updateFiles map[string]File
 				return errors.WithStack(err)
 			}
 			delete(updateFiles, header.Name)
-			// skip over file contents from old tarball
-			_, err := io.ReadAll(tr)
-			if err != nil {
-				return errors.WithStack(err)
-			}
 		} else {
 			// Add original content to new tarball, as item wasn't updated
-			oldContents, err := io.ReadAll(tr)
-			if err != nil {
-				return errors.WithStack(err)
-			}
 			if err := tw.WriteHeader(header); err != nil {
 				return errors.WithStack(err)
 			}
-			if _, err := tw.Write(oldContents); err != nil {
+			if _, err := io.Copy(tw, tr); err != nil {
 				return errors.WithStack(err)
 			}
 		}
@@ -1334,7 +1328,9 @@ func updateVolumeInfos(
 				volumeInfos[index].SnapshotDataMovementInfo.RetainedSnapshot = dataUpload.Spec.CSISnapshot.VolumeSnapshot
 				volumeInfos[index].SnapshotDataMovementInfo.Size = dataUpload.Status.Progress.TotalBytes
 				volumeInfos[index].SnapshotDataMovementInfo.IncrementalSize = dataUpload.Status.IncrementalBytes
+				volumeInfos[index].SnapshotDataMovementInfo.SourceSize = dataUpload.Status.SourceSize
 				volumeInfos[index].SnapshotDataMovementInfo.Phase = dataUpload.Status.Phase
+				volumeInfos[index].FallbackFull = dataUpload.Status.FallbackFull
 
 				if dataUpload.Status.Phase == velerov2alpha1.DataUploadPhaseCompleted {
 					volumeInfos[index].Result = volume.VolumeResultSucceeded
@@ -1428,22 +1424,20 @@ func resolveClusterScopedFilterPolicy(
 }
 
 func resolveResourceFilter(rf resourcepolicies.ResourceFilter) (*ResolvedResourceFilter, error) {
-	var selector labels.Selector
-	if len(rf.LabelSelector) > 0 {
-		var err error
-		selector, err = labels.ValidatedSelectorFromSet(labels.Set(rf.LabelSelector))
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector in resource filter: %w", err)
-		}
+	selector, err := resourcepolicies.SelectorFromPolicyLabelSelector(rf.LabelSelector)
+	if err != nil {
+		return nil, fmt.Errorf("invalid label selector in resource filter: %w", err)
 	}
 
 	var orSelectors []labels.Selector
 	for _, ols := range rf.OrLabelSelectors {
-		s, err := labels.ValidatedSelectorFromSet(labels.Set(ols))
+		s, err := resourcepolicies.SelectorFromPolicyLabelSelector(ols)
 		if err != nil {
 			return nil, fmt.Errorf("invalid OR label selector in resource filter: %w", err)
 		}
-		orSelectors = append(orSelectors, s)
+		if s != nil {
+			orSelectors = append(orSelectors, s)
+		}
 	}
 
 	var nameIE *collections.IncludesExcludes

@@ -7,8 +7,9 @@ frontmatter:
   date: [":filename", ":default"]
 params:
   author: Velero Authors
+  googleAnalytics: G-XX7MWLVX37
   logo: Velero.svg
-  cncf_logo: cncf-white.svg
+  cncf_logo: cncf-color.svg
   hero:
     backgroundColor: med-blue
   versioning: true
@@ -63,6 +64,9 @@ params:
     - title: Twitter
       fa_icon: fab fa-twitter
       url: https://twitter.com/projectvelero
+    - title: LinkedIn
+      fa_icon: fab fa-linkedin
+      url: https://www.linkedin.com/company/project-velero
     - title: Slack
       fa_icon: fab fa-slack
       url: https://kubernetes.slack.com/messages/velero

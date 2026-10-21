@@ -37,10 +37,10 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/label"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/label"
+	"github.com/velero-io/velero/pkg/uploader"
+	"github.com/velero-io/velero/pkg/util/filesystem"
 )
 
 // These annotations are taken from the Kubernetes persistent volume/persistent volume claim controller.
@@ -103,7 +103,10 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 			return true, err
 		}
 		if clusterNS != nil && (clusterNS.GetDeletionTimestamp() != nil || clusterNS.Status.Phase == corev1api.NamespaceTerminating) {
-			if resourceDeletionStatusTracker.Contains(clusterNS.Kind, clusterNS.Name, clusterNS.Name) {
+			// Use namespace.Kind (not clusterNS.Kind) so this key matches the one Add()
+			// writes below: client.Get() strips TypeMeta (Kind=""), but getNamespace()
+			// sets Kind="Namespace". Mismatched keys made Contains never match.
+			if resourceDeletionStatusTracker.Contains(namespace.Kind, namespace.Name, namespace.Name) {
 				namespaceAlreadyInDeletionTracker = true
 				return true, errors.Errorf("namespace %s is already present in the polling set, skipping execution", namespace.Name)
 			}
@@ -245,7 +248,7 @@ func isProvisionedByCSI(log logrus.FieldLogger, pv *corev1api.PersistentVolume, 
 		return true, nil
 	}
 	// Although the pv.Spec.CSI is nil, the volume could be provisioned by a CSI driver when enabling the CSI migration
-	// Refer to https://github.com/vmware-tanzu/velero/issues/4496 for more details
+	// Refer to https://github.com/velero-io/velero/issues/4496 for more details
 	if pv.Annotations != nil {
 		driverName := pv.Annotations[KubeAnnDynamicallyProvisioned]
 		migratedDriver := pv.Annotations[KubeAnnMigratedTo]

@@ -27,9 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/archive"
-	"github.com/vmware-tanzu/velero/pkg/client"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/archive"
+	"github.com/velero-io/velero/pkg/client"
 )
 
 // ChosenGroupVersion is the API Group version that was selected to restore
@@ -245,7 +245,11 @@ func parseUserPriorities(ctx *restoreContext, prioritiesData string) map[string]
 	// orchestras.music.example.io=v2,v3alpha1\n
 	// subscriptions.operators.coreos.com=v2,v1
 
-	lines := strings.Split(prioritiesData, "\n")
+	// Normalize Windows (CRLF) and legacy Mac (CR) line endings before splitting.
+	normalized := strings.ReplaceAll(prioritiesData, "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+
+	lines := strings.Split(normalized, "\n")
 	lines = formatUserPriorities(lines)
 
 	for _, line := range lines {

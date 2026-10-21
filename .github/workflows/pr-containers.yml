@@ -9,12 +9,15 @@ on:
       - 'Dockerfile'
       - 'Dockerfile-Windows'
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       name: Checkout
 
     - name: Set up QEMU
@@ -25,7 +28,7 @@ jobs:
 
     - name: Set up Docker Buildx
       id: buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
       with:
         version: latest
 

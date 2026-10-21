@@ -19,7 +19,6 @@ package kopialib
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -41,10 +40,10 @@ import (
 	"github.com/kopia/kopia/snapshot/snapshotmaintenance"
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/kopia"
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend"
-	"github.com/vmware-tanzu/velero/pkg/util/freelist"
+	"github.com/velero-io/velero/pkg/kopia"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
+	"github.com/velero-io/velero/pkg/repository/udmrepo/kopialib/backend"
+	"github.com/velero-io/velero/pkg/util/freelist"
 )
 
 type kopiaRepoService struct {
@@ -74,8 +73,22 @@ type logThrottle struct {
 	interval time.Duration
 }
 
+type objectPrefetch struct {
+	ctx       context.Context
+	cancel    context.CancelFunc
+	entries   []object.IndirectObjectEntry
+	curOffset int64
+	cond      *sync.Cond
+	mu        sync.Mutex
+	nextEntry int
+	budget    int64
+}
+
 type kopiaObjectReader struct {
 	rawReader object.Reader
+	rawRepo   repo.Repository
+	prefetch  *objectPrefetch
+	logger    logrus.FieldLogger
 }
 
 type kopiaObjectWriter struct {
@@ -339,7 +352,7 @@ func (km *kopiaMaintenance) maintainProgress(uploaded int64) {
 	}
 }
 
-func (kr *kopiaRepository) OpenObject(ctx context.Context, id udmrepo.ID) (udmrepo.ObjectReader, error) {
+func (kr *kopiaRepository) OpenObject(ctx context.Context, id udmrepo.ID, opt udmrepo.ObjectReadOptions) (udmrepo.ObjectReader, error) {
 	if kr.rawRepo == nil {
 		return nil, errors.New("repo is closed or not open")
 	}
@@ -354,9 +367,42 @@ func (kr *kopiaRepository) OpenObject(ctx context.Context, id udmrepo.ID) (udmre
 		return nil, errors.Wrap(err, "error to open object")
 	}
 
-	return &kopiaObjectReader{
+	var prefetch *objectPrefetch
+	if opt.Prefetch {
+		if e, err := kr.getFlattenedEntries(ctx, objID); err != nil {
+			kr.logger.WithError(err).Warnf("Failed to load entries for object %v, skip prefetch", id)
+		} else {
+			pCtx, pCancel := context.WithCancel(ctx)
+			prefetch = &objectPrefetch{
+				ctx:     pCtx,
+				cancel:  pCancel,
+				budget:  int64(opt.PrefetchBudgetMB) << 20,
+				entries: e,
+			}
+
+			prefetch.cond = sync.NewCond(&prefetch.mu)
+		}
+	}
+
+	rd := &kopiaObjectReader{
 		rawReader: reader,
-	}, nil
+		rawRepo:   kr.rawRepo,
+		prefetch:  prefetch,
+		logger:    kr.logger,
+	}
+
+	if rd.prefetch != nil {
+		go rd.prefetchProc()
+
+		go func() {
+			<-rd.prefetch.ctx.Done()
+			prefetch.mu.Lock()
+			prefetch.cond.Broadcast()
+			prefetch.mu.Unlock()
+		}()
+	}
+
+	return rd, nil
 }
 
 func (kr *kopiaRepository) GetManifest(ctx context.Context, id udmrepo.ID, mani *udmrepo.RepoManifest) error {
@@ -551,7 +597,7 @@ func (kr *kopiaRepository) WriteMetadata(ctx context.Context, meta *udmrepo.Meta
 }
 
 func (kr *kopiaRepository) ReadMetadata(ctx context.Context, id udmrepo.ID) (*udmrepo.Metadata, error) {
-	reader, err := kr.OpenObject(ctx, id)
+	reader, err := kr.OpenObject(ctx, id, udmrepo.ObjectReadOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error to open metadata object %v", id)
 	}
@@ -666,6 +712,7 @@ func (kr *kopiaRepository) GetSnapshot(ctx context.Context, id udmrepo.ID) (udmr
 	}
 
 	return udmrepo.Snapshot{
+		ID:          udmrepo.ID(snap.ID),
 		Source:      snap.Source.Path,
 		Description: snap.Description,
 		StartTime:   snap.StartTime.ToTime(),
@@ -685,8 +732,21 @@ func (kr *kopiaRepository) GetSnapshot(ctx context.Context, id udmrepo.ID) (udmr
 }
 
 func (kr *kopiaRepository) DeleteSnapshot(ctx context.Context, id udmrepo.ID) error {
-	if _, err := kr.GetSnapshot(ctx, id); err != nil {
-		return errors.Wrap(err, "error getting snapshot")
+	_, err := kr.GetSnapshot(ctx, id)
+	if err != nil {
+		if !errors.Is(err, snapshot.ErrSnapshotNotFound) {
+			return errors.Wrap(err, "error getting snapshot")
+		}
+
+		err = kr.rawRepo.Refresh(ctx)
+		if err != nil {
+			return errors.Wrap(err, "error refreshing repo on snapshot not found")
+		}
+
+		_, err = kr.GetSnapshot(ctx, id)
+		if err != nil {
+			return errors.Wrap(err, "error getting snapshot after repo refresh")
+		}
 	}
 
 	return kr.DeleteManifest(ctx, id)
@@ -705,6 +765,7 @@ func (kr *kopiaRepository) ListSnapshot(ctx context.Context, source string) ([]u
 	snapshots := []udmrepo.Snapshot{}
 	for _, snap := range mani {
 		snapshots = append(snapshots, udmrepo.Snapshot{
+			ID:          udmrepo.ID(snap.ID),
 			Source:      snap.Source.Path,
 			Description: snap.Description,
 			StartTime:   snap.StartTime.ToTime(),
@@ -793,7 +854,16 @@ func (kor *kopiaObjectReader) Read(p []byte) (int, error) {
 		return 0, errors.New("object reader is closed or not open")
 	}
 
-	return kor.rawReader.Read(p)
+	n, err := kor.rawReader.Read(p)
+	if n > 0 {
+		if kor.prefetch != nil {
+			kor.prefetch.mu.Lock()
+			kor.prefetch.curOffset += int64(n)
+			kor.prefetch.cond.Signal()
+			kor.prefetch.mu.Unlock()
+		}
+	}
+	return n, err
 }
 
 func (kor *kopiaObjectReader) Seek(offset int64, whence int) (int64, error) {
@@ -801,10 +871,83 @@ func (kor *kopiaObjectReader) Seek(offset int64, whence int) (int64, error) {
 		return -1, errors.New("object reader is closed or not open")
 	}
 
-	return kor.rawReader.Seek(offset, whence)
+	off, err := kor.rawReader.Seek(offset, whence)
+	if err == nil {
+		if kor.prefetch != nil {
+			kor.prefetch.mu.Lock()
+			kor.prefetch.curOffset = off
+			kor.prefetch.cond.Signal()
+			kor.prefetch.mu.Unlock()
+		}
+	}
+
+	return off, err
+}
+
+func (kor *kopiaObjectReader) prefetchProc() {
+	prefetch := kor.prefetch
+	if prefetch == nil {
+		return
+	}
+
+	for {
+		prefetch.mu.Lock()
+
+		select {
+		case <-prefetch.ctx.Done():
+			prefetch.mu.Unlock()
+			return
+		default:
+		}
+
+		curOffset := prefetch.curOffset
+
+		for prefetch.nextEntry < len(prefetch.entries) {
+			entry := prefetch.entries[prefetch.nextEntry]
+			if entry.Start+entry.Length <= curOffset {
+				prefetch.nextEntry++
+			} else {
+				break
+			}
+		}
+
+		if prefetch.nextEntry >= len(prefetch.entries) {
+			prefetch.mu.Unlock()
+			return
+		}
+
+		var toFetch []object.ID
+		for prefetch.nextEntry < len(prefetch.entries) {
+			entry := prefetch.entries[prefetch.nextEntry]
+
+			if entry.Start > curOffset+prefetch.budget {
+				break
+			}
+
+			toFetch = append(toFetch, entry.Object)
+			prefetch.nextEntry++
+		}
+
+		if len(toFetch) == 0 {
+			prefetch.cond.Wait()
+			prefetch.mu.Unlock()
+			continue
+		}
+
+		prefetch.mu.Unlock()
+
+		_, err := kor.rawRepo.PrefetchObjects(prefetch.ctx, toFetch, "")
+		if err != nil && err != context.Canceled {
+			kor.logger.WithError(err).Warnf("Failed to prefetch contents for offset %v", curOffset)
+		}
+	}
 }
 
 func (kor *kopiaObjectReader) Close() error {
+	if kor.prefetch != nil && kor.prefetch.cancel != nil {
+		kor.prefetch.cancel()
+	}
+
 	if kor.rawReader == nil {
 		return nil
 	}
@@ -913,8 +1056,7 @@ func (kow *kopiaObjectWriterEx) Write(p []byte) (int, error) {
 		kow.entryLock.Unlock()
 
 		buffOffset := curPos - offset
-		objName := fmt.Sprintf("%s-b%v", kow.description, entryID)
-		kow.writeObjectAsync(objName, entryID, p[buffOffset:buffOffset+kow.blockSize])
+		kow.writeObjectAsync(entryID, p[buffOffset:buffOffset+kow.blockSize])
 
 		curPos += kow.blockSize
 	}
@@ -922,38 +1064,38 @@ func (kow *kopiaObjectWriterEx) Write(p []byte) (int, error) {
 	return length, nil
 }
 
-func (kow *kopiaObjectWriterEx) writeObject(objName string, p []byte) (object.ID, error) {
+func (kow *kopiaObjectWriterEx) writeObject(p []byte) (object.ID, error) {
 	writer := kow.rawRepoWriter.NewObjectWriter(kopia.SetupKopiaLog(kow.ctx, kow.logger), object.WriterOptions{
-		Description: objName,
+		Description: kow.description,
 		Compressor:  kow.compressor,
 		Splitter:    kow.splitter,
 	})
 
 	if writer == nil {
-		return object.EmptyID, errors.Errorf("error opening writer for %s", objName)
+		return object.EmptyID, errors.New("error opening writer")
 	}
 
 	defer writer.Close()
 
 	written, err := writer.Write(p)
 	if err != nil {
-		return object.EmptyID, errors.Wrapf(err, "error writing for %s", objName)
+		return object.EmptyID, errors.Wrap(err, "error writing data")
 	}
 
 	if written != len(p) {
-		return object.EmptyID, errors.Errorf("short write for %s", objName)
+		return object.EmptyID, errors.New("short write")
 	}
 
 	objID, err := writer.Result()
 	if err != nil {
-		return object.EmptyID, errors.Wrapf(err, "error flushing data for %s", objName)
+		return object.EmptyID, errors.Wrap(err, "error flushing data")
 	}
 
 	return objID, nil
 }
 
-func (kow *kopiaObjectWriterEx) writeObjectSync(objName string, entry int, p []byte) error {
-	objID, err := kow.writeObject(objName, p)
+func (kow *kopiaObjectWriterEx) writeObjectSync(entry int, p []byte) error {
+	objID, err := kow.writeObject(p)
 	if err != nil {
 		return err
 	}
@@ -965,10 +1107,10 @@ func (kow *kopiaObjectWriterEx) writeObjectSync(objName string, entry int, p []b
 	return nil
 }
 
-func (kow *kopiaObjectWriterEx) writeObjectAsync(objName string, entryID int, p []byte) {
+func (kow *kopiaObjectWriterEx) writeObjectAsync(entryID int, p []byte) {
 	if kow.asyncWritesSem == nil {
-		if err := kow.writeObjectSync(objName, entryID, p); err != nil {
-			kow.saveWriteError(errors.Wrapf(err, "error writing object for %s", objName))
+		if err := kow.writeObjectSync(entryID, p); err != nil {
+			kow.saveWriteError(errors.Wrapf(err, "error writing object for %s, entry %d", kow.description, entryID))
 		}
 	} else {
 		kow.asyncWritesSem <- struct{}{}
@@ -977,8 +1119,8 @@ func (kow *kopiaObjectWriterEx) writeObjectAsync(objName string, entryID int, p 
 		copy(buffer, p)
 
 		kow.asyncWritesGroup.Go(func() {
-			if err := kow.writeObjectSync(objName, entryID, buffer); err != nil {
-				kow.saveWriteError(errors.Wrapf(err, "error writing object for %s", objName))
+			if err := kow.writeObjectSync(entryID, buffer); err != nil {
+				kow.saveWriteError(errors.Wrapf(err, "error writing object for %s, entry %d", kow.description, entryID))
 			}
 
 			kow.asyncBuffer.Return(buffer)
@@ -987,10 +1129,10 @@ func (kow *kopiaObjectWriterEx) writeObjectAsync(objName string, entryID int, p 
 	}
 }
 
-func (kow *kopiaObjectWriterEx) writeZeroObject(objName string, entryID int) error {
+func (kow *kopiaObjectWriterEx) writeZeroObject(entryID int) error {
 	if kow.zeroObject == object.EmptyID {
 		zeroBuffer := make([]byte, kow.blockSize)
-		objectID, err := kow.writeObject(objName, zeroBuffer)
+		objectID, err := kow.writeObject(zeroBuffer)
 		if err != nil {
 			return err
 		}
@@ -1071,9 +1213,8 @@ func (kow *kopiaObjectWriterEx) WriteAt(p []byte, offset int64) (int, error) {
 		})
 		kow.entryLock.Unlock()
 
-		objName := fmt.Sprintf("%s-b%v", kow.description, entryID)
-		if err := kow.writeZeroObject(objName, entryID); err != nil {
-			return 0, errors.Wrapf(err, "error writing zero object for %s", objName)
+		if err := kow.writeZeroObject(entryID); err != nil {
+			return 0, errors.Wrapf(err, "error writing zero object for %s, entry %v", kow.description, entryID)
 		}
 
 		curPos += kow.blockSize
@@ -1093,8 +1234,7 @@ func (kow *kopiaObjectWriterEx) WriteAt(p []byte, offset int64) (int, error) {
 		kow.entryLock.Unlock()
 
 		buffOffset := curPos - offset
-		objName := fmt.Sprintf("%s-b%v", kow.description, entryID)
-		kow.writeObjectAsync(objName, entryID, p[buffOffset:buffOffset+kow.blockSize])
+		kow.writeObjectAsync(entryID, p[buffOffset:buffOffset+kow.blockSize])
 
 		curPos += kow.blockSize
 	}

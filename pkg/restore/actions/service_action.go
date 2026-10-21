@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/plugin/velero"
+	"github.com/velero-io/velero/pkg/util/boolptr"
 )
 
 const annotationLastAppliedConfig = "kubectl.kubernetes.io/last-applied-configuration"
@@ -194,7 +194,7 @@ func deleteNodePorts(service *corev1api.Service) error {
 							// unnamed port
 							unnamedPortInts.Insert(nodePortInt)
 						} else {
-							explicitNodePorts.Insert(portName.(string))
+							explicitNodePorts.Insert(fmt.Sprint(portName))
 						}
 					}
 				}

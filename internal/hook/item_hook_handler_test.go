@@ -32,12 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/kuberesource"
+	velerotest "github.com/velero-io/velero/pkg/test"
+	"github.com/velero-io/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/util/collections"
 )
 
 func TestHandleHooksSkips(t *testing.T) {
@@ -1285,6 +1285,25 @@ func TestGetInitContainerFromAnnotations(t *testing.T) {
 				podRestoreHookInitContainerImageAnnotationKey:   "busy-box",
 				podRestoreHookInitContainerNameAnnotationKey:    "restore-init",
 				podRestoreHookInitContainerCommandAnnotationKey: "[foobarbaz",
+			},
+		},
+		{
+			name:      "should use the image's default entrypoint when the command annotation is empty",
+			expectNil: false,
+			expected:  builder.ForContainer("restore-init1", "busy-box").Result(),
+			inputAnnotations: map[string]string{
+				podRestoreHookInitContainerImageAnnotationKey:   "busy-box",
+				podRestoreHookInitContainerNameAnnotationKey:    "restore-init",
+				podRestoreHookInitContainerCommandAnnotationKey: "",
+			},
+		},
+		{
+			name:      "should use the image's default entrypoint when the command annotation is missing",
+			expectNil: false,
+			expected:  builder.ForContainer("restore-init1", "busy-box").Result(),
+			inputAnnotations: map[string]string{
+				podRestoreHookInitContainerImageAnnotationKey: "busy-box",
+				podRestoreHookInitContainerNameAnnotationKey:  "restore-init",
 			},
 		},
 	}

@@ -35,9 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/velero-io/velero/pkg/builder"
+	velerotest "github.com/velero-io/velero/pkg/test"
+	"github.com/velero-io/velero/pkg/uploader"
 )
 
 func TestNamespaceAndName(t *testing.T) {
@@ -152,6 +152,39 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 			assert.Equal(t, test.expectedCreatedResult, nsCreated)
 		})
 	}
+}
+
+// TestEnsureNamespaceExistsAndIsReadyTerminatingTrackerKindMismatch verifies the
+// tracker skip-path fires when Add and Contains see different Kind values, as they
+// do in production: getNamespace() sets Kind="Namespace" but client.Get() strips it.
+func TestEnsureNamespaceExistsAndIsReadyTerminatingTrackerKindMismatch(t *testing.T) {
+	// Passed-in namespace mirrors getNamespace(): Kind is set.
+	namespace := &corev1api.Namespace{
+		TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "test"},
+	}
+
+	// clusterNS mirrors client.Get(): Kind stripped, phase Terminating.
+	clusterNS := &corev1api.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: "test"},
+		Status:     corev1api.NamespaceStatus{Phase: corev1api.NamespaceTerminating},
+	}
+
+	nsClient := &velerotest.FakeNamespaceClient{}
+	defer nsClient.AssertExpectations(t)
+	nsClient.On("Get", "test", metav1.GetOptions{}).Return(clusterNS, nil)
+
+	// Seed the tracker as production Add() does.
+	tracker := NewResourceDeletionStatusTracker()
+	tracker.Add(namespace.Kind, namespace.Name, namespace.Name)
+
+	result, nsCreated, err := EnsureNamespaceExistsAndIsReady(namespace, nsClient, time.Millisecond, tracker)
+
+	assert.False(t, result)
+	assert.False(t, nsCreated)
+	// Skip-path must fire, not the full terminating-resource-timeout wait.
+	require.ErrorContains(t, err, "skipping polling for terminating namespace")
+	assert.NotContains(t, err.Error(), "timed out waiting for terminating namespace")
 }
 
 // TestGetVolumeDirectorySuccess tests that the GetVolumeDirectory function

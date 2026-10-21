@@ -22,7 +22,7 @@ import (
 	"github.com/cockroachdb/errors"
 	"go.yaml.in/yaml/v3"
 
-	datamover "github.com/vmware-tanzu/velero/pkg/util/datamover"
+	datamover "github.com/velero-io/velero/pkg/util/datamover"
 )
 
 const currentSupportDataVersion = "v1"
@@ -115,6 +115,20 @@ func (a *Action) validate() error {
 		if _, ok := validDataMovers[dataMover]; !ok {
 			return fmt.Errorf("invalid %q value %q, valid values are %q, %q, %q",
 				DataMoverParameter, dataMover, datamover.DataMoverTypeVelero, datamover.DataMoverTypeVeleroFs, datamover.DataMoverTypeVeleroBlock)
+		}
+	}
+
+	if raw, ok := a.Parameters[SnapshotClassParameter]; ok {
+		if a.Type != Snapshot {
+			return fmt.Errorf("parameter %q is only supported for the %q action, but the action type is %q",
+				SnapshotClassParameter, Snapshot, a.Type)
+		}
+		snapshotClass, ok := raw.(string)
+		if !ok {
+			return fmt.Errorf("parameter %q must be a string, got %T", SnapshotClassParameter, raw)
+		}
+		if snapshotClass == "" {
+			return fmt.Errorf("parameter %q must not be empty", SnapshotClassParameter)
 		}
 	}
 

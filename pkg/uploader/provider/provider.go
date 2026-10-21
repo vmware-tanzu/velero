@@ -27,10 +27,10 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/cbtservice"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/velero-io/velero/internal/credentials"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/cbtservice"
+	"github.com/velero-io/velero/pkg/uploader"
 )
 
 const restoreProgressCheckInterval = 10 * time.Second
@@ -57,16 +57,18 @@ type Provider interface {
 		cbtParam CBTParam,
 		volMode uploader.PersistentVolumeMode,
 		uploaderCfg map[string]string,
-		updater uploader.ProgressUpdater) (string, bool, int64, int64, error)
+		updater uploader.ProgressUpdater) (string, bool, int64, int64, int64, bool, error)
 	// RunRestore which will do restore for one specific volume with given snapshot id and return error
 	// updater is used for updating backup progress which implement by third-party
 	RunRestore(
 		ctx context.Context,
 		snapshotID string,
 		volumePath string,
+		incremental bool,
+		cbtParam CBTParam,
 		volMode uploader.PersistentVolumeMode,
 		uploaderConfig map[string]string,
-		updater uploader.ProgressUpdater) (int64, error)
+		updater uploader.ProgressUpdater) (int64, int64, bool, error)
 	// Close which will close related repository
 	Close(ctx context.Context) error
 }

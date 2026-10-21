@@ -23,13 +23,13 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/internal/resourcepolicies"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	"github.com/velero-io/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/util/logging"
 )
 
 /*
@@ -109,8 +109,23 @@ func (b *BackupBuilder) FromSchedule(schedule *velerov1api.Schedule) *BackupBuil
 	b.object.Spec = schedule.Spec.Template
 	b.ObjectMeta(WithLabelsMap(labels))
 
-	if schedule.Annotations != nil {
-		b.ObjectMeta(WithAnnotationsMap(schedule.Annotations))
+	var annotations map[string]string
+
+	// Check if there's explicit Annotations defined in the Schedule object template
+	// and if present then copy it to the backup object.
+	if schedule.Spec.Template.Metadata.Annotations != nil {
+		logger := logging.DefaultLogger(logging.LogLevelFlag(logrus.InfoLevel).Parse(), logging.NewFormatFlag().Parse())
+		annotations = schedule.Spec.Template.Metadata.Annotations
+		logger.WithFields(logrus.Fields{
+			"backup":      fmt.Sprintf("%s/%s", b.object.GetNamespace(), b.object.GetName()),
+			"annotations": schedule.Spec.Template.Metadata.Annotations,
+		}).Info("Schedule.template.metadata.annotations set - using those annotations instead of schedule.annotations for backup object")
+	} else {
+		annotations = schedule.Annotations
+	}
+
+	if annotations != nil {
+		b.ObjectMeta(WithAnnotationsMap(annotations))
 	}
 
 	if boolptr.IsSetToTrue(schedule.Spec.UseOwnerReferencesInBackup) {

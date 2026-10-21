@@ -17,7 +17,6 @@ limitations under the License.
 package output
 
 import (
-	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -25,13 +24,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"k8s.io/utils/ptr"
 
-	"github.com/vmware-tanzu/velero/internal/volume"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/util/results"
+	"github.com/velero-io/velero/internal/volume"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerov2alpha1 "github.com/velero-io/velero/pkg/apis/velero/v2alpha1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/util/results"
 )
 
 func TestDescribeBackupInSF(t *testing.T) {
@@ -48,6 +47,7 @@ func TestDescribeBackupInSF(t *testing.T) {
 		TTL(72 * time.Hour).
 		CSISnapshotTimeout(10 * time.Minute).
 		DataMover("mover").
+		BackupType(velerov1api.BackupTypeFull).
 		Hooks(velerov1api.BackupHooks{
 			Resources: []velerov1api.BackupResourceHookSpec{
 				{
@@ -90,6 +90,7 @@ func TestDescribeBackupInSF(t *testing.T) {
 				"clusterScoped": "auto",
 			},
 			"dataMover":               "mover",
+			"backupType":              velerov1api.BackupTypeFull,
 			"labelSelector":           emptyDisplay,
 			"storageLocation":         "backup-location",
 			"veleroNativeSnapshotPVs": "auto",
@@ -520,7 +521,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 					PVCNamespace:      "pvc-ns-3",
 					PVCName:           "pvc-3",
 					SnapshotDataMoved: true,
-					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
+					SnapshotDataMovementInfo: &volume.BackupSnapshotDataMovementInfo{
 						DataMover:      "velero",
 						UploaderType:   "fake-uploader",
 						SnapshotHandle: "fake-repo-id-3",
@@ -545,7 +546,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 					PVCName:           "pvc-4",
 					SnapshotDataMoved: true,
 					Result:            volume.VolumeResultSucceeded,
-					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
+					SnapshotDataMovementInfo: &volume.BackupSnapshotDataMovementInfo{
 						DataMover:      "velero",
 						UploaderType:   "fake-uploader",
 						SnapshotHandle: "fake-repo-id-4",
@@ -576,10 +577,14 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 					Result:            volume.VolumeResultFailed,
 					PVCName:           "pvc-4",
 					SnapshotDataMoved: true,
-					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
-						UploaderType:   "fake-uploader",
-						SnapshotHandle: "fake-repo-id-4",
-						OperationID:    "fake-operation-4",
+					BackupType:        velerov1api.BackupTypeIncremental,
+					SnapshotDataMovementInfo: &volume.BackupSnapshotDataMovementInfo{
+						UploaderType:    "fake-uploader",
+						SnapshotHandle:  "fake-repo-id-4",
+						OperationID:     "fake-operation-4",
+						Size:            100,
+						IncrementalSize: ptr.To(int64(50)),
+						Phase:           velerov2alpha1.DataUploadPhaseFailed,
 					},
 				},
 			},
@@ -588,10 +593,52 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 				"csiSnapshots": map[string]any{
 					"pvc-ns-4/pvc-4": map[string]any{
 						"dataMovement": map[string]any{
-							"operationID":  "fake-operation-4",
-							"dataMover":    "velero",
-							"uploaderType": "fake-uploader",
-							"result":       "failed",
+							"operationID":     "fake-operation-4",
+							"dataMover":       "velero",
+							"backupType":      "Incremental",
+							"uploaderType":    "fake-uploader",
+							"size":            int64(100),
+							"incrementalSize": int64(50),
+							"result":          "failed",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "details, data movement, incremental fallback to full",
+			volumeInfo: []*volume.BackupVolumeInfo{
+				{
+					BackupMethod:      volume.CSISnapshot,
+					PVCNamespace:      "pvc-ns-5",
+					Result:            volume.VolumeResultSucceeded,
+					PVCName:           "pvc-5",
+					SnapshotDataMoved: true,
+					BackupType:        velerov1api.BackupTypeIncremental,
+					FallbackFull:      true,
+					SnapshotDataMovementInfo: &volume.BackupSnapshotDataMovementInfo{
+						DataMover:       "velero",
+						UploaderType:    "fake-uploader",
+						SnapshotHandle:  "fake-repo-id-5",
+						OperationID:     "fake-operation-5",
+						Size:            200,
+						IncrementalSize: ptr.To(int64(200)),
+						Phase:           velerov2alpha1.DataUploadPhaseCompleted,
+					},
+				},
+			},
+			inputDetails: true,
+			expect: map[string]any{
+				"csiSnapshots": map[string]any{
+					"pvc-ns-5/pvc-5": map[string]any{
+						"dataMovement": map[string]any{
+							"operationID":     "fake-operation-5",
+							"dataMover":       "velero",
+							"backupType":      "Incremental (fallen back to Full)",
+							"uploaderType":    "fake-uploader",
+							"size":            int64(200),
+							"incrementalSize": int64(200),
+							"result":          "succeeded",
 						},
 					},
 				},
@@ -730,97 +777,4 @@ func TestDescribeDeleteBackupRequestsInSF(t *testing.T) {
 			assert.True(tt, reflect.DeepEqual(sd.output, tc.expect))
 		})
 	}
-}
-
-func TestDescribeFineGrainedFilterPoliciesInSF(t *testing.T) {
-	yamlData := `
-version: v1
-clusterScopedFilterPolicy:
-  resourceFilters:
-  - kinds: ["StorageClass"]
-    labelSelector: {"app": "velero"}
-  - kinds: ["ClusterRole"]
-    orLabelSelectors:
-    - {"app": "velero"}
-    - {"app": "test"}
-    names: ["role1"]
-    excludedNames: ["role2"]
-namespacedFilterPolicies:
-- namespaces: ["ns1", "ns2"]
-  resourceFilters:
-  - kinds: ["Pod", "ConfigMap"]
-    labelSelector: {"app": "velero"}
-  - kinds: ["*"]
-`
-	cm := &corev1api.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-policy",
-			Namespace: "velero",
-		},
-		Data: map[string]string{
-			"policy.yaml": yamlData,
-		},
-	}
-
-	client := fake.NewClientBuilder().WithRuntimeObjects(cm).Build()
-
-	backup := builder.ForBackup("velero", "test-backup").
-		ResourcePolicies("test-policy").Result()
-
-	sd := &StructuredDescriber{
-		output: make(map[string]any),
-		format: "",
-	}
-
-	DescribeFineGrainedFilterPoliciesInSF(context.Background(), client, sd, backup)
-
-	expect := map[string]any{
-		"clusterScopedFilterPolicy": map[string]any{
-			"resourceFilters": []map[string]any{
-				{
-					"kinds":         []string{"StorageClass"},
-					"labelSelector": map[string]string{"app": "velero"},
-				},
-				{
-					"kinds": []string{"ClusterRole"},
-					"orLabelSelectors": []map[string]string{
-						{"app": "velero"},
-						{"app": "test"},
-					},
-					"names":         []string{"role1"},
-					"excludedNames": []string{"role2"},
-				},
-			},
-		},
-		"namespacedFilterPolicies": []map[string]any{
-			{
-				"namespace": "ns1",
-				"resourceFilters": []map[string]any{
-					{
-						"kinds":         []string{"Pod", "ConfigMap"},
-						"labelSelector": map[string]string{"app": "velero"},
-					},
-					{
-						"kinds":      []string{},
-						"isCatchAll": true,
-					},
-				},
-			},
-			{
-				"namespace": "ns2",
-				"resourceFilters": []map[string]any{
-					{
-						"kinds":         []string{"Pod", "ConfigMap"},
-						"labelSelector": map[string]string{"app": "velero"},
-					},
-					{
-						"kinds":      []string{},
-						"isCatchAll": true,
-					},
-				},
-			},
-		},
-	}
-
-	assert.True(t, reflect.DeepEqual(sd.output, expect))
 }
