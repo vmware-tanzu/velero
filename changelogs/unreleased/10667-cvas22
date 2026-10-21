@@ -1,1 +1,1 @@
-Retry transient API errors when patching a backup to InProgress so it is not left stuck in InProgress
+Retry transient API errors when patching a backup or restore out of its initial phase so it is not left stuck in InProgress

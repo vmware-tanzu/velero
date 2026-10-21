@@ -73,9 +73,9 @@ const (
 	backupResyncPeriod = time.Minute
 )
 
-// startBackupPatchBackoff bounds the retries of the patch that moves a backup
-// out of ReadyToStart. It is a variable so tests can shorten it.
-var startBackupPatchBackoff = wait.Backoff{
+// startPhasePatchBackoff bounds the retries of the patch that moves a backup or
+// restore out of its initial phase. It is a variable so tests can shorten it.
+var startPhasePatchBackoff = wait.Backoff{
 	Steps:    5,
 	Duration: 100 * time.Millisecond,
 	Factor:   2.0,
@@ -355,7 +355,7 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// patch was not applied. If it was, the backup is already InProgress, a
 	// requeued reconcile skips it, and it stays InProgress until the server
 	// restarts. Retry such errors so the patch is confirmed before giving up.
-	if err := retry.OnError(startBackupPatchBackoff, isTransientAPIError, func() error {
+	if err := retry.OnError(startPhasePatchBackoff, isTransientAPIError, func() error {
 		return kubeutil.PatchResource(original, request.Backup, b.kbClient)
 	}); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "error updating Backup status to %s", request.Status.Phase)

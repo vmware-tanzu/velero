@@ -284,9 +284,9 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 func TestProcessBackupRetriesTransientStartPatchErrors(t *testing.T) {
 	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
 
-	origBackoff := startBackupPatchBackoff
-	startBackupPatchBackoff = wait.Backoff{Steps: 3, Duration: time.Millisecond, Factor: 1}
-	t.Cleanup(func() { startBackupPatchBackoff = origBackoff })
+	origBackoff := startPhasePatchBackoff
+	startPhasePatchBackoff = wait.Backoff{Steps: 3, Duration: time.Millisecond, Factor: 1}
+	t.Cleanup(func() { startPhasePatchBackoff = origBackoff })
 
 	tests := []struct {
 		name            string
