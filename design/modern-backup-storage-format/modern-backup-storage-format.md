@@ -1,7 +1,7 @@
 # Backup Storage Format With Morden Encryption And Compression
 
 ## Glossary & Abbreviation
-**Backup Storage**: The storage to persist the backup data and metadata.  
+**Backup Storage**: The storage to persist the backup data and metadata. Check [Unified Repository design][1] for details.   
 **BSL**: BackupStorageLocation. The Velero custom resource defining the Backup Storage.  
 **Backup Storage Format**: The layout and format of the data in the Backup Storage.  
 **Backup Repository**: Backup repository is layered between BR data movers and Backup Storage to provide BR related features for volume data. It is introduced in [Unified Repository design][1].  
@@ -303,6 +303,15 @@ For Format 2.0, Zstd is used for compression. Zstd is a modern compression metho
 | **Encoder Memory Footprint** | ~256 KB – 1 MB | **~8 MB – 12 MB** (at 4 MB window size) |
 | **Decoder Memory Footprint** | ~32 KB | **~4 MB** (determined by stream window size) |
 | **CPU Throttling Resilience** | **Poor**: High CPU time per byte frequently triggers Kubernetes CFS quota throttling | **Excellent**: Low CPU instructions per byte minimizes throttling spikes under cgroups v1/v2 quotas |
+
+### Encryption and Data Integrity
+
+For resource data, Format 2.0 always uses AES-256-GCM which is a method of AEAD. Specifically, it produces ciphertext together with an authentication tag covering both the encrypted data and AAD. During decryption, the tag is verified; modification of the ciphertext or AAD causes verification to fail.  
+Therefore, it provides data integrity verification alongside confidentiality, without requiring a separate checksum for data integrity verification.  
+
+For volume data, Velero delegates authenticated encryption and integrity verification to the backup repository and relies on it to report authentication failures.  
+For Velero built-in backup repository, Velero uses the default encryption method of Kopia repository, which is also AES-256-GCM, so data integrity verification is already covered.  
+
 
 ### Velero CSE and SSE
 
@@ -1090,3 +1099,5 @@ With this solution Format 2.0 is used for new BSLs only; Format 1.x is kept for 
 
 
 
+
+[1]: ../Implemented/unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
