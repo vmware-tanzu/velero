@@ -916,10 +916,14 @@ type PublicPodVolumeInfo struct {
 }
 ```
 
-The fields in these structs are sanitized, so that no sensitive information is included, since the public interface files are never encrypted.  
+The fields in these structs are sanitized, so that no highly sensitive information is included, since the public interface files are never encrypted.  
+
+The fields still include `Warnings` and `Errors` which are regarded as sensitive information in some way, because they may expose in-cluster information, e.g., secret or configmap names. Including these fields are a trade-off for observability, most observability secnarios require to know the result of the backup/restore and `Warnings` and `Errors` are important parts of them which could help users to validate if the backup/restore is useful.  
+In future, if this is still concerned, a dedicated desensitization operation could be introduced to remove the sensitive data from `Warnings` and `Errors`.  
+
 
 The existing backup/restore describe CLI should be refactored to use the information from the public interface of backup storage only.   
-Additionally, below information should be removed from backup/restore describe since they are sensitive information and not helpful for observation or troubleshooting:
+Additionally, below information should be removed from backup/restore describe since they are highly sensitive information and not helpful for observation or troubleshooting:
 - SnapshotHandle: exposing it allows an attacker to directly clone, mount, or exfiltrate the snapshot disk image outside of Kubernetes and without Velero encryption keys.
 - VolumeHandle: it exposes production storage LUNs.
 
