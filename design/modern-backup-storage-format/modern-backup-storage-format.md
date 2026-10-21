@@ -381,9 +381,9 @@ Below are the modified/added fields into BSL:
 type BackupStorageLocationSpec struct {
     // StorageFormat specifies the backup storage format version for this location.
     // Supported values:
-    // - "1.x": Legacy format (gzip compression, unencrypted manifests, no RSD).
-    // - "2.0": Modern format (zstd compression, AES-256-GCM client-side encryption, RSD).
-    // If omitted, defaults to "2.0" for brand new backup storage.
+    // - "1.1.0": Legacy format (gzip compression, unencrypted manifests, no RSD).
+    // - "2.0.0": Modern format (zstd compression, AES-256-GCM client-side encryption, RSD).
+    // If omitted, defaults to "1.1.0"
     // +optional
     StorageFormat string `json:"storageFormat,omitempty"`
 
@@ -930,7 +930,7 @@ The fields still include `Warnings` and `Errors` which are regarded as sensitive
 In future, if this is still concerned, a dedicated desensitization operation could be introduced to remove the sensitive data from `Warnings` and `Errors`.  
 
 
-The existing backup/restore describe CLI should be refactored to use the information from the public interface of backup storage only.   
+The existing backup/restore describe CLI should be refactored to use the information from the public interface of backup storage only, if the data is there.   
 Additionally, below information should be removed from backup/restore describe since they are highly sensitive information and not helpful for observation or troubleshooting:
 - SnapshotHandle: exposing it allows an attacker to directly clone, mount, or exfiltrate the snapshot disk image outside of Kubernetes and without Velero encryption keys.
 - VolumeHandle: it exposes production storage LUNs.
@@ -976,7 +976,7 @@ The SDK will retrieve the raw file from the backup storage, decrypt it to plaint
        ▼                                                                            │
 ```
 
-The SDK is in auto-fit mode, if the target file is not encrypted, it writes the raw file directly.  
+The SDK is in auto-fit mode, which works for both encrypted data and unencrypted data.  
 
 Below are the definition for the SDK:
 ```go
