@@ -26,9 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/velero-io/velero/pkg/kuberesource"
+	"github.com/velero-io/velero/pkg/plugin/velero"
+	velerotest "github.com/velero-io/velero/pkg/test"
 )
 
 func TestPodActionExecute(t *testing.T) {
@@ -163,6 +163,47 @@ func TestPodActionExecute(t *testing.T) {
 						{
 							VolumeMounts: []corev1api.VolumeMount{
 								{Name: "foo"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "ephemeralContainer volumeMounts matching prefix <service account name>-token- should be deleted",
+			obj: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+				Spec: corev1api.PodSpec{
+					ServiceAccountName: "foo",
+					Volumes: []corev1api.Volume{
+						{Name: "foo"},
+						{Name: "foo-token-foo"},
+					},
+					EphemeralContainers: []corev1api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: corev1api.EphemeralContainerCommon{
+								VolumeMounts: []corev1api.VolumeMount{
+									{Name: "foo"},
+									{Name: "foo-token-foo"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedRes: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+				Spec: corev1api.PodSpec{
+					ServiceAccountName: "foo",
+					Volumes: []corev1api.Volume{
+						{Name: "foo"},
+					},
+					EphemeralContainers: []corev1api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: corev1api.EphemeralContainerCommon{
+								VolumeMounts: []corev1api.VolumeMount{
+									{Name: "foo"},
+								},
 							},
 						},
 					},

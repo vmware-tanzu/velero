@@ -34,13 +34,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"github.com/vmware-tanzu/velero/pkg/restorehelper"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/util/collections"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/kuberesource"
+	"github.com/velero-io/velero/pkg/podexec"
+	"github.com/velero-io/velero/pkg/restorehelper"
+	"github.com/velero-io/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/util/collections"
+	"github.com/velero-io/velero/pkg/util/kube"
 )
 
 type HookPhase string
@@ -147,7 +147,7 @@ func (i *InitContainerRestoreHookHandler) HandleRestoreHooks(
 		labels := labels.Set(metadata.GetLabels())
 
 		// Apply the hook according to the target namespace in which the pod will be restored
-		// more details see https://github.com/vmware-tanzu/velero/issues/4720
+		// more details see https://github.com/velero-io/velero/issues/4720
 		if namespaceMapping != nil {
 			if n, ok := namespaceMapping[namespace]; ok {
 				namespace = n
@@ -365,6 +365,12 @@ func getPodExecHookFromAnnotations(annotations map[string]string, phase HookPhas
 
 func parseStringToCommand(commandValue string) []string {
 	var command []string
+	// An empty command means the container image's own entrypoint should be used.
+	// Callers that require a command already return early; getInitContainerFromAnnotation
+	// deliberately allows this case, so return nil rather than indexing an empty string.
+	if commandValue == "" {
+		return nil
+	}
 	// check for json array
 	if commandValue[0] == '[' {
 		if err := json.Unmarshal([]byte(commandValue), &command); err != nil {
@@ -419,7 +425,7 @@ func getInitContainerFromAnnotation(podName string, annotations map[string]strin
 		return nil
 	}
 	if command == "" {
-		log.Infof("RestoreHook init container for pod %s is using container's default entrypoint", podName, containerImage)
+		log.Infof("RestoreHook init container for pod %s is using the default entrypoint of image %s", podName, containerImage)
 	}
 	if containerName == "" {
 		uid, err := uuid.NewRandom()

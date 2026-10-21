@@ -21,15 +21,15 @@ import (
 	io "io"
 
 	mock "github.com/stretchr/testify/mock"
-	itemoperation "github.com/vmware-tanzu/velero/pkg/itemoperation"
+	itemoperation "github.com/velero-io/velero/pkg/itemoperation"
 
-	persistence "github.com/vmware-tanzu/velero/pkg/persistence"
+	persistence "github.com/velero-io/velero/pkg/persistence"
 
-	results "github.com/vmware-tanzu/velero/pkg/util/results"
+	results "github.com/velero-io/velero/pkg/util/results"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	v1 "github.com/velero-io/velero/pkg/apis/velero/v1"
 
-	volume "github.com/vmware-tanzu/velero/internal/volume"
+	volume "github.com/velero-io/velero/internal/volume"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 )
@@ -449,6 +449,36 @@ func (_m *BackupStore) GetRestoreResults(name string) (map[string]results.Result
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[string]results.Result)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRestoreVolumeInfos provides a mock function with given fields: name
+func (_m *BackupStore) GetRestoreVolumeInfos(name string) ([]*volume.RestoreVolumeInfo, error) {
+	ret := _m.Called(name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRestoreVolumeInfos")
+	}
+
+	var r0 []*volume.RestoreVolumeInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) ([]*volume.RestoreVolumeInfo, error)); ok {
+		return rf(name)
+	}
+	if rf, ok := ret.Get(0).(func(string) []*volume.RestoreVolumeInfo); ok {
+		r0 = rf(name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*volume.RestoreVolumeInfo)
 		}
 	}
 

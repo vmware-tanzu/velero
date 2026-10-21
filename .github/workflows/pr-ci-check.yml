@@ -1,5 +1,9 @@
 name: Pull Request CI Check
 on: [pull_request]
+
+permissions:
+  contents: read
+
 jobs:
   get-go-version:
     uses: ./.github/workflows/get-go-version.yaml
@@ -10,6 +14,10 @@ jobs:
     name: Run CI
     needs: get-go-version
     runs-on: ubuntu-latest
+    # The build container mounts .go/pkg as its GOPATH/pkg, so pointing the host
+    # here lets go mod tidy and the container share one cached module download.
+    env:
+      GOMODCACHE: ${{ github.workspace }}/.go/pkg/mod
     strategy:
       fail-fast: false
     steps:
@@ -24,7 +32,7 @@ jobs:
       - name: Make ci
         run: make ci
       - name: Upload test coverage
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.out

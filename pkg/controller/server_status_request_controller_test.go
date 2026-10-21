@@ -30,12 +30,12 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/buildinfo"
+	"github.com/velero-io/velero/pkg/plugin/framework"
+	"github.com/velero-io/velero/pkg/plugin/framework/common"
+	velerotest "github.com/velero-io/velero/pkg/test"
 )
 
 func statusRequestBuilder(resourceVersion string) *builder.ServerStatusRequestBuilder {
@@ -92,7 +92,7 @@ var _ = Describe("Server Status Request Reconciler", func() {
 				Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			} else {
 				Expect(err).ToNot(HaveOccurred())
-				Eventually(instance.Status.Phase == test.expected.Status.Phase, timeout).Should(BeTrue())
+				Expect(instance.Status.Phase).To(Equal(test.expected.Status.Phase))
 			}
 		},
 		Entry("with phase=empty will be processed and phased successfully patched", request{

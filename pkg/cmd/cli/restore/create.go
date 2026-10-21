@@ -31,17 +31,17 @@ import (
 	"k8s.io/client-go/tools/cache"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/pkg/util/velero/restore"
+	"github.com/velero-io/velero/internal/resourcemodifiers"
+	"github.com/velero-io/velero/internal/resourcepolicies"
+	api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/cmd"
+	"github.com/velero-io/velero/pkg/cmd/cli"
+	"github.com/velero-io/velero/pkg/cmd/util/flag"
+	"github.com/velero-io/velero/pkg/cmd/util/output"
+	"github.com/velero-io/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/util/kube"
+	"github.com/velero-io/velero/pkg/util/velero/restore"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -99,6 +99,8 @@ type CreateOptions struct {
 	IncludeNamespaces           flag.StringArray
 	ExcludeNamespaces           flag.StringArray
 	ExistingResourcePolicy      string
+	ExistingVolumeDataPolicy    string
+	AllowExistingVolumeMismatch flag.OptionalBool
 	IncludeResources            flag.StringArray
 	ExcludeResources            flag.StringArray
 	StatusIncludeResources      flag.StringArray
@@ -115,19 +117,22 @@ type CreateOptions struct {
 	SkipDefaultResourceModifier bool
 	WriteSparseFiles            flag.OptionalBool
 	ParallelFilesDownload       int
+	DeleteExtraFiles            flag.OptionalBool
 	client                      kbclient.WithWatch
 }
 
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		Labels:                  flag.NewMap(),
-		Annotations:             flag.NewMap(),
-		IncludeNamespaces:       flag.NewStringArray("*"),
-		NamespaceMappings:       flag.NewMap().WithEntryDelimiter(',').WithKeyValueDelimiter(':'),
-		RestoreVolumes:          flag.NewOptionalBool(nil),
-		PreserveNodePorts:       flag.NewOptionalBool(nil),
-		IncludeClusterResources: flag.NewOptionalBool(nil),
-		WriteSparseFiles:        flag.NewOptionalBool(nil),
+		Labels:                      flag.NewMap(),
+		Annotations:                 flag.NewMap(),
+		IncludeNamespaces:           flag.NewStringArray("*"),
+		NamespaceMappings:           flag.NewMap().WithEntryDelimiter(',').WithKeyValueDelimiter(':'),
+		RestoreVolumes:              flag.NewOptionalBool(nil),
+		PreserveNodePorts:           flag.NewOptionalBool(nil),
+		IncludeClusterResources:     flag.NewOptionalBool(nil),
+		AllowExistingVolumeMismatch: flag.NewOptionalBool(nil),
+		WriteSparseFiles:            flag.NewOptionalBool(nil),
+		DeleteExtraFiles:            flag.NewOptionalBool(nil),
 	}
 }
 
@@ -141,13 +146,16 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.Annotations, "annotations", "Annotations to apply to the restore.")
 	flags.Var(&o.IncludeResources, "include-resources", "Resources to include in the restore, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources).")
 	flags.Var(&o.ExcludeResources, "exclude-resources", "Resources to exclude from the restore, formatted as resource.group, such as storageclasses.storage.k8s.io.")
-	flags.StringVar(&o.ExistingResourcePolicy, "existing-resource-policy", "", "Restore Policy to be used during the restore workflow, can be - none or update")
+	flags.StringVar(&o.ExistingResourcePolicy, "existing-resource-policy", "", "Restore Policy to be used during the restore workflow for Kubernetes resources, can be - none or update")
+	flags.StringVar(&o.ExistingVolumeDataPolicy, "existing-volume-data-policy", "", "Restore Policy to be used during the restore workflow for volume data, can be - none, full or incremental")
+	f := flags.VarPF(&o.AllowExistingVolumeMismatch, "allow-existing-volume-mismatch", "", "Whether to allow in-place restore when the existing PVC is bound to a different volume handle than at backup time.")
+	f.NoOptDefVal = cmd.TRUE
 	flags.Var(&o.StatusIncludeResources, "status-include-resources", "Resources to include in the restore status, formatted as resource.group, such as storageclasses.storage.k8s.io.")
 	flags.Var(&o.StatusExcludeResources, "status-exclude-resources", "Resources to exclude from the restore status, formatted as resource.group, such as storageclasses.storage.k8s.io.")
 	flags.VarP(&o.Selector, "selector", "l", "Only restore resources matching this label selector.")
 	flags.Var(&o.OrSelector, "or-selector", "Restore resources matching at least one of the label selector from the list. Label selectors should be separated by ' or '. For example, foo=bar or app=nginx")
 	flags.DurationVar(&o.ItemOperationTimeout, "item-operation-timeout", o.ItemOperationTimeout, "How long to wait for async plugin operations before timeout.")
-	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "Whether to restore volumes from snapshots.")
+	f = flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "Whether to restore volumes from snapshots.")
 	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
 	// like a normal bool flag
 	f.NoOptDefVal = cmd.TRUE
@@ -175,6 +183,9 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f.NoOptDefVal = cmd.TRUE
 
 	flags.IntVar(&o.ParallelFilesDownload, "parallel-files-download", 0, "The number of restore operations to run in parallel. If set to 0, the default parallelism will be the number of CPUs for the node that node agent pod is running.")
+
+	f = flags.VarPF(&o.DeleteExtraFiles, "delete-extra-files", "", "Whether to delete extra files in the target volume that do not exist in the backup during file system restore. This setting is only applicable to File System restores (PodVolumeBackup or CSI File System Data Move) and has no effect on Block Data Move restores.")
+	f.NoOptDefVal = cmd.TRUE
 }
 
 func (o *CreateOptions) Complete(args []string, f client.Factory) error {
@@ -222,6 +233,10 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	if len(o.ExistingResourcePolicy) > 0 && !restore.IsResourcePolicyValid(o.ExistingResourcePolicy) {
 		return errors.New("existing-resource-policy has invalid value, it accepts only none, update as value")
+	}
+
+	if len(o.ExistingVolumeDataPolicy) > 0 && !restore.IsVolumeDataPolicyValid(o.ExistingVolumeDataPolicy) {
+		return errors.New("existing-volume-data-policy has invalid value, it accepts only none, full, incremental as value")
 	}
 
 	if o.ParallelFilesDownload < 0 {
@@ -344,27 +359,30 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			Annotations: o.Annotations.Data(),
 		},
 		Spec: api.RestoreSpec{
-			BackupName:              o.BackupName,
-			ScheduleName:            o.ScheduleName,
-			IncludedNamespaces:      o.IncludeNamespaces,
-			ExcludedNamespaces:      o.ExcludeNamespaces,
-			IncludedResources:       o.IncludeResources,
-			ExcludedResources:       o.ExcludeResources,
-			ExistingResourcePolicy:  api.PolicyType(o.ExistingResourcePolicy),
-			NamespaceMapping:        o.NamespaceMappings.Data(),
-			LabelSelector:           o.Selector.LabelSelector,
-			OrLabelSelectors:        o.OrSelector.OrLabelSelectors,
-			RestorePVs:              o.RestoreVolumes.Value,
-			PreserveNodePorts:       o.PreserveNodePorts.Value,
-			IncludeClusterResources: o.IncludeClusterResources.Value,
-			ResourceModifier:        resModifiers,
-			ResourcePolicy:          resPolicies,
+			BackupName:                  o.BackupName,
+			ScheduleName:                o.ScheduleName,
+			IncludedNamespaces:          o.IncludeNamespaces,
+			ExcludedNamespaces:          o.ExcludeNamespaces,
+			IncludedResources:           o.IncludeResources,
+			ExcludedResources:           o.ExcludeResources,
+			ExistingResourcePolicy:      api.ResourcePolicyType(o.ExistingResourcePolicy),
+			ExistingVolumeDataPolicy:    api.VolumeDataPolicyType(o.ExistingVolumeDataPolicy),
+			AllowExistingVolumeMismatch: o.AllowExistingVolumeMismatch.Value,
+			NamespaceMapping:            o.NamespaceMappings.Data(),
+			LabelSelector:               o.Selector.LabelSelector,
+			OrLabelSelectors:            o.OrSelector.OrLabelSelectors,
+			RestorePVs:                  o.RestoreVolumes.Value,
+			PreserveNodePorts:           o.PreserveNodePorts.Value,
+			IncludeClusterResources:     o.IncludeClusterResources.Value,
+			ResourceModifier:            resModifiers,
+			ResourcePolicy:              resPolicies,
 			ItemOperationTimeout: metav1.Duration{
 				Duration: o.ItemOperationTimeout,
 			},
 			UploaderConfig: &api.UploaderConfigForRestore{
 				WriteSparseFiles:      o.WriteSparseFiles.Value,
 				ParallelFilesDownload: o.ParallelFilesDownload,
+				DeleteExtraFiles:      o.DeleteExtraFiles.Value,
 			},
 		},
 	}

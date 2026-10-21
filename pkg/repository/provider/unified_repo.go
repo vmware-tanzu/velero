@@ -30,12 +30,12 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
-	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	reposervice "github.com/vmware-tanzu/velero/pkg/repository/udmrepo/service"
+	"github.com/velero-io/velero/internal/credentials"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	repoconfig "github.com/velero-io/velero/pkg/repository/config"
+	repokey "github.com/velero-io/velero/pkg/repository/keys"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
+	reposervice "github.com/velero-io/velero/pkg/repository/udmrepo/service"
 )
 
 type unifiedRepoProvider struct {
@@ -327,7 +327,7 @@ func (urp *unifiedRepoProvider) Forget(ctx context.Context, snapshotID string, p
 		}
 	}()
 
-	err = bkRepo.DeleteManifest(ctx, udmrepo.ID(snapshotID))
+	err = bkRepo.DeleteSnapshot(ctx, udmrepo.ID(snapshotID))
 	if err != nil {
 		return errors.Wrap(err, "error to delete manifest")
 	}
@@ -376,7 +376,7 @@ func (urp *unifiedRepoProvider) BatchForget(ctx context.Context, snapshotIDs []s
 
 	errs := []error{}
 	for _, snapshotID := range snapshotIDs {
-		err = bkRepo.DeleteManifest(ctx, udmrepo.ID(snapshotID))
+		err = bkRepo.DeleteSnapshot(ctx, udmrepo.ID(snapshotID))
 		if err != nil {
 			errs = append(errs, errors.Wrapf(err, "error to delete manifest %s", snapshotID))
 		}
@@ -501,10 +501,15 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 		return map[string]string{}, errors.New("invalid storage provider")
 	}
 
-	config := backupLocation.Spec.Config
-	if config == nil {
-		config = map[string]string{}
+	config := make(map[string]string)
+	if backupLocation.Spec.Config != nil {
+		for k, v := range backupLocation.Spec.Config {
+			config[k] = v
+		}
 	}
+
+	// Delete any user-provided credentialsFile to prevent path traversal vulnerabilities
+	delete(config, repoconfig.CredentialsFileKey)
 
 	if backupLocation.Spec.Credential != nil {
 		config[repoconfig.CredentialsFileKey], err = credentialsFileStore.Path(backupLocation.Spec.Credential)
@@ -549,10 +554,15 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 		return map[string]string{}, errors.New("invalid storage provider")
 	}
 
-	config := backupLocation.Spec.Config
-	if config == nil {
-		config = map[string]string{}
+	config := make(map[string]string)
+	if backupLocation.Spec.Config != nil {
+		for k, v := range backupLocation.Spec.Config {
+			config[k] = v
+		}
 	}
+
+	// Delete any user-provided credentialsFile to prevent path traversal vulnerabilities
+	delete(config, repoconfig.CredentialsFileKey)
 
 	bucket := strings.Trim(config["bucket"], "/")
 	prefix := strings.Trim(config["prefix"], "/")

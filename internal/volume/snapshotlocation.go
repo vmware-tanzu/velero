@@ -19,8 +19,8 @@ package volume
 import (
 	"github.com/cockroachdb/errors"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/internal/credentials"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
 )
 
 // UpdateVolumeSnapshotLocationWithCredentialConfig adds the credentials file path to the config
@@ -29,6 +29,10 @@ func UpdateVolumeSnapshotLocationWithCredentialConfig(location *velerov1api.Volu
 	if location.Spec.Config == nil {
 		location.Spec.Config = make(map[string]string)
 	}
+
+	// Delete any user-provided credentialsFile to prevent path traversal vulnerabilities
+	delete(location.Spec.Config, "credentialsFile")
+
 	// If the VSL specifies a credential, fetch its path on disk and pass to
 	// plugin via the config.
 	if location.Spec.Credential != nil && credentialStore != nil {

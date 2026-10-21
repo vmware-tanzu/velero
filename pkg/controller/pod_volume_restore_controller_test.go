@@ -19,8 +19,11 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"github.com/cockroachdb/errors"
 	"github.com/sirupsen/logrus"
@@ -43,18 +46,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/datapath"
-	datapathmockes "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
-	"github.com/vmware-tanzu/velero/pkg/exposer"
-	exposermockes "github.com/vmware-tanzu/velero/pkg/exposer/mocks"
-	"github.com/vmware-tanzu/velero/pkg/restorehelper"
-	"github.com/vmware-tanzu/velero/pkg/test"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/datapath"
+	datapathmockes "github.com/velero-io/velero/pkg/datapath/mocks"
+	"github.com/velero-io/velero/pkg/exposer"
+	exposermockes "github.com/velero-io/velero/pkg/exposer/mocks"
+	"github.com/velero-io/velero/pkg/restorehelper"
+	"github.com/velero-io/velero/pkg/test"
+	velerotest "github.com/velero-io/velero/pkg/test"
+	"github.com/velero-io/velero/pkg/uploader"
+	"github.com/velero-io/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/util/kube"
 )
 
 func TestShouldProcess(t *testing.T) {
@@ -748,6 +751,7 @@ func initPodVolumeRestoreReconcilerWithError(objects []runtime.Object, cliObj []
 		nil,
 		nil, // podLabels
 		nil, // podAnnotations
+		nil, // tolerations
 	), nil
 }
 
@@ -1087,7 +1091,7 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 			}
 
 			if test.sportTime != nil {
-				r.cancelledPVR[test.pvr.Name] = test.sportTime.Time
+				r.cancelledPVR.Store(test.pvr.Name, test.sportTime.Time)
 			}
 
 			if test.constrained {
@@ -1208,9 +1212,15 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 			}
 
 			if test.expectCancelRecord {
-				assert.Contains(t, r.cancelledPVR, test.pvr.Name)
+				_, ok := r.cancelledPVR.Load(test.pvr.Name)
+				assert.True(t, ok)
 			} else {
-				assert.Empty(t, r.cancelledPVR)
+				empty := true
+				r.cancelledPVR.Range(func(key, value any) bool {
+					empty = false
+					return false
+				})
+				assert.True(t, empty)
 			}
 
 			if isPVRInFinalState(&pvr) || pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseInProgress {
@@ -1326,6 +1336,7 @@ func TestPodVolumeRestoreSetupExposeParam(t *testing.T) {
 				nil, // repoConfigMgr (unused when cacheVolumeConfigs is nil)
 				tt.args.customLabels,
 				tt.args.customAnnotations,
+				nil,
 			)
 
 			// Act
@@ -1462,6 +1473,15 @@ func TestOnPodVolumeRestoreProgress(t *testing.T) {
 			},
 		},
 		{
+			name: "patch in progress phase with negative progress values and message",
+			pvr:  pvrBuilder().Result(),
+			progress: uploader.Progress{
+				TotalBytes: -1,
+				BytesDone:  -1,
+				Message:    "some warning message",
+			},
+		},
+		{
 			name:     "failed to get pvr",
 			pvr:      pvrBuilder().Result(),
 			needErrs: []bool{true, false, false, false},
@@ -1489,17 +1509,30 @@ func TestOnPodVolumeRestoreProgress(t *testing.T) {
 			require.NoError(t, r.client.Create(t.Context(), pvr))
 
 			// Create a Progress object
-			progress := &uploader.Progress{
-				TotalBytes: totalBytes,
-				BytesDone:  bytesDone,
-			}
+			progress := &test.progress
 
 			r.OnDataPathProgress(ctx, namespace, pvrName, progress)
-			if len(test.needErrs) != 0 && !test.needErrs[0] {
+			if len(test.needErrs) == 0 {
 				updatedPVR := &velerov1api.PodVolumeRestore{}
 				require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
-				assert.Equal(t, test.progress.TotalBytes, updatedPVR.Status.Progress.TotalBytes)
-				assert.Equal(t, test.progress.BytesDone, updatedPVR.Status.Progress.BytesDone)
+				if progress.TotalBytes != -1 {
+					assert.Equal(t, test.progress.TotalBytes, updatedPVR.Status.Progress.TotalBytes)
+				} else {
+					assert.Equal(t, int64(0), updatedPVR.Status.Progress.TotalBytes) // assuming default or original value
+				}
+				if progress.BytesDone != -1 {
+					assert.Equal(t, test.progress.BytesDone, updatedPVR.Status.Progress.BytesDone)
+				} else {
+					assert.Equal(t, int64(0), updatedPVR.Status.Progress.BytesDone) // assuming default or original value
+				}
+				if progress.Message != "" {
+					assert.Contains(t, updatedPVR.Status.Activities, progress.Message)
+
+					// Call with the same message again to verify deduplication
+					r.OnDataPathProgress(ctx, namespace, pvrName, progress)
+					require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
+					assert.Equal(t, []string{progress.Message}, updatedPVR.Status.Activities)
+				}
 			}
 		})
 	}
@@ -1934,4 +1967,48 @@ func TestResumeCancellablePodVolumeRestore(t *testing.T) {
 			}
 		})
 	}
+}
+
+type pvrSequenceClock struct {
+	*clocktesting.FakeClock
+	mu sync.Mutex
+}
+
+func (c *pvrSequenceClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.FakeClock.Step(time.Second)
+	return c.FakeClock.Now()
+}
+
+func TestPodVolumeRestoreCancelConcurrency(t *testing.T) {
+	ctx := t.Context()
+	pvr := builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, "pvr-1").Cancel(true).Phase(velerov1api.PodVolumeRestorePhaseInProgress).Result()
+
+	r, err := initPodVolumeRestoreReconciler(nil, []client.Object{pvr})
+	require.NoError(t, err)
+
+	firstTime := time.Now()
+	// manually store the initial time
+	r.cancelledPVR.Store(pvr.Name, firstTime)
+
+	// Custom clock that returns a different time each call
+	r.clock = &pvrSequenceClock{FakeClock: clocktesting.NewFakeClock(firstTime)}
+
+	var wg sync.WaitGroup
+	routines := 50
+	wg.Add(routines)
+
+	for i := 0; i < routines; i++ {
+		go func() {
+			defer wg.Done()
+			_, _ = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: pvr.Name, Namespace: pvr.Namespace}})
+		}()
+	}
+
+	wg.Wait()
+
+	v, ok := r.cancelledPVR.Load(pvr.Name)
+	assert.True(t, ok)
+	assert.Equal(t, firstTime, v.(time.Time), "The initially recorded timestamp should be preserved")
 }

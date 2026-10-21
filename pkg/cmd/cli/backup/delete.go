@@ -27,13 +27,13 @@ import (
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/confirm"
-	"github.com/vmware-tanzu/velero/pkg/label"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/cmd"
+	"github.com/velero-io/velero/pkg/cmd/cli"
+	"github.com/velero-io/velero/pkg/cmd/util/confirm"
+	"github.com/velero-io/velero/pkg/label"
 )
 
 // NewDeleteCommand creates a new command that deletes a backup.
@@ -121,7 +121,29 @@ func Run(o *cli.DeleteOptions) error {
 	}
 
 	// create a backup deletion request for each
+	bslCache := make(map[string]*velerov1api.BackupStorageLocation)
 	for _, b := range backups {
+		storageLocationName := b.Spec.StorageLocation
+		if storageLocationName == "" {
+			errs = append(errs, errors.Errorf("cannot delete backup %q because it does not have a backup storage location set", b.Name))
+			continue
+		}
+
+		location, ok := bslCache[storageLocationName]
+		if !ok {
+			location = &velerov1api.BackupStorageLocation{}
+			if err := o.Client.Get(context.TODO(), controllerclient.ObjectKey{Namespace: o.Namespace, Name: storageLocationName}, location); err != nil {
+				errs = append(errs, errors.Wrapf(err, "error getting backup storage location %q for backup %q", storageLocationName, b.Name))
+				continue
+			}
+			bslCache[storageLocationName] = location
+		}
+
+		if location.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
+			errs = append(errs, errors.Errorf("cannot delete backup %q because backup storage location %q is currently in read-only mode", b.Name, location.Name))
+			continue
+		}
+
 		deleteRequest := builder.ForDeleteBackupRequest(o.Namespace, "").BackupName(b.Name).
 			ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, label.GetValidName(b.Name),
 				velerov1api.BackupUIDLabel, string(b.UID)), builder.WithGenerateName(b.Name+"-")).Result()

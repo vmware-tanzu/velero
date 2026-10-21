@@ -36,11 +36,11 @@ import (
 	clientTesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/repository"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/velero-io/velero/internal/resourcepolicies"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/repository"
+	velerotest "github.com/velero-io/velero/pkg/test"
 )
 
 type fakeInformerRegistration struct{}
@@ -333,7 +333,8 @@ func createPVObj(index int, withHostPath bool) *corev1api.PersistentVolume {
 }
 
 func createPVCObj(index int) *corev1api.PersistentVolumeClaim {
-	pvcObj := builder.ForPersistentVolumeClaim("fake-ns", fmt.Sprintf("fake-pvc-%d", index)).VolumeName(fmt.Sprintf("fake-pv-%d", index)).Result()
+	pvcObj := builder.ForPersistentVolumeClaim("fake-ns", fmt.Sprintf("fake-pvc-%d", index)).VolumeName(fmt.Sprintf("fake-pv-%d", index)).
+		Phase(corev1api.ClaimBound).Result()
 	return pvcObj
 }
 
@@ -357,7 +358,7 @@ func createPVBObj(fail bool, withSnapshot bool, index int, uploaderType string) 
 }
 
 func createNodeObj() *corev1api.Node {
-	return builder.ForNode("fake-node-name").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
+	return builder.ForNode("fake-node-name").Labels(map[string]string{corev1api.LabelOSStable: "linux"}).Result()
 }
 
 func TestBackupPodVolumes(t *testing.T) {

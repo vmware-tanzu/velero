@@ -38,10 +38,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	repomocks "github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/mocks"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
+	repomocks "github.com/velero-io/velero/pkg/repository/udmrepo/kopialib/backend/mocks"
 
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerotest "github.com/velero-io/velero/pkg/test"
 )
 
 func TestOpen(t *testing.T) {
@@ -1609,6 +1609,7 @@ func TestGetSnapshot(t *testing.T) {
 			snapshotID:  udmrepo.ID("fake-id"),
 			setRepoMock: true,
 			expectedSnap: udmrepo.Snapshot{
+				ID:          "fake-id",
 				Source:      "fake-source",
 				Description: "fake-desc",
 				StartTime:   mockMani.StartTime.ToTime(),
@@ -1679,75 +1680,110 @@ func TestDeleteSnapshot(t *testing.T) {
 		Tags: map[string]string{"tag1": "val1"},
 	}
 
+	setManifestPayload := func(args mock.Arguments) {
+		payload := args.Get(2)
+		if ptr, ok := payload.(*snapshot.Manifest); ok {
+			*ptr = *mockMani
+		} else {
+			b, err := json.Marshal(mockMani)
+			require.NoError(t, err)
+			err = json.Unmarshal(b, payload)
+			require.NoError(t, err)
+		}
+	}
+
 	testCases := []struct {
-		name            string
-		rawRepo         *repomocks.MockRepository
-		rawWriter       *repomocks.MockRepositoryWriter
-		snapshotID      udmrepo.ID
-		rawRepoRetErr   error
-		rawWriterRetErr error
-		setRepoMock     bool
-		setWriterMock   bool
-		expectedErr     string
+		name        string
+		snapshotID  udmrepo.ID
+		mockRepo    func(*repomocks.MockRepository)
+		mockWriter  func(*repomocks.MockRepositoryWriter)
+		expectedErr string
 	}{
 		{
-			name:          "get snapshot fail",
-			rawRepo:       repomocks.NewMockRepository(t),
-			snapshotID:    udmrepo.ID("fake-id"),
-			rawRepoRetErr: errors.New("fake-get-error"),
-			setRepoMock:   true,
-			expectedErr:   "error getting snapshot: error getting snapshot manifest: unable to find manifest entries: fake-get-error",
+			name:       "get snapshot fail",
+			snapshotID: udmrepo.ID("fake-id"),
+			mockRepo: func(r *repomocks.MockRepository) {
+				r.On("GetManifest", mock.Anything, manifest.ID("fake-id"), mock.Anything).Return(&manifest.EntryMetadata{
+					Labels: map[string]string{manifest.TypeLabelKey: snapshot.ManifestType},
+				}, errors.New("fake-get-error")).Once()
+			},
+			expectedErr: "error getting snapshot: error getting snapshot manifest: unable to find manifest entries: fake-get-error",
 		},
 		{
-			name:            "delete manifest fail",
-			rawRepo:         repomocks.NewMockRepository(t),
-			rawWriter:       repomocks.NewMockRepositoryWriter(t),
-			snapshotID:      udmrepo.ID("fake-id"),
-			rawWriterRetErr: errors.New("fake-delete-error"),
-			setRepoMock:     true,
-			setWriterMock:   true,
-			expectedErr:     "error to delete manifest: fake-delete-error",
+			name:       "snapshot not found in cache, repo refresh fail",
+			snapshotID: udmrepo.ID("fake-id"),
+			mockRepo: func(r *repomocks.MockRepository) {
+				r.On("GetManifest", mock.Anything, manifest.ID("fake-id"), mock.Anything).Return(nil, manifest.ErrNotFound).Once()
+				r.On("Refresh", mock.Anything).Return(errors.New("fake-refresh-error")).Once()
+			},
+			expectedErr: "error refreshing repo on snapshot not found: fake-refresh-error",
 		},
 		{
-			name:          "succeed",
-			rawRepo:       repomocks.NewMockRepository(t),
-			rawWriter:     repomocks.NewMockRepositoryWriter(t),
-			snapshotID:    udmrepo.ID("fake-id"),
-			setRepoMock:   true,
-			setWriterMock: true,
+			name:       "snapshot not found in cache, refreshed, but still not found",
+			snapshotID: udmrepo.ID("fake-id"),
+			mockRepo: func(r *repomocks.MockRepository) {
+				r.On("GetManifest", mock.Anything, manifest.ID("fake-id"), mock.Anything).Return(nil, manifest.ErrNotFound).Once()
+				r.On("Refresh", mock.Anything).Return(nil).Once()
+				r.On("GetManifest", mock.Anything, manifest.ID("fake-id"), mock.Anything).Return(nil, manifest.ErrNotFound).Once()
+			},
+			expectedErr: "error getting snapshot after repo refresh: error getting snapshot manifest: snapshot not found",
+		},
+		{
+			name:       "snapshot not found in cache, refreshed, found, and delete succeed",
+			snapshotID: udmrepo.ID("fake-id"),
+			mockRepo: func(r *repomocks.MockRepository) {
+				r.On("GetManifest", mock.Anything, manifest.ID("fake-id"), mock.Anything).Return(nil, manifest.ErrNotFound).Once()
+				r.On("Refresh", mock.Anything).Return(nil).Once()
+				r.On("GetManifest", mock.Anything, manifest.ID("fake-id"), mock.Anything).Return(&manifest.EntryMetadata{
+					Labels: map[string]string{manifest.TypeLabelKey: snapshot.ManifestType},
+				}, nil).Run(setManifestPayload).Once()
+			},
+			mockWriter: func(w *repomocks.MockRepositoryWriter) {
+				w.On("DeleteManifest", mock.Anything, manifest.ID("fake-id")).Return(nil).Once()
+			},
+		},
+		{
+			name:       "delete manifest fail",
+			snapshotID: udmrepo.ID("fake-id"),
+			mockRepo: func(r *repomocks.MockRepository) {
+				r.On("GetManifest", mock.Anything, manifest.ID("fake-id"), mock.Anything).Return(&manifest.EntryMetadata{
+					Labels: map[string]string{manifest.TypeLabelKey: snapshot.ManifestType},
+				}, nil).Run(setManifestPayload).Once()
+			},
+			mockWriter: func(w *repomocks.MockRepositoryWriter) {
+				w.On("DeleteManifest", mock.Anything, manifest.ID("fake-id")).Return(errors.New("fake-delete-error")).Once()
+			},
+			expectedErr: "error to delete manifest: fake-delete-error",
+		},
+		{
+			name:       "succeed",
+			snapshotID: udmrepo.ID("fake-id"),
+			mockRepo: func(r *repomocks.MockRepository) {
+				r.On("GetManifest", mock.Anything, manifest.ID("fake-id"), mock.Anything).Return(&manifest.EntryMetadata{
+					Labels: map[string]string{manifest.TypeLabelKey: snapshot.ManifestType},
+				}, nil).Run(setManifestPayload).Once()
+			},
+			mockWriter: func(w *repomocks.MockRepositoryWriter) {
+				w.On("DeleteManifest", mock.Anything, manifest.ID("fake-id")).Return(nil).Once()
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			kr := &kopiaRepository{}
-
-			if tc.rawRepo != nil {
-				if tc.setRepoMock {
-					tc.rawRepo.On("GetManifest", mock.Anything, mock.Anything, mock.Anything).Return(&manifest.EntryMetadata{
-						Labels: map[string]string{
-							manifest.TypeLabelKey: snapshot.ManifestType,
-						},
-					}, tc.rawRepoRetErr).Run(func(args mock.Arguments) {
-						if tc.rawRepoRetErr == nil {
-							payload := args.Get(2)
-							if ptr, ok := payload.(*snapshot.Manifest); ok {
-								*ptr = *mockMani
-							} else {
-								b, _ := json.Marshal(mockMani)
-								json.Unmarshal(b, payload)
-							}
-						}
-					})
-				}
-				kr.rawRepo = tc.rawRepo
+			rawRepo := repomocks.NewMockRepository(t)
+			if tc.mockRepo != nil {
+				tc.mockRepo(rawRepo)
 			}
 
-			if tc.rawWriter != nil {
-				if tc.setWriterMock {
-					tc.rawWriter.On("DeleteManifest", mock.Anything, mock.Anything).Return(tc.rawWriterRetErr)
-				}
-				kr.rawWriter = tc.rawWriter
+			rawWriter := repomocks.NewMockRepositoryWriter(t)
+			if tc.mockWriter != nil {
+				tc.mockWriter(rawWriter)
+			}
+
+			kr := &kopiaRepository{
+				rawRepo:   rawRepo,
+				rawWriter: rawWriter,
 			}
 
 			err := kr.DeleteSnapshot(t.Context(), tc.snapshotID)
@@ -1805,6 +1841,7 @@ func TestListSnapshot(t *testing.T) {
 			setRepoMock: true,
 			expectedSnaps: []udmrepo.Snapshot{
 				{
+					ID:          "fake-id",
 					Source:      "fake-source",
 					Description: "fake-desc",
 					StartTime:   mockMani.StartTime.ToTime(),

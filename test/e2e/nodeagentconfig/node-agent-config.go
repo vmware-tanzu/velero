@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/cockroachdb/errors"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,15 +32,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
-	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
-	veleroutil "github.com/vmware-tanzu/velero/test/util/velero"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/velero-io/velero/pkg/apis/velero/v2alpha1"
+	"github.com/velero-io/velero/pkg/builder"
+	velerotypes "github.com/velero-io/velero/pkg/types"
+	"github.com/velero-io/velero/pkg/util/kube"
+	"github.com/velero-io/velero/test"
+	. "github.com/velero-io/velero/test/e2e/test"
+	k8sutil "github.com/velero-io/velero/test/util/k8s"
+	veleroutil "github.com/velero-io/velero/test/util/velero"
 )
 
 type NodeAgentConfigTestCase struct {
@@ -62,7 +63,7 @@ var LoadAffinities func() = TestFunc(&NodeAgentConfigTestCase{
 			{
 				NodeSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
-						"kubernetes.io/arch": "amd64",
+						corev1api.LabelArchStable: "amd64",
 					},
 				},
 				StorageClass: test.StorageClassName2,
@@ -92,6 +93,10 @@ var LoadAffinities func() = TestFunc(&NodeAgentConfigTestCase{
 func (n *NodeAgentConfigTestCase) Init() error {
 	// generate random number as UUIDgen and set one default timeout duration
 	n.TestCase.Init()
+
+	if !test.SecondStorageClassInstalled() {
+		Skip("this case maps between two StorageClasses; it needs --storage-class-file-2")
+	}
 
 	// generate variable names based on CaseBaseName + UUIDgen
 	n.CaseBaseName = "node-agent-config-" + n.UUIDgen

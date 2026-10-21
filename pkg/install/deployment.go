@@ -26,9 +26,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
-	"github.com/vmware-tanzu/velero/internal/velero"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/velero-io/velero/internal/velero"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/util/kube"
 )
 
 type podTemplateOption func(*podTemplateConfig)
@@ -395,7 +395,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1api.Deployme
 									{
 										MatchExpressions: []corev1api.NodeSelectorRequirement{
 											{
-												Key:      "kubernetes.io/os",
+												Key:      corev1api.LabelOSStable,
 												Values:   []string{"windows"},
 												Operator: corev1api.NodeSelectorOpNotIn,
 											},
@@ -532,7 +532,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1api.Deployme
 
 	if len(c.plugins) > 0 {
 		for _, image := range c.plugins {
-			container := *builder.ForPluginContainer(image, pullPolicy).Result()
+			container := *builder.ForPluginContainer(image, pullPolicy, deployment.Spec.Template.Spec.InitContainers).Result()
 			deployment.Spec.Template.Spec.InitContainers = append(deployment.Spec.Template.Spec.InitContainers, container)
 		}
 	}

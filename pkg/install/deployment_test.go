@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1api "k8s.io/api/core/v1"
 
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/velero-io/velero/pkg/util/kube"
 )
 
 func TestDeployment(t *testing.T) {
@@ -120,7 +120,7 @@ func TestDeployment(t *testing.T) {
 					{
 						MatchExpressions: []corev1api.NodeSelectorRequirement{
 							{
-								Key:      "kubernetes.io/os",
+								Key:      corev1api.LabelOSStable,
 								Values:   []string{"windows"},
 								Operator: corev1api.NodeSelectorOpNotIn,
 							},

@@ -21,7 +21,7 @@ import (
 
 	"github.com/fatih/color"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	v1 "github.com/velero-io/velero/pkg/apis/velero/v1"
 )
 
 func DescribeSchedule(schedule *v1.Schedule) string {

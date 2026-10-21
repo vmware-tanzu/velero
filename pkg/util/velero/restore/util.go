@@ -1,12 +1,18 @@
 package restore
 
 import (
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	api "github.com/velero-io/velero/pkg/apis/velero/v1"
 )
 
 func IsResourcePolicyValid(resourcePolicy string) bool {
-	if resourcePolicy == string(api.PolicyTypeNone) || resourcePolicy == string(api.PolicyTypeUpdate) {
-		return true
-	}
-	return false
+	return resourcePolicy == "" ||
+		resourcePolicy == string(api.ResourcePolicyTypeNone) ||
+		resourcePolicy == string(api.ResourcePolicyTypeUpdate)
+}
+
+func IsVolumeDataPolicyValid(volumeDataPolicy string) bool {
+	return volumeDataPolicy == "" ||
+		volumeDataPolicy == string(api.VolumeDataPolicyTypeNone) ||
+		volumeDataPolicy == string(api.VolumeDataPolicyTypeFull) ||
+		volumeDataPolicy == string(api.VolumeDataPolicyTypeIncremental)
 }

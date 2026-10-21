@@ -25,11 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
+	v1 "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/cmd"
+	"github.com/velero-io/velero/pkg/cmd/cli"
+	"github.com/velero-io/velero/pkg/cmd/util/output"
 )
 
 func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
@@ -56,7 +56,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					selector, err = labels.Parse(listOptions.LabelSelector)
 					cmd.CheckError(err)
 				}
-				err = crClient.List(context.TODO(), schedules, &ctrlclient.ListOptions{LabelSelector: selector})
+				err = crClient.List(context.TODO(), schedules, &ctrlclient.ListOptions{LabelSelector: selector, Namespace: f.Namespace()})
 				cmd.CheckError(err)
 			}
 

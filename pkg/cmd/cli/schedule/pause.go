@@ -28,10 +28,10 @@ import (
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/cmd"
+	"github.com/velero-io/velero/pkg/cmd/cli"
 )
 
 // NewPauseCommand creates the command for pause
@@ -114,6 +114,7 @@ func runPause(f client.Factory, o *cli.SelectOptions, paused bool, skipImmediate
 		res := new(velerov1api.ScheduleList)
 		err := crClient.List(context.TODO(), res, &ctrlclient.ListOptions{
 			LabelSelector: selector,
+			Namespace:     f.Namespace(),
 		})
 		if err != nil {
 			errs = append(errs, errors.WithStack(err))

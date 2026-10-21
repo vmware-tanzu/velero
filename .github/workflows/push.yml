@@ -29,6 +29,9 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ needs.get-go-version.outputs.version }}
+          # The Build step cleans the module cache, so saving it would store an
+          # empty entry under the key that PR jobs restore.
+          cache: false
 
       - name: Set up QEMU
         id: qemu
@@ -48,7 +51,7 @@ jobs:
       - name: Test
         run: make test
       - name: Upload test coverage
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.out

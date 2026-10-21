@@ -26,8 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
-	"github.com/vmware-tanzu/velero/internal/velero"
-	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	"github.com/velero-io/velero/internal/velero"
+	"github.com/velero-io/velero/pkg/nodeagent"
 )
 
 func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet {
@@ -247,7 +247,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 						{
 							MatchExpressions: []corev1api.NodeSelectorRequirement{
 								{
-									Key:      "kubernetes.io/os",
+									Key:      corev1api.LabelOSStable,
 									Values:   []string{"windows"},
 									Operator: corev1api.NodeSelectorOpIn,
 								},
@@ -280,7 +280,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 						{
 							MatchExpressions: []corev1api.NodeSelectorRequirement{
 								{
-									Key:      "kubernetes.io/os",
+									Key:      corev1api.LabelOSStable,
 									Values:   []string{"windows"},
 									Operator: corev1api.NodeSelectorOpNotIn,
 								},

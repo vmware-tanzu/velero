@@ -10,10 +10,10 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	framework "github.com/vmware-tanzu/velero/test/e2e/test"
-	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
-	veleroutil "github.com/vmware-tanzu/velero/test/util/velero"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	framework "github.com/velero-io/velero/test/e2e/test"
+	k8sutil "github.com/velero-io/velero/test/util/k8s"
+	veleroutil "github.com/velero-io/velero/test/util/velero"
 )
 
 type PeriodicalCase struct {
@@ -184,7 +184,7 @@ func (n *PeriodicalCase) Verify() error {
 	By("Namespaces were restored", func() {
 		for _, ns := range *n.NSIncluded {
 			_, err := k8sutil.GetConfigMap(n.Client.ClientGo, ns, n.CaseBaseName)
-			Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("failed to list CM in namespace: %s\n", ns))
+			Expect(err).ToNot(HaveOccurred(), fmt.Sprintf("failed to list CM in namespace: %s\n", ns))
 		}
 	})
 	return nil

@@ -26,13 +26,13 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backup"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
+	"github.com/velero-io/velero/internal/resourcepolicies"
+	api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/cmd"
+	"github.com/velero-io/velero/pkg/cmd/cli"
+	"github.com/velero-io/velero/pkg/cmd/cli/backup"
+	"github.com/velero-io/velero/pkg/cmd/util/output"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -136,9 +136,10 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 	schedule := &api.Schedule{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: f.Namespace(),
-			Name:      o.BackupOptions.Name,
-			Labels:    o.BackupOptions.Labels.Data(),
+			Namespace:   f.Namespace(),
+			Name:        o.BackupOptions.Name,
+			Labels:      o.BackupOptions.Labels.Data(),
+			Annotations: o.BackupOptions.Annotations.Data(),
 		},
 		Spec: api.ScheduleSpec{
 			Template: api.BackupSpec{
@@ -163,6 +164,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				ItemOperationTimeout:             metav1.Duration{Duration: o.BackupOptions.ItemOperationTimeout},
 				DataMover:                        o.BackupOptions.DataMover,
 				SnapshotMoveData:                 o.BackupOptions.SnapshotMoveData.Value,
+				BackupType:                       api.BackupType(o.BackupOptions.BackupType),
 			},
 			Schedule:                   o.Schedule,
 			UseOwnerReferencesInBackup: &o.UseOwnerReferencesInBackup,

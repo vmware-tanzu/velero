@@ -31,19 +31,19 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/datapath"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/datapath"
+	"github.com/velero-io/velero/pkg/uploader"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
 
 	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerotest "github.com/velero-io/velero/pkg/test"
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	datapathmockes "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
+	datapathmockes "github.com/velero-io/velero/pkg/datapath/mocks"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -165,7 +165,7 @@ func TestOnPvrCompleted(t *testing.T) {
 		{
 			name:        "marshal fail",
 			marshalErr:  errors.New("fake-marshal-error"),
-			expectedErr: "error marshaling restore result {{ } 0}: fake-marshal-error",
+			expectedErr: "error marshaling restore result {{ } 0 0 false}: fake-marshal-error",
 		},
 		{
 			name:                "succeed",

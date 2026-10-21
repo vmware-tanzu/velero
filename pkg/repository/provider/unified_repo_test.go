@@ -30,12 +30,12 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	velerocredentials "github.com/vmware-tanzu/velero/internal/credentials"
-	credmock "github.com/vmware-tanzu/velero/internal/credentials/mocks"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	reposervicenmocks "github.com/vmware-tanzu/velero/pkg/repository/udmrepo/mocks"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerocredentials "github.com/velero-io/velero/internal/credentials"
+	credmock "github.com/velero-io/velero/internal/credentials/mocks"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
+	reposervicenmocks "github.com/velero-io/velero/pkg/repository/udmrepo/mocks"
+	velerotest "github.com/velero-io/velero/pkg/test"
 )
 
 func TestGetStorageCredentials(t *testing.T) {
@@ -85,7 +85,7 @@ func TestGetStorageCredentials(t *testing.T) {
 				Spec: velerov1api.BackupStorageLocationSpec{
 					Provider: "velero.io/aws",
 					Config: map[string]string{
-						"credentialsFile": "credentials-from-config-map",
+						"credentialsFile": "credentials-from-config-map", // This should be ignored
 					},
 				},
 			},
@@ -96,7 +96,7 @@ func TestGetStorageCredentials(t *testing.T) {
 			},
 			credFileStore: new(credmock.FileStore),
 			expected: map[string]string{
-				"accessKeyID":     "from: credentials-from-config-map",
+				"accessKeyID":     "from: ",
 				"providerName":    "",
 				"secretAccessKey": "",
 				"sessionToken":    "",
@@ -108,7 +108,7 @@ func TestGetStorageCredentials(t *testing.T) {
 				Spec: velerov1api.BackupStorageLocationSpec{
 					Provider: "velero.io/aws",
 					Config: map[string]string{
-						"credentialsFile": "credentials-from-config-map",
+						"credentialsFile": "credentials-from-config-map", // This should be ignored
 					},
 					Credential: &corev1api.SecretKeySelector{},
 				},
@@ -134,7 +134,7 @@ func TestGetStorageCredentials(t *testing.T) {
 				Spec: velerov1api.BackupStorageLocationSpec{
 					Provider: "velero.io/aws",
 					Config: map[string]string{
-						"credentialsFile": "credentials-from-config-map",
+						"credentialsFile": "credentials-from-config-map", // This should be ignored
 					},
 				},
 			},
@@ -176,16 +176,16 @@ func TestGetStorageCredentials(t *testing.T) {
 				Spec: velerov1api.BackupStorageLocationSpec{
 					Provider: "velero.io/gcp",
 					Config: map[string]string{
-						"credentialsFile": "credentials-from-config-map",
+						"credentialsFile": "credentials-from-config-map", // This should be ignored
 					},
 				},
 			},
 			getGCPCredentials: func(config map[string]string) string {
-				return "credentials-from-config-map"
+				return config["credentialsFile"]
 			},
 			credFileStore: new(credmock.FileStore),
 			expected: map[string]string{
-				"credFile": "credentials-from-config-map",
+				"credFile": "",
 			},
 		},
 	}
@@ -938,7 +938,7 @@ func TestForget(t *testing.T) {
 			}
 
 			if tc.backupRepo != nil {
-				backupRepo.On("DeleteManifest", mock.Anything, mock.Anything).Return(tc.retFuncDelete)
+				backupRepo.On("DeleteSnapshot", mock.Anything, mock.Anything).Return(tc.retFuncDelete)
 				backupRepo.On("Flush", mock.Anything).Return(tc.retFuncFlush)
 				backupRepo.On("Close", mock.Anything).Return(nil)
 			}
@@ -1124,7 +1124,7 @@ func TestBatchForget(t *testing.T) {
 			}
 
 			if tc.backupRepo != nil {
-				backupRepo.On("DeleteManifest", mock.Anything, mock.Anything).Return(tc.retFuncDelete)
+				backupRepo.On("DeleteSnapshot", mock.Anything, mock.Anything).Return(tc.retFuncDelete)
 				backupRepo.On("Flush", mock.Anything).Return(tc.retFuncFlush)
 				backupRepo.On("Close", mock.Anything).Return(nil)
 			}

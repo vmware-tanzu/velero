@@ -27,11 +27,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	. "github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test/util/k8s"
-	. "github.com/vmware-tanzu/velero/test/util/kibishii"
-	. "github.com/vmware-tanzu/velero/test/util/providers"
-	. "github.com/vmware-tanzu/velero/test/util/velero"
+	. "github.com/velero-io/velero/test"
+	. "github.com/velero-io/velero/test/util/k8s"
+	. "github.com/velero-io/velero/test/util/kibishii"
+	. "github.com/velero-io/velero/test/util/providers"
+	. "github.com/velero-io/velero/test/util/velero"
 )
 
 const (
@@ -58,8 +58,8 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 	less := func(a, b string) bool { return a < b }
 
 	BeforeEach(func() {
-		if useVolumeSnapshots && veleroCfg.CloudProvider == Kind {
-			Skip(fmt.Sprintf("Volume snapshots not supported on %s", Kind))
+		if useVolumeSnapshots && KibishiiVolumesAreHostPath(veleroCfg) {
+			Skip("Kibishii's PVs on kind are hostPath without EnableCSI, so there is nothing to snapshot")
 		}
 		var err error
 		flag.Parse()
@@ -141,7 +141,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			podName2 := "kibishii-deployment-1"
 
 			label1 := "for=1"
-			// TODO remove when issue https://github.com/vmware-tanzu/velero/issues/4724 is fixed
+			// TODO remove when issue https://github.com/velero-io/velero/issues/4724 is fixed
 			//label2 := "for!=1"
 			label2 := "for=2"
 			By("Create namespace for sample workload", func() {
@@ -308,7 +308,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			By(fmt.Sprintf("Get all backups from 2 BSLs %s before deleting one of them", backupLocation1), func() {
 				backupsBeforeDel, err := GetAllBackups(context.Background(), veleroCfg.VeleroCLI)
 				Expect(err).To(Succeed())
-				Expect(cmp.Diff(backupsInBsl1AndBsl2, backupsBeforeDel, cmpopts.SortSlices(less))).Should(BeEmpty())
+				Expect(cmp.Diff(backupsInBsl1AndBsl2, backupsBeforeDel, cmpopts.SortSlices(less))).To(BeEmpty())
 
 				By(fmt.Sprintf("Backup1 %s should exist in cloud object store before bsl deletion", backupName1), func() {
 					Expect(ObjectsShouldBeInBucket(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile,
@@ -325,7 +325,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 					backupsAfterDel, err := GetAllBackups(context.Background(), veleroCfg.VeleroCLI)
 					Expect(err).To(Succeed())
 					// Default BSL is deleted, so backups in additional BSL should be left only
-					Expect(cmp.Diff(backupsInBSL2, backupsAfterDel, cmpopts.SortSlices(less))).Should(BeEmpty())
+					Expect(cmp.Diff(backupsInBSL2, backupsAfterDel, cmpopts.SortSlices(less))).To(BeEmpty())
 				})
 			})
 

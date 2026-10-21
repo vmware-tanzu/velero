@@ -113,7 +113,24 @@ type RestoreSpec struct {
 	// ExistingResourcePolicy specifies the restore behavior for the Kubernetes resource to be restored
 	// +optional
 	// +nullable
-	ExistingResourcePolicy PolicyType `json:"existingResourcePolicy,omitempty"`
+	ExistingResourcePolicy ResourcePolicyType `json:"existingResourcePolicy,omitempty"`
+
+	// ExistingVolumeDataPolicy specifies the restore behavior for the volume data to be restored
+	// +optional
+	// +nullable
+	ExistingVolumeDataPolicy VolumeDataPolicyType `json:"existingVolumeDataPolicy,omitempty"`
+
+	// AllowExistingVolumeMismatch specifies whether to bypass the in-place restore pre-flight check
+	// that verifies the existing PVC is bound to the original volume handle from the backup.
+	// When true, in-place restore is permitted even if the existing volume handle does not match.
+	// +optional
+	// +nullable
+	AllowExistingVolumeMismatch *bool `json:"allowExistingVolumeMismatch,omitempty"`
+
+	// CSISnapshotTimeout specifies the time used to wait for CSI VolumeSnapshot ready to use during creation, before returning error as timeout.
+	// The default value is 30 minute.
+	// +optional
+	CSISnapshotTimeout metav1.Duration `json:"csiSnapshotTimeout,omitempty"`
 
 	// ItemOperationTimeout specifies the time used to wait for RestoreItemAction operations
 	// The default value is 4 hour.
@@ -158,6 +175,11 @@ type UploaderConfigForRestore struct {
 	// ParallelFilesDownload is the concurrency number setting for restore.
 	// +optional
 	ParallelFilesDownload int `json:"parallelFilesDownload,omitempty"`
+	// DeleteExtraFiles specifies whether to delete the extra files in the target volume that do not exist in the backup.
+	// This setting is only applicable to File System restores (PodVolumeBackup or CSI File System Data Move) and has no effect on Block Data Move restores.
+	// +optional
+	// +nullable
+	DeleteExtraFiles *bool `json:"deleteExtraFiles,omitempty"`
 }
 
 // RestoreHooks contains custom behaviors that should be executed during or post restore.
@@ -324,13 +346,22 @@ const (
 	// The failing error is recorded in status.FailureReason.
 	RestorePhaseFailed RestorePhase = "Failed"
 
-	// PolicyTypeNone means velero will not overwrite the resource
+	// ResourcePolicyTypeNone means velero will not overwrite the resource
 	// in cluster with the one in backup whether changed/unchanged.
-	PolicyTypeNone PolicyType = "none"
+	ResourcePolicyTypeNone ResourcePolicyType = "none"
 
-	// PolicyTypeUpdate means velero will try to attempt a patch on
+	// ResourcePolicyTypeUpdate means velero will try to attempt a patch on
 	// the changed resources.
-	PolicyTypeUpdate PolicyType = "update"
+	ResourcePolicyTypeUpdate ResourcePolicyType = "update"
+
+	// VolumeDataPolicyTypeNone means velero will skip and not overwrite the volume data if the volume already exists
+	VolumeDataPolicyTypeNone VolumeDataPolicyType = "none"
+
+	// VolumeDataPolicyTypeFull means velero will try to restore the volume data fully if the volume already exists.
+	VolumeDataPolicyTypeFull VolumeDataPolicyType = "full"
+
+	// VolumeDataPolicyTypeIncremental means velero will try to restore the volume data incrementally if the volume already exists.
+	VolumeDataPolicyTypeIncremental VolumeDataPolicyType = "incremental"
 )
 
 // RestoreStatus captures the current status of a Velero restore
@@ -441,6 +472,22 @@ type Restore struct {
 	Status RestoreStatus `json:"status,omitempty"`
 }
 
+func (r *Restore) IsVolumeDataInplaceRestore() bool {
+	return r.Spec.ExistingVolumeDataPolicy == VolumeDataPolicyTypeFull || r.Spec.ExistingVolumeDataPolicy == VolumeDataPolicyTypeIncremental
+}
+
+func (r *Restore) IsVolumeDataInplaceFullRestore() bool {
+	return r.Spec.ExistingVolumeDataPolicy == VolumeDataPolicyTypeFull
+}
+
+func (r *Restore) IsVolumeDataInplaceIncrementalRestore() bool {
+	return r.Spec.ExistingVolumeDataPolicy == VolumeDataPolicyTypeIncremental
+}
+
+func (r *Restore) AllowExistingVolumeMismatch() bool {
+	return r.Spec.AllowExistingVolumeMismatch != nil && *r.Spec.AllowExistingVolumeMismatch
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RestoreList is a list of Restores.
@@ -453,5 +500,8 @@ type RestoreList struct {
 	Items []Restore `json:"items"`
 }
 
-// PolicyType helps specify the ExistingResourcePolicy
-type PolicyType string
+// ResourcePolicyType helps specify the ExistingResourcePolicy
+type ResourcePolicyType string
+
+// VolumeDataPolicyType helps specify the ExistingVolumeDataPolicy
+type VolumeDataPolicyType string

@@ -29,12 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
 
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	podvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
+	"github.com/velero-io/velero/internal/resourcepolicies"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/kuberesource"
+	velerotest "github.com/velero-io/velero/pkg/test"
+	podvolumeutil "github.com/velero-io/velero/pkg/util/podvolume"
+	vhutil "github.com/velero-io/velero/pkg/util/volumehelper"
 )
 
 func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
@@ -329,6 +330,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 				fakeClient,
 				tc.defaultVolumesToFSBackup,
 				false,
+				nil,
 			)
 
 			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.inputObj)
@@ -345,11 +347,23 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 	}
 }
 
+type mockPVCMustInclusionTracker struct {
+	isPVCIncluded func(namespace, pvcName string) bool
+}
+
+func (m *mockPVCMustInclusionTracker) IsPVCIncluded(namespace, pvcName string) bool {
+	if m.isPVCIncluded == nil {
+		return false
+	}
+	return m.isPVCIncluded(namespace, pvcName)
+}
+
 func TestVolumeHelperImpl_ShouldIncludeVolumeInBackup(t *testing.T) {
 	testCases := []struct {
 		name             string
 		vol              corev1api.Volume
 		backupExcludePVC bool
+		isPVCIncluded    func(pvcName string) bool
 		shouldInclude    bool
 	}{
 		{
@@ -446,6 +460,38 @@ func TestVolumeHelperImpl_ShouldIncludeVolumeInBackup(t *testing.T) {
 			shouldInclude:    false,
 		},
 		{
+			name: "volume has pvc, backupExcludePVC is true, but isPVCIncluded returns true so include",
+			vol: corev1api.Volume{
+				Name: "sample-volume",
+				VolumeSource: corev1api.VolumeSource{
+					PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+						ClaimName: "sample-pvc",
+					},
+				},
+			},
+			backupExcludePVC: true,
+			isPVCIncluded: func(pvcName string) bool {
+				return pvcName == "sample-pvc"
+			},
+			shouldInclude: true,
+		},
+		{
+			name: "volume has pvc, backupExcludePVC is false, isPVCIncluded returns false, but globally included so include",
+			vol: corev1api.Volume{
+				Name: "sample-volume",
+				VolumeSource: corev1api.VolumeSource{
+					PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+						ClaimName: "sample-pvc",
+					},
+				},
+			},
+			backupExcludePVC: false,
+			isPVCIncluded: func(pvcName string) bool {
+				return false
+			},
+			shouldInclude: true,
+		},
+		{
 			name: "volume name has prefix default-token so do not include",
 			vol: corev1api.Volume{
 				Name: "default-token-vol-name",
@@ -480,13 +526,23 @@ func TestVolumeHelperImpl_ShouldIncludeVolumeInBackup(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to build policy with error %v", err)
 			}
-			vh := &volumeHelperImpl{
-				volumePolicy:     p,
-				snapshotVolumes:  ptr.To(true),
-				logger:           velerotest.NewLogger(),
-				backupExcludePVC: tc.backupExcludePVC,
+			var tracker vhutil.PVCMustInclusionTracker
+			if tc.isPVCIncluded != nil {
+				tracker = &mockPVCMustInclusionTracker{
+					isPVCIncluded: func(ns, pvcName string) bool {
+						return tc.isPVCIncluded(pvcName)
+					},
+				}
 			}
-			actualShouldInclude := vh.shouldIncludeVolumeInBackup(tc.vol)
+			vh := &volumeHelperImpl{
+				volumePolicy:            p,
+				snapshotVolumes:         ptr.To(true),
+				logger:                  velerotest.NewLogger(),
+				backupExcludePVC:        tc.backupExcludePVC,
+				pvcMustInclusionTracker: tracker,
+			}
+			pod := corev1api.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default"}}
+			actualShouldInclude := vh.shouldIncludeVolumeInBackup(tc.vol, pod)
 			assert.Equalf(t, actualShouldInclude, tc.shouldInclude, "Want shouldInclude as %v; Got actualShouldInclude as %v", tc.shouldInclude, actualShouldInclude)
 		})
 	}
@@ -694,6 +750,7 @@ func TestVolumeHelperImpl_ShouldPerformFSBackup(t *testing.T) {
 				fakeClient,
 				tc.defaultVolumesToFSBackup,
 				false,
+				nil,
 			)
 
 			actualShouldFSBackup, actualError := vh.ShouldPerformFSBackup(tc.pod.Spec.Volumes[0], *tc.pod)
@@ -889,6 +946,7 @@ func TestVolumeHelperImplWithCache_ShouldPerformSnapshot(t *testing.T) {
 				tc.defaultVolumesToFSBackup,
 				false,
 				namespaces,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -1041,6 +1099,7 @@ func TestVolumeHelperImplWithCache_ShouldPerformFSBackup(t *testing.T) {
 				tc.defaultVolumesToFSBackup,
 				false,
 				namespaces,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -1062,6 +1121,7 @@ func TestNewVolumeHelperImplWithCache(t *testing.T) {
 		name                    string
 		backup                  velerov1api.Backup
 		resourcePolicyConfigMap *corev1api.ConfigMap
+		globalPolicyConfigMap   *corev1api.ConfigMap
 		pvcPodCache             bool // whether to pass a cache
 		expectError             bool
 	}{
@@ -1146,6 +1206,74 @@ volumePolicies:
 			pvcPodCache: false,
 			expectError: true,
 		},
+		{
+			name: "creates VolumeHelper with global volume policies and per-backup policies",
+			backup: velerov1api.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-backup",
+					Namespace: "velero",
+					Annotations: map[string]string{
+						velerov1api.GlobalBackupVolumePolicyConfigMapAnnotation: "global-policy",
+					},
+				},
+				Spec: velerov1api.BackupSpec{
+					SnapshotVolumes: ptr.To(true),
+					ResourcePolicy: &corev1api.TypedLocalObjectReference{
+						Kind: "ConfigMap",
+						Name: "resource-policy",
+					},
+				},
+			},
+			resourcePolicyConfigMap: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "resource-policy",
+					Namespace: "velero",
+				},
+				Data: map[string]string{
+					"policy": `version: v1
+volumePolicies:
+- conditions:
+    storageClass:
+    - gp2-csi
+  action:
+    type: snapshot`,
+				},
+			},
+			globalPolicyConfigMap: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "global-policy",
+					Namespace: "velero",
+				},
+				Data: map[string]string{
+					"policy": `version: v1
+volumePolicies:
+- conditions:
+    storageClass:
+    - other-csi
+  action:
+    type: skip`,
+				},
+			},
+			pvcPodCache: true,
+			expectError: false,
+		},
+		{
+			name: "fails when global resource policy ConfigMap not found",
+			backup: velerov1api.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-backup",
+					Namespace: "velero",
+					Annotations: map[string]string{
+						velerov1api.GlobalBackupVolumePolicyConfigMapAnnotation: "non-existent-global-policy",
+					},
+				},
+				Spec: velerov1api.BackupSpec{
+					SnapshotVolumes: ptr.To(true),
+				},
+			},
+			pvcPodCache: false,
+			expectError: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1153,6 +1281,9 @@ volumePolicies:
 			var objs []runtime.Object
 			if tc.resourcePolicyConfigMap != nil {
 				objs = append(objs, tc.resourcePolicyConfigMap)
+			}
+			if tc.globalPolicyConfigMap != nil {
+				objs = append(objs, tc.globalPolicyConfigMap)
 			}
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
 
@@ -1166,6 +1297,7 @@ volumePolicies:
 				fakeClient,
 				logrus.StandardLogger(),
 				cache,
+				nil,
 			)
 
 			if tc.expectError {
@@ -1221,7 +1353,7 @@ func TestNewVolumeHelperImplWithCache_UsesCache(t *testing.T) {
 		},
 	}
 
-	vh, err := NewVolumeHelperImplWithCache(backup, fakeClient, logrus.StandardLogger(), cache)
+	vh, err := NewVolumeHelperImplWithCache(backup, fakeClient, logrus.StandardLogger(), cache, nil)
 	require.NoError(t, err)
 
 	// Convert PV to unstructured
@@ -1353,6 +1485,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot_UnboundPVC(t *testing.T) {
 				fakeClient,
 				false,
 				false,
+				nil,
 			)
 
 			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.inputPVC)
@@ -1530,6 +1663,7 @@ func TestVolumeHelperImpl_ShouldPerformFSBackup_UnboundPVC(t *testing.T) {
 				fakeClient,
 				false,
 				false,
+				nil,
 			)
 
 			actualShouldFSBackup, actualError := vh.ShouldPerformFSBackup(tc.pod.Spec.Volumes[0], *tc.pod)
@@ -1669,6 +1803,7 @@ func TestGetDataMoverFromActionParameters(t *testing.T) {
 				fakeClient,
 				false,
 				false,
+				nil,
 			)
 
 			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.inputObj)
@@ -1794,6 +1929,7 @@ func TestGetActionParameters(t *testing.T) {
 				fakeClient,
 				false,
 				false,
+				nil,
 			)
 
 			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.inputObj)
@@ -1980,6 +2116,7 @@ func TestShouldPerformCustomAction(t *testing.T) {
 				fakeClient,
 				false,
 				false,
+				nil,
 			)
 
 			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.inputObj)
@@ -2102,6 +2239,7 @@ func TestGetPVAndMatchAction(t *testing.T) {
 				fakeClient,
 				false,
 				false,
+				nil,
 			)
 
 			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.inputObj)

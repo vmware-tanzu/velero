@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -53,34 +54,34 @@ import (
 	"k8s.io/client-go/util/retry"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
-	"github.com/vmware-tanzu/velero/internal/hook"
-	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	"github.com/vmware-tanzu/velero/internal/volume"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/archive"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/discovery"
-	"github.com/vmware-tanzu/velero/pkg/features"
-	"github.com/vmware-tanzu/velero/pkg/itemoperation"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/label"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
-	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
-	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"github.com/vmware-tanzu/velero/pkg/podvolume"
-	"github.com/vmware-tanzu/velero/pkg/podvolume/configs"
-	"github.com/vmware-tanzu/velero/pkg/types"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/util/collections"
-	csiutil "github.com/vmware-tanzu/velero/pkg/util/csi"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/pkg/util/results"
-	"github.com/vmware-tanzu/velero/pkg/util/wildcard"
+	"github.com/velero-io/velero/internal/credentials"
+	"github.com/velero-io/velero/internal/hook"
+	"github.com/velero-io/velero/internal/resourcemodifiers"
+	"github.com/velero-io/velero/internal/resourcepolicies"
+	"github.com/velero-io/velero/internal/volume"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/archive"
+	"github.com/velero-io/velero/pkg/client"
+	"github.com/velero-io/velero/pkg/discovery"
+	"github.com/velero-io/velero/pkg/features"
+	"github.com/velero-io/velero/pkg/itemoperation"
+	"github.com/velero-io/velero/pkg/kuberesource"
+	"github.com/velero-io/velero/pkg/label"
+	"github.com/velero-io/velero/pkg/plugin/framework"
+	"github.com/velero-io/velero/pkg/plugin/velero"
+	riav2 "github.com/velero-io/velero/pkg/plugin/velero/restoreitemaction/v2"
+	vsv1 "github.com/velero-io/velero/pkg/plugin/velero/volumesnapshotter/v1"
+	"github.com/velero-io/velero/pkg/podexec"
+	"github.com/velero-io/velero/pkg/podvolume"
+	"github.com/velero-io/velero/pkg/podvolume/configs"
+	"github.com/velero-io/velero/pkg/types"
+	"github.com/velero-io/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/util/collections"
+	csiutil "github.com/velero-io/velero/pkg/util/csi"
+	"github.com/velero-io/velero/pkg/util/filesystem"
+	"github.com/velero-io/velero/pkg/util/kube"
+	"github.com/velero-io/velero/pkg/util/results"
+	"github.com/velero-io/velero/pkg/util/wildcard"
 )
 
 const ObjectStatusRestoreAnnotationKey = "velero.io/restore-status"
@@ -1004,6 +1005,19 @@ func (ctx *restoreContext) processSelectedResource(
 					targetNS = namespace
 				}
 			}
+
+			// Make sure the resource in the "resourceMustHave" set will always be created in the namespace where velero is installed.
+			if ctx.resourceMustHave.Has(groupResource.String()) && targetNS != "" && targetNS != ctx.restore.Namespace {
+				err := fmt.Errorf("resource %s/%s is must-have per velero internal setting, and is namespace-scoped, but its target namespace %q is not Velero's namespace %q", groupResource.String(), selectedItem.name, targetNS, ctx.restore.Namespace)
+				ctx.log.WithFields(logrus.Fields{
+					"resource":        groupResource.String(),
+					"name":            selectedItem.name,
+					"targetNamespace": targetNS,
+					"veleroNamespace": ctx.restore.Namespace,
+				}).Error(err.Error())
+				errs.Add(targetNS, err)
+				continue
+			}
 			// If we don't know whether this namespace exists yet, attempt to create
 			// it in order to ensure it exists. Try to get it from the backup tarball
 			// (in order to get any backed-up metadata), but if we don't find it there,
@@ -1623,6 +1637,33 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		return warnings, errs, itemExists
 	}
 
+	// Strip any pre-existing Velero-internal in-place restore carrier annotations coming from
+	// the backup metadata before RestoreItemActions run. A carrier is only trusted when it is
+	// set during this restore (by the engine below or by the PVC CSI RIA); a stale carrier
+	// baked into the backup must not be acted on, e.g. a stale "selected-node" could pin a
+	// newly provisioned PVC to a stale node.
+	stripInplaceRestoreCarrierAnnotations(obj)
+
+	// Carry backup volume info the PVC CSI RIA needs for the in-place restore pre-flight
+	// checks but has no access to: the source volume size and the backed-up volume handle.
+	if groupResource == kuberesource.PersistentVolumeClaims {
+		pvName, _, _ := unstructured.NestedString(obj.Object, "spec", "volumeName")
+		volumeInfo := ctx.backupVolumeInfoMap[pvName]
+		annotations := obj.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		if sourceSize := volumeInfo.SourceSize(); sourceSize > 0 {
+			annotations[velerov1api.InplaceRestoreSourceSizeAnnotation] = strconv.FormatInt(sourceSize, 10)
+		}
+		if volumeInfo.PVInfo != nil && volumeInfo.PVInfo.VolumeHandle != "" {
+			annotations[velerov1api.InplaceRestoreVolumeHandleAnnotation] = volumeInfo.PVInfo.VolumeHandle
+		}
+		if len(annotations) > 0 {
+			obj.SetAnnotations(annotations)
+		}
+	}
+
 	restoreLogger.Infof("restore status includes excludes: %+v", ctx.resourceStatusIncludesExcludes)
 
 	for _, action := range ctx.getApplicableActions(groupResource, namespace) {
@@ -1754,6 +1795,21 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			errs.Add(namespace, fmt.Errorf("additional items for %s are not ready to use", resourceID))
 		}
 	}
+
+	// Translate the Velero-internal carrier annotation (set by the PVC CSI RestoreItemAction
+	// during an in-place volume data restore) back to the Kubernetes "selected-node" annotation.
+	// This runs after all RestoreItemActions so the result does not depend on the order in which
+	// the actions executed: the generic PVC RIA unconditionally strips the Kubernetes annotation,
+	// while the carrier annotation passes through untouched. The carrier itself is always
+	// stripped so it never lands on the cluster.
+	if annotations := obj.GetAnnotations(); annotations != nil {
+		if selectedNode := annotations[velerov1api.InplaceRestoreSelectedNodeAnnotation]; selectedNode != "" {
+			restoreLogger.Infof("Restoring %q annotation with value %q from in-place restore carrier annotation", kube.KubeAnnSelectedNode, selectedNode)
+			annotations[kube.KubeAnnSelectedNode] = selectedNode
+			obj.SetAnnotations(annotations)
+		}
+	}
+	stripInplaceRestoreCarrierAnnotations(obj)
 
 	// This comes after running item actions because we have built-in actions that restore
 	// a PVC's associated PV (if applicable). As part of the PV being restored, the 'pvsToProvision'
@@ -1889,6 +1945,51 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		itemStatus := ctx.restoredItems[itemKey]
 		itemStatus.itemExists = itemExists
 		ctx.restoredItems[itemKey] = itemStatus
+
+		// PodVolumeRestores are only created for pods Velero creates, so an
+		// existing pod silently skips the volume data restore. For an in-place
+		// restore this fails the pre-flight check: the pod is still consuming
+		// the PVCs that were supposed to be restored in place. Otherwise it is
+		// only worth a warning.
+		if newGR == kuberesource.Pods {
+			pod := new(corev1api.Pod)
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
+				errs.Add(namespace, err)
+				return warnings, errs, itemExists
+			}
+			if len(podvolume.GetVolumeBackupsForPod(ctx.podVolumeBackups, pod, originalNamespace)) > 0 {
+				if ctx.restore.IsVolumeDataInplaceRestore() {
+					err := errors.Errorf("in-place restore pre-flight check failed, skipping volume data restore: pod %s already exists and is still using the backed-up volumes: delete the pod and its owning workload and retry", kube.NamespaceAndName(obj))
+					restoreLogger.Error(err.Error())
+					errs.Add(namespace, err)
+					return warnings, errs, itemExists
+				} else {
+					err := errors.Errorf("skipping volume data restore: pod %s already exists, its PodVolumeBackups will not be restored", kube.NamespaceAndName(obj))
+					restoreLogger.Warn(err.Error())
+					warnings.Add(namespace, err)
+				}
+			}
+		}
+
+		// Snapshot-based volume data is never restored into an existing volume:
+		// the existing PVC (CSI snapshot) or PV (native snapshot) is left untouched.
+		// Warn so the user knows the volume data was not restored rather than assuming it was.
+		if newGR == kuberesource.PersistentVolumeClaims {
+			if info, ok := backupVolumeInfoForPVC(ctx.backupVolumeInfoMap, originalNamespace, obj.GetName()); ok &&
+				info.BackupMethod == volume.CSISnapshot {
+				err := errors.Errorf("skipping volume data restore: PVC %s already exists, its backed-up volume data will not be restored to it", kube.NamespaceAndName(obj))
+				restoreLogger.Warn(err.Error())
+				warnings.Add(namespace, err)
+			}
+		}
+		if newGR == kuberesource.PersistentVolumes {
+			if info, ok := ctx.backupVolumeInfoMap[backupResourceName]; ok && info.BackupMethod == volume.NativeSnapshot {
+				err := errors.Errorf("skipping volume data restore: PV %s already exists, its backed-up volume data will not be restored to it", obj.GetName())
+				restoreLogger.Warn(err.Error())
+				warnings.Add(namespace, err)
+			}
+		}
+
 		// Remove insubstantial metadata.
 		fromCluster, err = resetMetadataAndStatus(fromCluster)
 		if err != nil {
@@ -1930,7 +2031,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				if err != nil {
 					warnings.Add(namespace, err)
 					// check if there is existingResourcePolicy and if it is set to update policy
-					if len(ctx.restore.Spec.ExistingResourcePolicy) > 0 && ctx.restore.Spec.ExistingResourcePolicy == velerov1api.PolicyTypeUpdate {
+					if len(ctx.restore.Spec.ExistingResourcePolicy) > 0 && ctx.restore.Spec.ExistingResourcePolicy == velerov1api.ResourcePolicyTypeUpdate {
 						// remove restore labels so that we apply the latest backup/restore names on the object via patch
 						removeRestoreLabels(fromCluster)
 						//try patching just the backup/restore labels
@@ -1950,14 +2051,14 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 					restoreLogger.Infof("restore API has resource policy defined %s, executing restore workflow accordingly for changed resource %s %s", resourcePolicy, fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
 
 					// existingResourcePolicy is set as none, add warning
-					if resourcePolicy == velerov1api.PolicyTypeNone {
+					if resourcePolicy == velerov1api.ResourcePolicyTypeNone {
 						e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version",
 							obj.GetKind(), obj.GetName())
 						warnings.Add(namespace, e)
 						itemStatus.action = ItemRestoreResultSkipped
 						ctx.restoredItems[itemKey] = itemStatus
 						// existingResourcePolicy is set as update, attempt patch on the resource and add warning if it fails
-					} else if resourcePolicy == velerov1api.PolicyTypeUpdate {
+					} else if resourcePolicy == velerov1api.ResourcePolicyTypeUpdate {
 						// processing update as existingResourcePolicy
 						warningsFromUpdateRP, errsFromUpdateRP := ctx.processUpdateResourcePolicy(fromCluster, fromClusterWithLabels, obj, namespace, resourceClient)
 						if warningsFromUpdateRP.IsEmpty() && errsFromUpdateRP.IsEmpty() {
@@ -1980,7 +2081,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 
 		//update backup/restore labels on the unchanged resources if existingResourcePolicy is set as update
-		if ctx.restore.Spec.ExistingResourcePolicy == velerov1api.PolicyTypeUpdate {
+		if ctx.restore.Spec.ExistingResourcePolicy == velerov1api.ResourcePolicyTypeUpdate {
 			resourcePolicy := ctx.restore.Spec.ExistingResourcePolicy
 			restoreLogger.Infof("restore API has resource policy defined %s, executing restore workflow accordingly for unchanged resource %s %s ", resourcePolicy, obj.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
 			// remove restore labels so that we apply the latest backup/restore names on the object via patch
@@ -2072,10 +2173,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs, itemExists
 		}
 
-		// Do not create podvolumerestore when current restore excludes pv/pvc
-		if ctx.resourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()) &&
-			ctx.resourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumes.String()) &&
-			len(podvolume.GetVolumeBackupsForPod(ctx.podVolumeBackups, pod, originalNamespace)) > 0 {
+		if len(podvolume.GetVolumeBackupsForPod(ctx.podVolumeBackups, pod, originalNamespace)) > 0 {
 			restorePodVolumeBackups(ctx, createdObj, originalNamespace)
 		}
 	}
@@ -2125,7 +2223,7 @@ func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, e
 	// 1. For NodePort service, the service has nodePort preservation while the same nodePort service already exists. - Get invalid value error
 	// 2. For LoadBalancer service, the "healthCheckNodePort" already exists. - Get internal error
 	// If this is the case, the function returns true to avoid reporting error.
-	// Refer to https://github.com/vmware-tanzu/velero/issues/2308 for more details
+	// Refer to https://github.com/velero-io/velero/issues/2308 for more details
 	if obj.GetKind() != "Service" {
 		return false, nil
 	}
@@ -2228,6 +2326,17 @@ func remapClaimRefNS(ctx *restoreContext, obj *unstructured.Unstructured) (bool,
 	return true, nil
 }
 
+// backupVolumeInfoForPVC returns the backup volume info of the PV the given
+// source-namespace PVC was bound to at backup time.
+func backupVolumeInfoForPVC(infos map[string]volume.BackupVolumeInfo, pvcNamespace, pvcName string) (volume.BackupVolumeInfo, bool) {
+	for _, info := range infos {
+		if info.PVCNamespace == pvcNamespace && info.PVCName == pvcName {
+			return info, true
+		}
+	}
+	return volume.BackupVolumeInfo{}, false
+}
+
 // restorePodVolumeBackups restores the PodVolumeBackups for the given restored pod
 func restorePodVolumeBackups(ctx *restoreContext, createdObj *unstructured.Unstructured, originalNamespace string) {
 	if ctx.podVolumeRestorer == nil {
@@ -2247,11 +2356,12 @@ func restorePodVolumeBackups(ctx *restoreContext, createdObj *unstructured.Unstr
 			}
 
 			data := podvolume.RestoreData{
-				Restore:          ctx.restore,
-				Pod:              pod,
-				PodVolumeBackups: ctx.podVolumeBackups,
-				SourceNamespace:  originalNamespace,
-				BackupLocation:   ctx.backup.Spec.StorageLocation,
+				Restore:           ctx.restore,
+				Pod:               pod,
+				PodVolumeBackups:  ctx.podVolumeBackups,
+				SourceNamespace:   originalNamespace,
+				BackupLocation:    ctx.backup.Spec.StorageLocation,
+				BackupVolumeInfos: ctx.backupVolumeInfoMap,
 			}
 			if errs := ctx.podVolumeRestorer.RestorePodVolumes(data, ctx.restoreVolumeInfoTracker); errs != nil {
 				ctx.log.WithError(kubeerrs.NewAggregate(errs)).Error("unable to successfully complete pod volume restores of pod's volumes")
@@ -2470,6 +2580,23 @@ func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstr
 	}
 	resetStatus(obj)
 	return obj, nil
+}
+
+// inplaceRestoreCarrierAnnotations are the Velero-internal annotations used to pass data
+// between the restore engine and the in-place restore RestoreItemActions. They never land on
+// the cluster.
+var inplaceRestoreCarrierAnnotations = []string{
+	velerov1api.InplaceRestoreSelectedNodeAnnotation,
+	velerov1api.InplaceRestoreSourceSizeAnnotation,
+	velerov1api.InplaceRestoreVolumeHandleAnnotation,
+}
+
+func stripInplaceRestoreCarrierAnnotations(obj metav1.Object) {
+	annotations := obj.GetAnnotations()
+	for _, k := range inplaceRestoreCarrierAnnotations {
+		delete(annotations, k)
+	}
+	obj.SetAnnotations(annotations)
 }
 
 // addRestoreLabels labels the provided object with the restore name and the
@@ -2833,7 +2960,7 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource string, original
 				}
 
 				if skipItem {
-					ctx.log.Infof("restore orSelector labels did not match, skipping restore of item: %s", skipItem, item)
+					ctx.log.Infof("restore orSelector labels did not match, skipping restore of item: %s", item)
 					continue
 				}
 			}

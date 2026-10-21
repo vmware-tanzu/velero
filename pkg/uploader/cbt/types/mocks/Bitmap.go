@@ -6,7 +6,7 @@ package mocks
 
 import (
 	mock "github.com/stretchr/testify/mock"
-	"github.com/vmware-tanzu/velero/pkg/uploader/cbt/types"
+	"github.com/velero-io/velero/pkg/uploader/cbt/types"
 )
 
 // NewBitmap creates a new instance of Bitmap. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -291,4 +291,31 @@ func (_c *Bitmap_VolumeID_Call) Return(s string) *Bitmap_VolumeID_Call {
 func (_c *Bitmap_VolumeID_Call) RunAndReturn(run func() string) *Bitmap_VolumeID_Call {
 	_c.Call.Return(run)
 	return _c
+}
+// SetChangeID provides a mock function for the type Bitmap
+func (_mock *Bitmap) SetChangeID(id string) {
+	_mock.Called(id)
+}
+
+// SetError provides a mock function for the type Bitmap
+func (_mock *Bitmap) SetError(err error) {
+	_mock.Called(err)
+}
+
+// Errors provides a mock function for the type Bitmap
+func (_mock *Bitmap) Errors() []error {
+	ret := _mock.Called()
+	if len(ret) == 0 {
+		panic("no return value specified for Errors")
+	}
+
+	var r0 []error
+	if returnFunc, ok := ret.Get(0).(func() []error); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]error)
+		}
+	}
+	return r0
 }

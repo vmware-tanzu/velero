@@ -31,10 +31,10 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-	cbt "github.com/vmware-tanzu/velero/pkg/uploader/cbt/types"
-	"github.com/vmware-tanzu/velero/pkg/util/freelist"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
+	"github.com/velero-io/velero/pkg/uploader"
+	cbt "github.com/velero-io/velero/pkg/uploader/cbt/types"
+	"github.com/velero-io/velero/pkg/util/freelist"
 )
 
 var ErrCanceled = errors.New("uploader is canceled")
@@ -84,6 +84,12 @@ func (blkup *blockUploader) Backup(source sourceInfo, parentObject udmrepo.ID, b
 
 	if bitmap == nil {
 		return udmrepo.Snapshot{}, 0, errors.New("bitmap is not available")
+	}
+
+	if bitmap.Errors() != nil {
+		for _, err := range bitmap.Errors() {
+			blkup.progress.UpdateProgress(&uploader.Progress{BytesDone: -1, TotalBytes: -1, Message: err.Error()})
+		}
 	}
 
 	backupMode := udmrepo.ObjectDataBackupModeInc
@@ -153,19 +159,25 @@ func (blkup *blockUploader) Restore(snapshot udmrepo.Snapshot, dest destInfo, bi
 		return 0, 0, errors.New("bitmap is not available")
 	}
 
+	if bitmap.Errors() != nil {
+		for _, err := range bitmap.Errors() {
+			blkup.progress.UpdateProgress(&uploader.Progress{BytesDone: -1, TotalBytes: -1, Message: err.Error()})
+		}
+	}
+
 	meta, err := blkup.repoWriter.ReadMetadata(blkup.ctx, snapshot.RootObject.ID)
 	if err != nil {
-		return 0, 0, errors.Wrapf(err, "error reading snapshot metadata for %s", snapshot.Description)
+		return 0, 0, errors.Wrapf(err, "error reading snapshot metadata for %s", snapshot.ID)
 	}
 
 	if len(meta.SubObjects) != 1 {
-		return 0, 0, errors.Errorf("unexpected number of bdev object (%d) for snapshot %s", len(meta.SubObjects), snapshot.Description)
+		return 0, 0, errors.Errorf("unexpected number of bdev object (%d) for snapshot %s", len(meta.SubObjects), snapshot.ID)
 	}
 
 	sourceSize, err := getSourceSize(snapshot)
 	if err != nil {
 		sourceSize = meta.SubObjects[0].Size
-		blkup.log.Warnf("Failed to get source size from snapshot %s, use backup size %v", snapshot.Description, sourceSize)
+		blkup.log.Warnf("Failed to get source size from snapshot %s, use backup size %v", snapshot.ID, sourceSize)
 	}
 
 	if sourceSize > meta.SubObjects[0].Size {
@@ -655,11 +667,11 @@ func loadObjectFromSnapshot(ctx context.Context, rep udmrepo.BackupRepo, snapsho
 
 	meta, err := rep.ReadMetadata(ctx, snapshot.RootObject.ID)
 	if err != nil {
-		return "", errors.Wrapf(err, "error reading snapshot metadata for %s", snapshot.Description)
+		return "", errors.Wrap(err, "error reading snapshot metadata")
 	}
 
 	if len(meta.SubObjects) != 1 {
-		return "", errors.Errorf("unexpected number of bdev object (%d) for snapshot %s", len(meta.SubObjects), snapshot.Description)
+		return "", errors.Errorf("unexpected number of bdev object (%d)", len(meta.SubObjects))
 	}
 
 	return meta.SubObjects[0].ID, nil

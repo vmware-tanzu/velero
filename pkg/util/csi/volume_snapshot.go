@@ -38,15 +38,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/util/stringptr"
-	"github.com/vmware-tanzu/velero/pkg/util/stringslice"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/util/stringptr"
+	"github.com/velero-io/velero/pkg/util/stringslice"
 )
 
 const (
 	waitInternal                          = 2 * time.Second
 	volumeSnapshotContentProtectFinalizer = "velero.io/volume-snapshot-content-protect-finalizer"
+	VolumeSnapshotInGroupFinalizer        = "snapshot.storage.kubernetes.io/volumesnapshot-in-group-protection"
+	VolumeSnapshotAsSourceFinalizer       = "snapshot.storage.kubernetes.io/volumesnapshot-as-source-protection"
 )
 
 // WaitVolumeSnapshotReady waits a VS to become ready to use until the timeout reaches
@@ -165,7 +167,16 @@ func DeleteVolumeSnapshotContentIfAny(
 // disappearance and returns errors on any failure.
 func EnsureDeleteVS(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface,
 	vsName string, vsNamespace string, timeout time.Duration) error {
-	err := snapshotClient.VolumeSnapshots(vsNamespace).Delete(ctx, vsName, metav1.DeleteOptions{})
+	vs, err := snapshotClient.VolumeSnapshots(vsNamespace).Get(ctx, vsName, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrap(err, "checking VGS membership before deleting VolumeSnapshot")
+	}
+	if err == nil && vs.Status != nil && vs.Status.VolumeGroupSnapshotName != nil {
+		// The external-snapshotter controller defers member deletion while the
+		// parent VGS exists. Terminal VGS cleanup owns this deletion.
+		return nil
+	}
+	err = snapshotClient.VolumeSnapshots(vsNamespace).Delete(ctx, vsName, metav1.DeleteOptions{})
 	if err != nil {
 		return errors.Wrap(err, "error to delete volume snapshot")
 	}
@@ -187,6 +198,12 @@ func EnsureDeleteVS(ctx context.Context, snapshotClient snapshotter.SnapshotV1In
 
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
+			// updated is only set once the VS has been retrieved successfully, so it
+			// is still nil when the deadline is exceeded before that happens, e.g.
+			// when the first Get times out. No finalizers are available to report.
+			if updated == nil {
+				return errors.Errorf("timeout to assure VolumeSnapshot %s is deleted", vsName)
+			}
 			return errors.Errorf("timeout to assure VolumeSnapshot %s is deleted, finalizers in VS %v", vsName, updated.Finalizers)
 		} else {
 			return errors.Wrapf(err, "error to assure VolumeSnapshot is deleted, %s", vsName)
@@ -224,7 +241,16 @@ func RemoveVSCProtect(ctx context.Context, snapshotClient snapshotter.SnapshotV1
 // disappearance and returns errors on any failure.
 func EnsureDeleteVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface,
 	vscName string, timeout time.Duration) error {
-	err := snapshotClient.VolumeSnapshotContents().Delete(ctx, vscName, metav1.DeleteOptions{})
+	vsc, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vscName, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrap(err, "checking VGS membership before deleting VolumeSnapshotContent")
+	}
+	if err == nil && vsc.Status != nil && vsc.Status.VolumeGroupSnapshotHandle != nil {
+		// Group-member content is deleted by terminal VGS cleanup, not through
+		// an individual VolumeSnapshotContent deletion.
+		return nil
+	}
+	err = snapshotClient.VolumeSnapshotContents().Delete(ctx, vscName, metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrap(err, "error to delete volume snapshot content")
 	}
@@ -246,6 +272,12 @@ func EnsureDeleteVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1I
 
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
+			// updated is only set once the VSC has been retrieved successfully, so it
+			// is still nil when the deadline is exceeded before that happens, e.g.
+			// when the first Get times out. No finalizers are available to report.
+			if updated == nil {
+				return errors.Errorf("timeout to assure VolumeSnapshotContent %s is deleted", vscName)
+			}
 			return errors.Errorf("timeout to assure VolumeSnapshotContent %s is deleted, finalizers in VSC %v", vscName, updated.Finalizers)
 		} else {
 			return errors.Wrapf(err, "error to assure VolumeSnapshotContent is deleted, %s", vscName)
@@ -264,7 +296,16 @@ func DeleteVolumeSnapshotIfAny(
 	vsNamespace string,
 	log logrus.FieldLogger,
 ) {
-	err := snapshotClient.VolumeSnapshots(vsNamespace).Delete(ctx, vsName, metav1.DeleteOptions{})
+	vs, err := snapshotClient.VolumeSnapshots(vsNamespace).Get(ctx, vsName, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		log.WithError(err).Warnf("Unable to check VGS membership for VolumeSnapshot %s/%s", vsNamespace, vsName)
+		return
+	}
+	if err == nil && vs.Status != nil && vs.Status.VolumeGroupSnapshotName != nil {
+		log.Warnf("Deferring deletion of VGS member VolumeSnapshot %s/%s until VGS cleanup", vsNamespace, vsName)
+		return
+	}
+	err = snapshotClient.VolumeSnapshots(vsNamespace).Delete(ctx, vsName, metav1.DeleteOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			log.WithError(err).Debugf(
@@ -567,7 +608,15 @@ func CleanupVolumeSnapshot(
 		vs,
 	)
 	if err != nil {
-		log.Debugf("Failed to get volumesnapshot %s/%s", volSnap.Namespace, volSnap.Name)
+		if apierrors.IsNotFound(err) {
+			log.Debugf("VolumeSnapshot %s/%s is already deleted", volSnap.Namespace, volSnap.Name)
+		} else {
+			log.WithError(err).Warnf("Failed to get volumesnapshot %s/%s; skipping cleanup", volSnap.Namespace, volSnap.Name)
+		}
+		return
+	}
+	if vs.Status != nil && vs.Status.VolumeGroupSnapshotName != nil {
+		log.Warnf("Deferring deletion of VGS member VolumeSnapshot %s/%s until VGS cleanup", vs.Namespace, vs.Name)
 		return
 	}
 
@@ -600,6 +649,18 @@ func DeleteReadyVolumeSnapshot(
 	client crclient.Client,
 	logger logrus.FieldLogger,
 ) {
+	current := new(snapshotv1api.VolumeSnapshot)
+	if err := client.Get(ctx, crclient.ObjectKeyFromObject(&vs), current); err != nil {
+		if !apierrors.IsNotFound(err) {
+			logger.WithError(err).Warnf("Failed to get VolumeSnapshot %s/%s; skipping cleanup", vs.Namespace, vs.Name)
+		}
+		return
+	}
+	vs = *current
+	if vs.Status != nil && vs.Status.VolumeGroupSnapshotName != nil {
+		logger.Warnf("Deferring deletion of VGS member VolumeSnapshot %s/%s until VGS cleanup", vs.Namespace, vs.Name)
+		return
+	}
 	logger.Infof("Deleting Volumesnapshot %s/%s", vs.Namespace, vs.Name)
 	if vs.Status == nil ||
 		vs.Status.BoundVolumeSnapshotContentName == nil ||
@@ -701,7 +762,7 @@ func WaitUntilVSCHandleIsReady(
 			if vsc.Status != nil &&
 				vsc.Status.Error != nil {
 				log.Warnf("VolumeSnapshotContent %s has error: %v",
-					vsc.Name, *vsc.Status.Error.Message)
+					vsc.Name, stringptr.GetString(vsc.Status.Error.Message))
 			}
 			return false, nil
 		}
@@ -752,10 +813,10 @@ func WaitUntilVSCHandleIsReady(
 				vsc.Status.Error != nil {
 				log.Errorf(
 					"Timed out awaiting reconciliation of VolumeSnapshot, VolumeSnapshotContent %s has error: %v",
-					vsc.Name, *vsc.Status.Error.Message)
+					vsc.Name, stringptr.GetString(vsc.Status.Error.Message))
 				return nil,
 					errors.Errorf("CSI got timed out with error: %v",
-						*vsc.Status.Error.Message)
+						stringptr.GetString(vsc.Status.Error.Message))
 			} else {
 				log.Errorf(
 					"Timed out awaiting reconciliation of volumesnapshot %s/%s",
