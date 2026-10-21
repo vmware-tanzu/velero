@@ -822,6 +822,12 @@ Different backup repostories may have their own specific paramters for connectio
 
 For symentric consideration, another CLI `velero repo disconnect` is provided to disconnect from the backup repository.  
 
+### Auxiliary Data Isolation
+
+Rule: Auxiliary Data must be write-only to Velero core workflow.  
+This rule should be strictly followed Format V2 and it is also helpful for Format V1.x. Therefore, below code needs to be refactored to keep this rule:  
+- In restore-finalizer, it visits the restore resource-list to identify the restored PVC, while resource-list is a Auxiliary Data. This is actually a fault of the existing code, it is more reasonable to visit volume-info instead of resource-list to fulfill this purpose.
+
 ### Backup Storage Observability
 
 #### Public Data Interface
