@@ -19,7 +19,7 @@
 Velero persists backup data of Kubernetes resources and volumes, metadata, and logs into backup storages configured via BackupStorageLocation (BSL). Currently, the Backup Storage Format has several critical architectural and security limitations:
 
 - **Lack of Complete Client-Side Encryption**  
-   Backup data of Kuberentes resoruces are unencrypted. While backup storage providers may offer server-side encryption (SSE), Velero does not protect against compromised backup storage, rogue backup storage admins, or untrusted backup storage targets. Kubernetes `Secret` objects, private keys, tokens, and container environment variables reside in plaintext inside the archive.
+   Backup data of Kubernetes resources are unencrypted. While backup storage providers may offer server-side encryption (SSE), Velero does not protect against compromised backup storage, rogue backup storage admins, or untrusted backup storage targets. Kubernetes `Secret` objects, private keys, tokens, and container environment variables reside in plaintext inside the archive.
 
 - **Vulnerability to Malicious Data Injection ("Poisoned Backup" Attacks)**  
    Because Velero runs with `cluster-admin` privileges in Kubernetes and holds cloud provider IAM credentials:
@@ -151,7 +151,7 @@ Below lists the Auxiliary files:
 - `<restore-name>/<name>-logs.zst`
 - `<restore-name>/<name>-resource-list.json.zst`
 
-`<name>-results.json.zst` files (backup and restore) are for a single purpuse -- composing Public Data Interface. However, they are not Auxiliary files, client or 3rd tools should not read this file directly.  
+`<name>-results.json.zst` files (backup and restore) are for a single purpose -- composing Public Data Interface. However, they are not Auxiliary files, client or 3rd tools should not read this file directly.  
 
 
 ### Root Storage Descriptor (RSD)
@@ -159,7 +159,7 @@ Root Storage Descriptor (`velero-storage.json`) is a new file added to the backu
 
 ### Format Switch
 The implementation for Format 1.x is kept as is. And a new implementation for Format 2.0 is added.  
-In Root Storage Descriptor, a piece of format version information is recorded, so if Format version 2.0, the new implementation is called; otherwise, it fallbacks the old implemntation.  
+In Root Storage Descriptor, a piece of format version information is recorded, so if Format version 2.0, the new implementation is called; otherwise, it fallbacks the old implementation.  
 
 The same format version also exists in BSL spec, so the value in BSL must match the truth of the data in the backup storage, otherwise, the BSL goes to `Unavailable`.   
 
@@ -230,7 +230,7 @@ RSD in BSL and in the backup storage may mismatch in below cases:
 1. Password rotation happens in another cluster. Since Velero in the current cluster is not aware of it, the BSL's status is kept as is
 2. New cluster onboarding, users create a new BSL CR in the current cluster and point it to an existing backup storage
 3. BSL update, users update the BSL and point it to a different backup storage, so the BSL's status is set as `Unavailable`
-4. ETCD data rollback, corruption or accidently update to the BSL. Since Velero in the current cluster is not aware of it, the BSL's status is kept as is
+4. ETCD data rollback, corruption or accidentally update to the BSL. Since Velero in the current cluster is not aware of it, the BSL's status is kept as is
 
 In all these cases:
 - If the RSD is still available and working, the BMK generated from it is still valid, because BMK is created once and immutable. Then the activities, e.g., backup, restore, repository maintenance, could work normally without breaking
@@ -244,7 +244,7 @@ Password rotation involves two secrets:
  - `target-password`: the new password to be changed to, it is referred by the password rotation CR
 
 Velero does below steps for the password rotation:
-1. Set BSL CR to `unavilable`
+1. Set BSL CR to `unavailable`
 2. Computes KEK_old from `active-password`
 3. Unwraps BMK from `velero-storage.json` in memory
 4. Computes KEK_new from `target-password`
@@ -256,7 +256,7 @@ The existing backup data or Velero metadata is not touched, and the existing bac
 
 Password rotation is launched by an explicit request by users, just changing the secrets won't trigger the rotation. This is for two purposes:
 - Ensure password rotation is always under users' awareness, so that they have oppotunity to backup the RSD
-- Ensure the BSL is set to `unavailable` before the rotation, so that no new activies are launched during the password rotation
+- Ensure the BSL is set to `unavailable` before the rotation, so that no new activities are launched during the password rotation
 
 After password rotation starts, no new backup storage access activities should be started; existing activities which have already been running could continue, no functionality breaks.  
 
@@ -271,9 +271,9 @@ The information in Root Storage Descriptor is critical, once it is lost or corru
 Below mechanisms are used to detect corruption of Root Storage Descriptor:
 1. Calculate a hash of fields in `velero-storage.json` and save it to `velero-storage.json` for cross check
 2. Check BMK in `velero-storage.json` through the same AES-256-GCM
-3. Check BMK fingerprint. While 1 and 2 are mostly for detection of unintentional changes, this is for detection of intentional changes from attackers, which may siliently poison the backup data
+3. Check BMK fingerprint. While 1 and 2 are mostly for detection of unintentional changes, this is for detection of intentional changes from attackers, which may silently poison the backup data
 
-A periodical sync task is required for each backup storage to do this detection. When any level of checks fail, the BSL will be set to `unavailable` and data operations, including write and read, are forbiden.  
+A periodical sync task is required for each backup storage to do this detection. When any level of checks fail, the BSL will be set to `unavailable` and data operations, including write and read, are forbidden.  
 Once BSL is unavailable due to RSD check errors, users need to interfere and recover the RSD manually.     
 
 #### Recover Root Storage Descriptor
@@ -282,14 +282,14 @@ Once BSL is unavailable due to RSD check errors, users need to interfere and rec
 2. [default and automatic] Clone in BSL. Since the BSL clone is not fully trustful, users need to do manual checks and guarantee it is correct, before restoring it to the backup storage.
 3. [out of current Velero instance] A side by side protection of RSD from Velero Self Protection. Velero Self Protection is a separate feature in backlog for backup/restore Velero's own data which includes the RSD as well. Once this feature is ready, users is expected to do backups before password rotation and when the Recover RSD in the backup storage is detected as corrupted/lost, it could be restored from the Self Protection backup.
 
-To use Teir-1 reduncency, users need to stop all Velero activies of the backup storage location and rollback the `velero-storage.json` from the storage side. Velero is unaware of this process.  
+To use Teir-1 reduncency, users need to stop all Velero activities of the backup storage location and rollback the `velero-storage.json` from the storage side. Velero is unaware of this process.  
 
-To use Teir-2 and Teir-3 redundency, BSL is either avialable or restored from Velero self protection backup, then users need to extract the Root Storage Descriptor from the BSL, stop all Velero activies of the backup storage location and upload to the backup storage.  
+To use Teir-2 and Teir-3 redundancy, BSL is either available or restored from Velero self protection backup, then users need to extract the Root Storage Descriptor from the BSL, stop all Velero activities of the backup storage location and upload to the backup storage.  
 The Recover Root Storage Descriptor in the backup storage is always the source of truth, so Velero won't sync it back to the backup storage automatically.  
 
 ### Modernize Compression
 
-gzip is not performing well in compression ratio for Velero resource backup tarballs, the sliding window size is only 32KB, so Kubernetes resources which are tipically several or dozens of KB in size and there are duplicated data among resources, the compression ratio is poor.  
+gzip is not performing well in compression ratio for Velero resource backup tarballs, the sliding window size is only 32KB, so Kubernetes resources which are typically several or dozens of KB in size and there are duplicated data among resources, the compression ratio is poor.  
 
 For Format 2.0, Zstd is used for compression. Zstd is a modern compression method with much larger sliding window size, so brings much better compression/decompression throughput, compression ratio, and is also optimized for modern CPU and Kubernetes environments. Below is a detailed compression between gzip and Zstd:  
 
@@ -315,7 +315,7 @@ For Velero built-in backup repository, Velero uses the default encryption method
 
 ### Velero CSE and SSE
 
-Velero Clinet Side Encryption has no conflict with Sever Side Encryption from the backup storage. Instead, they work together to mitigate the security risks. Therefore, users are recommended to enable the both mechanisms.  
+Velero Client Side Encryption has no conflict with Sever Side Encryption from the backup storage. Instead, they work together to mitigate the security risks. Therefore, users are recommended to enable the both mechanisms.  
 Below lists the threat models, which layer fixes them and how:  
 
 | Threat Model | Mitigating Layer | SSE | Velero CSE |
@@ -428,7 +428,7 @@ type BackupStorageLocationStatus struct {
 ### BSL Initialization
 At present, when creating a new BSL, nothing is written to the backup storage, only the connection to the backup storage is verified.  
 For Format 2.0, when a new BSL is created, the Root Storage Descriptor needs to be generated and written to the backup storage.  
-Below diagram shows what happens during BSL initializaiton.    
+Below diagram shows what happens during BSL initialization.    
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -493,7 +493,7 @@ BSL is synced and verified against the existing backup storage in below cases:
 2. When a new BSL CR is created and the backup storage is already created by other clusters. This is a special case of 1
 3. A periodical sync time reaches 
 
-In normal cases, the BSL is either set as `Unavailable` so a sync starts immediately or the RSD in the BSL is still useable so an immediate sync is not required.  
+In normal cases, the BSL is either set as `Unavailable` so a sync starts immediately or the RSD in the BSL is still usable so an immediate sync is not required.  
 
 The periodical sync is used to take case of below cases:
 - Immediate sync is not required as the RSD is still usable but in long term, make it synced with the backup storage
@@ -578,7 +578,7 @@ Before using the BSL clone RSD, verification should be done first, the verificat
 |  Get BSL from cluster                                                                  |
 |         │                                                                              |
 |         ▼ PASS                                                                         |
-|  [Check 2: Check clone RSD availablility from BSL]                                     |
+|  [Check 2: Check clone RSD availability from BSL]                                      |
 |         │                                                                              |
 |         ▼ PASS                                                                         |
 |  [Check 3: Structural Completeness]                                                    |
@@ -655,7 +655,7 @@ Below diagram takes data mover pods for example to show the sequence of backup r
 ```
 
 BSL status is probed in two steps. Failure of the check will trigger retries so won't fail the tasks:
-- At the begining of the controllers reconciling a data mover CR (e.g., DataUpload, DataDownload, PodVolumeBackup, PodVolumeRestore), if the BSL is not in `available` state, the reconcile aborts and the next reconcile will retry
+- At the beginning of the controllers reconciling a data mover CR (e.g., DataUpload, DataDownload, PodVolumeBackup, PodVolumeRestore), if the BSL is not in `available` state, the reconcile aborts and the next reconcile will retry
 - At the beginning of the data mover pods retrieving DEK_repo to connect to the backup repository, if the BSL is not in `available` state, the data mover execution will wait and retry
 
 The BMK fingerprint check is also done by the data mover, once the check fails, the task will fail.  
@@ -803,7 +803,7 @@ The compression algorithm and parameters are hard-coded as below, it not necessa
 
 Compression is enabled by default and not allowed to be disabled for resource backup data.  
 
-At present, gzip compression is scattered and embeded in the specific workflow, we need to add an abstraction layer which adapts to call either gzip or zstd according to the format. So the places that are calling compression needs to be refactored to call this abstraction.  
+At present, gzip compression is scattered and embedded in the specific workflow, we need to add an abstraction layer which adapts to call either gzip or zstd according to the format. So the places that are calling compression needs to be refactored to call this abstraction.  
 
 ### Backup Repository Connection
 
@@ -814,7 +814,7 @@ Previously, we suggest users to use the backup repository connection method/CLI 
 However, with Format 2.0, the backup repository password is fully managed by Velero through `DEK_repo`, users cannot use the repository native method/CLI for the connection since they cannot specify the repo password.  
 
 To cope with this problem, Velero provides a new CLI `velero repository connect` to connect to the repository. When users call this CLI, Velero retrieves the `active-password` secret in the cluster, unwrap `DEK_repo` through the secret and call the connect functionality to the backup repository.  
-Unter the Unfied Repository architecture, the repository provider must implement `Connect` method for Velero to connect to the backup repository, so it is always guaranteed that this CLI could be implmented.  
+Under the Unfied Repository architecture, the repository provider must implement `Connect` method for Velero to connect to the backup repository, so it is always guaranteed that this CLI could be implemented.  
 After the backup repository is connected, users could use the backup repository's own commands to operate the backup repository.  
 
 `velero repo connect` CLI supports in-cluster mode and DR mode, while in-cluster mode is used by normal cases when the cluster is still available; and DR mode is used to support the scenarios that the cluster has gone so there is no way to access the BSL and secret.  
@@ -829,10 +829,10 @@ Here are the parameters for DR mode:
 Here are the parameters shared by the both mode:
 - `source-namespace`: the namespace that the backup is created for
 - `repository-type`: the type of the backup repository, optional, default to `kopia`
-- `read-only`: whether to createa read-only connection, optional, applied to the supported backup repository only
+- `read-only`: whether to create read-only connection, optional, applied to the supported backup repository only
 - `config-file`: path of the config file for the connection, optional, applied to the backup repository that use local config file only
 
-Different backup repostories may have their own specific paramters for connection, these parameters could be passed to the CLI as is, the CLI will convey all the paramters to the backup repository connection functionality.  
+Different backup repositories may have their own specific parameters for connection, these parameters could be passed to the CLI as is, the CLI will convey all the parameters to the backup repository connection functionality.  
 
 For symentric consideration, another CLI `velero repo disconnect` is provided to disconnect from the backup repository.  
 
@@ -940,7 +940,7 @@ type PublicPodVolumeInfo struct {
 
 The fields in these structs are sanitized, so that no highly sensitive information is included, since the public interface files are never encrypted.  
 
-The fields still include `Warnings` and `Errors` which are regarded as sensitive information in some way, because they may expose in-cluster information, e.g., secret or configmap names. Including these fields are a trade-off for observability, most observability secnarios require to know the result of the backup/restore and `Warnings` and `Errors` are important parts of them which could help users to validate if the backup/restore is useful.  
+The fields still include `Warnings` and `Errors` which are regarded as sensitive information in some way, because they may expose in-cluster information, e.g., secret or configmap names. Including these fields are a trade-off for observability, most observability scenarios require to know the result of the backup/restore and `Warnings` and `Errors` are important parts of them which could help users to validate if the backup/restore is useful.  
 In future, if this is still concerned, a dedicated desensitization operation could be introduced to remove the sensitive data from `Warnings` and `Errors`.  
 
 The existing backup/restore describe CLI should be refactored to use the information from the public interface of backup storage only, if the data is there.   
@@ -950,18 +950,18 @@ Additionally, below information should be removed from backup/restore describe s
 
 #### Configurable Encryption
 
-Users could configure whether to encrypt the Auxiliary Data when intialize the BSL, but they cannot change it after the BSL is intialized.  
+Users could configure whether to encrypt the Auxiliary Data when initialize the BSL, but they cannot change it after the BSL is initialized.  
 A new field `AuxiliaryDataEncryptionConfig` is added to BSL spec to allow users to configure the encryption for Auxiliary Data.  
 Users could select whether to encrypt the items of Auxiliary Data individually, e.g., backup/restore logs, resource list, etc.  
 
-Below are the mechanisms to prevent users from modifying the configuration after BSL is intialized, either in cluster or in backup storage:
+Below are the mechanisms to prevent users from modifying the configuration after BSL is initialized, either in cluster or in backup storage:
 - Modifying auxiliary Data encryption configuration in RSD in backup storage will cause headerchecksum failure and also BSL becoming to `unavailable`
 - In BSL controller, modifying auxiliary Data encryption configuration in BSL spec will cause BSL becoming to `unavailable` since BSL RSD clone drifts from main RSD
 - A `+kubebuilder:validation:XValidation:rule="self == oldSelf"` marker is added to the BSL CRD, so that the API server will refuse mutating the auxiliary Data encryption fields 
 
 #### Auxiliary Data Download API
 
-A SDK will be provided by Velero for downloading the Auxiliary Data, including below functionalties:
+A SDK will be provided by Velero for downloading the Auxiliary Data, including below functionalities:
 - DownloadBackupLog
 - DownloadRestoreLog
 - DownloadBackupResourceList
@@ -1079,7 +1079,7 @@ Below new parameters are added to `velero backup-location delete`:
 
 ## Installation
 
-Below new paramters/functionalties are added:  
+Below new parameters/functionalities are added:  
 
 | Parameter | Type / Default | Description |
 | :--- | :--- | :--- |
@@ -1090,7 +1090,7 @@ Below new paramters/functionalties are added:
 | `--preserve-bsl-secrets` | bool (default `false`) | When set, Velero uninstall **preserves the `velero` namespace and the BSL Secrets**. |
 
 The uninstallation option `--preserve-bsl-secrets` is required because the BSL secrets are provided by users, users may need a copy before deleting them.  
-When the option is not specified, Velero uninstallation should print a warning to notifiy uers that the secrets will be deleted.  
+When the option is not specified, Velero uninstallation should print a warning to notify users that the secrets will be deleted.  
 
 ## Backwards Compatibility
 
