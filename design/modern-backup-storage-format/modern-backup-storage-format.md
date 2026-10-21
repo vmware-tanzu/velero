@@ -789,6 +789,8 @@ The compression algorithm and parameters are hard-coded as below, it not necessa
 
 Compression is enabled by default and not allowed to be disabled for resource backup data.  
 
+At present, gzip compression is scattered and embeded in the specific workflow, we need to add an abstraction layer which adapts to call either gzip or zstd according to the format. So the places that are calling compression needs to be refactored to call this abstraction.  
+
 ### Backup Repository Connection
 
 A `DEK_repo` is generated for each backup repository, it should not be exposed to users.  
