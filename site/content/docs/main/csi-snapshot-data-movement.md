@@ -281,7 +281,7 @@ For incremental backups using `velero-block`, Velero will automatically fall bac
 - The critical information is missing or cannot be retrieved from the parent snapshot.
 - The parent snapshot is missing in the backup repository.
 
-When fallback occurs, unallocated regions are still skipped and identical data blocks remain deduplicated by the backup repository. The backup description will clearly indicate that a fallback took place: `Backup Type: Incremental (fallen back to Full)`.
+When fallback occurs, unallocated regions are still skipped and identical data blocks remain deduplicated by the backup repository. The backup description will clearly indicate that a fallback took place: `Backup Type: Incremental (fallen back to Full)`. In addition, the reason for the fallback is captured in the `status.activities` field of the corresponding `DataUpload` CR.
 
 ### Monitoring Backup Progress
 
@@ -331,6 +331,10 @@ You can also view the full `DataUpload` custom resource:
 kubectl -n velero get datauploads -l velero.io/backup-name=YOUR_BACKUP_NAME -o yaml
 ```
 
+In the `DataUpload` status:
+- `status.activities`: Lists operational activity and progress messages encountered during data movement, such as incremental fallback reasons.
+- `status.message`: Describes the terminal status if the operation failed or was cancelled.
+
 ## To restore
 
 You do not need to specify data mover information when creating a restore. Velero automatically retrieves the configurations (data mover type, backup mode, uploader) from the backup metadata.
@@ -371,6 +375,8 @@ You can also view the `DataDownload` custom resources directly:
 kubectl -n velero get datadownloads -l velero.io/restore-name=YOUR_RESTORE_NAME -o yaml
 ```
 
+Similar to `DataUpload`, `status.activities` captures operational activities during data download, while `status.message` describes terminal failure or cancellation details.
+
 ## Limitations
 
 - **[Velero Block Data Mover] Linux Node Execution**: Block data mover pods mount raw block devices. Because Windows containers do not support raw block mode volumes, block data mover pods can only run on Linux nodes. However, Windows workloads backed by block storage can still be backed up and restored using the block data mover as long as the data mover pods run on Linux nodes.
@@ -407,6 +413,10 @@ velero restore logs RESTORE_NAME
 
 When reviewing backup details, check whether an incremental backup fell back to full:
 - Look for `Backup Type: Incremental (fallen back to Full)` under `Data Movement`. This indicates that CBT metadata retrieval was unsuccessful or the parent snapshot was missing.
+- Inspect the specific reason for fallback from `status.activities` on the `DataUpload` CR:
+  ```bash
+  kubectl -n velero get datauploads -l velero.io/backup-name=BACKUP_NAME -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{range .status.activities}{"  - "}{.}{"\n"}{end}{end}'
+  ```
 
 What is the status of your `DataUpload` and `DataDownload`?
 
@@ -415,6 +425,11 @@ kubectl -n velero get datauploads -l velero.io/backup-name=BACKUP_NAME -o yaml
 
 kubectl -n velero get datadownloads -l velero.io/restore-name=RESTORE_NAME -o yaml
 ```
+
+Key fields to check in the CR status:
+- `status.phase`: Displays the current lifecycle phase (e.g., `Accepted`, `Prepared`, `InProgress`, `Completed`, `Failed`, `Cancelled`).
+- `status.activities`: Lists events and progress messages that occurred during data movement (such as fallback details or warnings).
+- `status.message`: Details the reason when the CR reaches a terminal failure or cancelled status.
 
 Is there any useful information in the Velero server or data mover pod logs?
 
@@ -635,7 +650,7 @@ Sometimes, `RestorePVC` needs to be configured to increase the performance of re
 [7]: https://docs.microsoft.com/en-us/azure/aks/azure-files-dynamic-pv
 [8]: api-types/backupstoragelocation.md
 [9]: supported-providers.md
-[10]: restore-reference.md#changing-pv/pvc-Storage-Classes
+[10]: restore-reference.md#changing-pvpvc-storage-classes
 [11]: data-movement-pod-resource-configuration.md
 [12]: performance-guidance.md
 [13]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/

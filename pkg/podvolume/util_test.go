@@ -22,8 +22,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1api "k8s.io/api/core/v1"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
 )
 
 func TestGetVolumeBackupsForPod(t *testing.T) {

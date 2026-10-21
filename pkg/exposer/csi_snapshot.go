@@ -34,13 +34,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/pkg/nodeagent"
-	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
-	"github.com/vmware-tanzu/velero/pkg/util"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/util/csi"
-	"github.com/vmware-tanzu/velero/pkg/util/datamover"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/velero-io/velero/pkg/nodeagent"
+	velerotypes "github.com/velero-io/velero/pkg/types"
+	"github.com/velero-io/velero/pkg/util"
+	"github.com/velero-io/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/util/csi"
+	"github.com/velero-io/velero/pkg/util/datamover"
+	"github.com/velero-io/velero/pkg/util/kube"
 )
 
 // BackupPVCSecretLabel is the label applied to secrets and configmaps copied to the
@@ -211,19 +211,23 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 
 	curLog.WithField("vsc name", vsc.Name).WithField("retained", (retained != nil)).Info("Finished to retain VSC")
 
-	err = csi.EnsureDeleteVS(ctx, e.csiSnapshotClient, volumeSnapshot.Name, volumeSnapshot.Namespace, csiExposeParam.OperationTimeout)
-	if err != nil {
-		return errors.Wrap(err, "error to delete volume snapshot")
+	if volumeSnapshot.Status != nil && volumeSnapshot.Status.VolumeGroupSnapshotName != nil {
+		curLog.Warn("Deferring deletion of VGS member VolumeSnapshot and VolumeSnapshotContent until VGS cleanup")
+	} else {
+		err = csi.EnsureDeleteVS(ctx, e.csiSnapshotClient, volumeSnapshot.Name, volumeSnapshot.Namespace, csiExposeParam.OperationTimeout)
+		if err != nil {
+			return errors.Wrap(err, "error to delete volume snapshot")
+		}
+
+		curLog.WithField("vs name", volumeSnapshot.Name).Infof("VS is deleted in namespace %s", volumeSnapshot.Namespace)
+
+		err = csi.EnsureDeleteVSC(ctx, e.csiSnapshotClient, vsc.Name, csiExposeParam.OperationTimeout)
+		if err != nil {
+			return errors.Wrap(err, "error to delete volume snapshot content")
+		}
+
+		curLog.WithField("vsc name", vsc.Name).Infof("VSC is deleted")
 	}
-
-	curLog.WithField("vs name", volumeSnapshot.Name).Infof("VS is deleted in namespace %s", volumeSnapshot.Namespace)
-
-	err = csi.EnsureDeleteVSC(ctx, e.csiSnapshotClient, vsc.Name, csiExposeParam.OperationTimeout)
-	if err != nil {
-		return errors.Wrap(err, "error to delete volume snapshot content")
-	}
-
-	curLog.WithField("vsc name", vsc.Name).Infof("VSC is deleted")
 
 	var volumeSize resource.Quantity
 	if volumeSnapshot.Status.RestoreSize != nil && !volumeSnapshot.Status.RestoreSize.IsZero() {

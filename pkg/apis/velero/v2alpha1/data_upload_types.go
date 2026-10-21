@@ -19,7 +19,7 @@ package v2alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
+	"github.com/velero-io/velero/pkg/apis/velero/shared"
 )
 
 // DataUploadSpec is the specification for a DataUpload.
@@ -147,7 +147,7 @@ type DataUploadStatus struct {
 	// +nullable
 	DataMoverResult *map[string]string `json:"dataMoverResult,omitempty"`
 
-	// Message is a message about the DataUpload's status.
+	// Message is a message describing the DataUpload when it reaches to a terminal status.
 	// +optional
 	Message string `json:"message,omitempty"`
 
@@ -205,6 +205,11 @@ type DataUploadStatus struct {
 
 	// FallbackFull indicates whether the incremental backup has fallen back to full backup
 	FallbackFull bool `json:"fallbackFull,omitempty"`
+
+	// Activities contains one or more messages about what have been done for this DataUpload.
+	// +optional
+	// +nullable
+	Activities []string `json:"activities,omitempty"`
 }
 
 // TODO(2.0) After converting all resources to use the runttime-controller client,

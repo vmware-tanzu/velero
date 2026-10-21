@@ -504,7 +504,7 @@ Add customized tolerations for data mover pods to allow scheduling on nodes with
 
 Unlike `podLabels`/`podAnnotations`, `tolerations` does **not** replace Velero's [in-tree third-party toleration allowlist](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/third_party.go). Any toleration on the node-agent DaemonSet whose key is in that allowlist (currently `kubernetes.azure.com/scalesetpriority` and `CriticalAddonsOnly`) is always merged in alongside the tolerations configured here, with duplicates removed.
 
-The configurations work for DataUpload, DataDownload, PodVolumeBackup, and PodVolumeRestore pods. This does not affect repository maintenance jobs, which inherit tolerations from the Velero Deployment directly.
+The configurations work for DataUpload, DataDownload, PodVolumeBackup, and PodVolumeRestore pods. This does not affect repository maintenance jobs; tolerations for maintenance jobs are configured separately via the repository maintenance job ConfigMap (see [Repository Maintenance](../repository-maintenance.md#tolerations-configuration)).
 
 #### Configuration Example
 ```json

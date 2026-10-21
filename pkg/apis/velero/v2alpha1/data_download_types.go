@@ -19,7 +19,7 @@ package v2alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
+	"github.com/velero-io/velero/pkg/apis/velero/shared"
 )
 
 // DataDownloadSpec is the specification for a DataDownload.
@@ -109,7 +109,7 @@ type DataDownloadStatus struct {
 	// +optional
 	Phase DataDownloadPhase `json:"phase,omitempty"`
 
-	// Message is a message about the DataDownload's status.
+	// Message is a message describing the DataDownload when it reaches to a terminal status.
 	// +optional
 	Message string `json:"message,omitempty"`
 
@@ -152,6 +152,11 @@ type DataDownloadStatus struct {
 
 	// FallbackFull indicates whether the incremental restore has fallen back to full restore
 	FallbackFull bool `json:"fallbackFull,omitempty"`
+
+	// Activities contains one or more messages about what have been done for this DataDownload.
+	// +optional
+	// +nullable
+	Activities []string `json:"activities,omitempty"`
 }
 
 // TODO(2.0) After converting all resources to use the runtime-controller client, the genclient and k8s:deepcopy markers will no longer be needed and should be removed.

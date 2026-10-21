@@ -39,21 +39,22 @@ import (
 	"github.com/cockroachdb/errors"
 	"golang.org/x/mod/semver"
 	schedulingv1api "k8s.io/api/scheduling/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/internal/volume"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
-	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	"github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test"
-	common "github.com/vmware-tanzu/velero/test/util/common"
-	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	"github.com/velero-io/velero/internal/volume"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	cliinstall "github.com/velero-io/velero/pkg/cmd/cli/install"
+	"github.com/velero-io/velero/pkg/cmd/util/flag"
+	veleroexec "github.com/velero-io/velero/pkg/util/exec"
+	"github.com/velero-io/velero/test"
+	. "github.com/velero-io/velero/test"
+	common "github.com/velero-io/velero/test/util/common"
+	. "github.com/velero-io/velero/test/util/k8s"
 )
 
 const BackupObjectsPrefix = "backups"
@@ -932,7 +933,7 @@ func InstallVeleroCLI(ctx context.Context, version string) (string, error) {
 	postfix := ".tar.gz"
 	tarball := name + postfix
 	err := wait.PollUntilContextTimeout(ctx, time.Second*5, time.Minute*5, true, func(ctx context.Context) (bool, error) {
-		tempFile, err := getVeleroCliTarball("https://github.com/vmware-tanzu/velero/releases/download/" + version + "/" + tarball)
+		tempFile, err := getVeleroCliTarball("https://github.com/velero-io/velero/releases/download/" + version + "/" + tarball)
 		if err != nil {
 			return false, errors.WithMessagef(err, "failed to get Velero CLI tarball")
 		}
@@ -1316,7 +1317,8 @@ func BuildSnapshotCheckPointFromVolumeInfo(
 	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
 	snapshotCheckPoint.PodName = KibishiiPVCNameList
 
-	if (veleroCfg.CloudProvider == Azure || veleroCfg.CloudProvider == AWS) && strings.EqualFold(veleroCfg.Features, FeatureCSI) {
+	if (veleroCfg.CloudProvider == Azure || veleroCfg.CloudProvider == AWS ||
+		veleroCfg.CloudProvider == Kind) && strings.EqualFold(veleroCfg.Features, FeatureCSI) {
 		snapshotCheckPoint.EnableCSI = true
 
 		var VscCount = 0
@@ -1507,37 +1509,49 @@ func GetVeleroPodName(ctx context.Context) ([]string, error) {
 // e2e-storage-class is the default StorageClass for E2E.
 // e2e-storage-class-2 is used for the StorageClass mapping test case.
 // Kibishii StorageClass is not covered here.
-func InstallStorageClasses(provider string) error {
+func InstallStorageClasses(provider string, clients ...TestClient) error {
+	var client TestClient
+	if len(clients) > 0 {
+		client = clients[0]
+	} else if VeleroCfg.ClientToInstallVelero != nil {
+		client = *VeleroCfg.ClientToInstallVelero
+	} else {
+		return errors.New("no client available to install storage classes")
+	}
+
 	ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer ctxCancel()
 
-	storageClassFilePath := fmt.Sprintf("../testdata/storage-class/%s.yaml", provider)
+	// The names stay fixed, since every spec refers to them. What a caller can
+	// choose is the definition they are created from, so a cluster whose volumes
+	// need a different provisioner or parameters can be targeted without editing
+	// the shared test data.
+	providerFile := fmt.Sprintf("../testdata/storage-class/%s.yaml", provider)
 
-	if err := InstallStorageClass(ctx, storageClassFilePath); err != nil {
+	firstFile := StorageClassFile
+	if firstFile == "" {
+		firstFile = providerFile
+	}
+
+	fmt.Printf("Install storage class %s with %s.\n", StorageClassName, firstFile)
+	if err := CreateStorageClassFromYaml(ctx, client, firstFile, StorageClassName); err != nil {
 		return err
 	}
-	content, err := os.ReadFile(storageClassFilePath)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get %s when install storage class", storageClassFilePath)
+
+	// An explicitly empty second file runs the suite without a second
+	// StorageClass. The cases that map between two of them skip.
+	if !SecondStorageClassInstalled() {
+		fmt.Printf("Skip installing %s, no StorageClass definition was given for it.\n", StorageClassName2)
+		return nil
 	}
 
-	// Replace the name to e2e-storage-class-2
-	newContent := strings.ReplaceAll(
-		string(content),
-		fmt.Sprintf("name: %s", StorageClassName),
-		fmt.Sprintf("name: %s", StorageClassName2),
-	)
-
-	tmpFile, err := os.CreateTemp("", "sc-file")
-	if err != nil {
-		return errors.Wrapf(err, "failed to create temp file  when install storage class")
+	secondFile := StorageClassFile2
+	if secondFile == "" {
+		secondFile = providerFile
 	}
 
-	defer os.Remove(tmpFile.Name())
-	if _, err := tmpFile.WriteString(newContent); err != nil {
-		return errors.Wrapf(err, "failed to write content into temp file %s when install storage class", tmpFile.Name())
-	}
-	return InstallStorageClass(ctx, tmpFile.Name())
+	fmt.Printf("Install storage class %s with %s.\n", StorageClassName2, secondFile)
+	return CreateStorageClassFromYaml(ctx, client, secondFile, StorageClassName2)
 }
 
 func GetPvName(ctx context.Context, client TestClient, pvcName, namespace string) (string, error) {
@@ -1562,11 +1576,9 @@ func GetPvName(ctx context.Context, client TestClient, pvcName, namespace string
 }
 func DeletePVs(ctx context.Context, client TestClient, pvList []string) error {
 	for _, pv := range pvList {
-		args := []string{"delete", "pv", pv, "--timeout=0s"}
-		fmt.Println(args)
-		err := exec.CommandContext(ctx, "kubectl", args...).Run()
-		if err != nil {
-			return errors.New(fmt.Sprintf("Deleted PV  %s ", pv))
+		err := client.ClientGo.CoreV1().PersistentVolumes().Delete(ctx, pv, metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "Failed to delete PV %s", pv)
 		}
 	}
 	return nil

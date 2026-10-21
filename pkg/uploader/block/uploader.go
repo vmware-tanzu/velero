@@ -31,10 +31,10 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-	cbt "github.com/vmware-tanzu/velero/pkg/uploader/cbt/types"
-	"github.com/vmware-tanzu/velero/pkg/util/freelist"
+	"github.com/velero-io/velero/pkg/repository/udmrepo"
+	"github.com/velero-io/velero/pkg/uploader"
+	cbt "github.com/velero-io/velero/pkg/uploader/cbt/types"
+	"github.com/velero-io/velero/pkg/util/freelist"
 )
 
 var ErrCanceled = errors.New("uploader is canceled")

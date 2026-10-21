@@ -46,18 +46,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/datapath"
-	datapathmockes "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
-	"github.com/vmware-tanzu/velero/pkg/exposer"
-	exposermockes "github.com/vmware-tanzu/velero/pkg/exposer/mocks"
-	"github.com/vmware-tanzu/velero/pkg/restorehelper"
-	"github.com/vmware-tanzu/velero/pkg/test"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	"github.com/velero-io/velero/pkg/builder"
+	"github.com/velero-io/velero/pkg/datapath"
+	datapathmockes "github.com/velero-io/velero/pkg/datapath/mocks"
+	"github.com/velero-io/velero/pkg/exposer"
+	exposermockes "github.com/velero-io/velero/pkg/exposer/mocks"
+	"github.com/velero-io/velero/pkg/restorehelper"
+	"github.com/velero-io/velero/pkg/test"
+	velerotest "github.com/velero-io/velero/pkg/test"
+	"github.com/velero-io/velero/pkg/uploader"
+	"github.com/velero-io/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/util/kube"
 )
 
 func TestShouldProcess(t *testing.T) {
@@ -1512,7 +1512,7 @@ func TestOnPodVolumeRestoreProgress(t *testing.T) {
 			progress := &test.progress
 
 			r.OnDataPathProgress(ctx, namespace, pvrName, progress)
-			if len(test.needErrs) != 0 && !test.needErrs[0] {
+			if len(test.needErrs) == 0 {
 				updatedPVR := &velerov1api.PodVolumeRestore{}
 				require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
 				if progress.TotalBytes != -1 {
@@ -1526,7 +1526,12 @@ func TestOnPodVolumeRestoreProgress(t *testing.T) {
 					assert.Equal(t, int64(0), updatedPVR.Status.Progress.BytesDone) // assuming default or original value
 				}
 				if progress.Message != "" {
-					assert.Contains(t, updatedPVR.Status.Message, progress.Message)
+					assert.Contains(t, updatedPVR.Status.Activities, progress.Message)
+
+					// Call with the same message again to verify deduplication
+					r.OnDataPathProgress(ctx, namespace, pvrName, progress)
+					require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
+					assert.Equal(t, []string{progress.Message}, updatedPVR.Status.Activities)
 				}
 			}
 		})
