@@ -43,7 +43,7 @@ Velero persists backup data of Kubernetes resources and volumes, metadata, and l
    Establish a modernized, secure, and authenticated storage layout for Velero backups.
 
 - **End-to-End Client-Side Authenticated Encryption**:
-   Encrypt all internal resource backup data before uploading to the backup storage, using AEAD with Additional Authenticated Data (AAD) to prevent exfiltration, tampering, file swapping, and omission attacks.
+   Encrypt all internal resource backup data before uploading to the backup storage, using AEAD with Additional Authenticated Data (AAD) to prevent exfiltration, tampering, file swapping, and truncation attacks.
 
 - **Unified Encryption Password for Resources and Volumes**:
    Share the encryption password between the resource backup engine and the volume backup engine (backup repository) under a single secret configuration and key management.
@@ -77,6 +77,9 @@ Velero persists backup data of Kubernetes resources and volumes, metadata, and l
 
 - **WORM Support**
   Velero at present doesn't support WORM (Write Only Read Many) backup storage, this design has no goal to fix this gap.
+
+- **File Deletion Detection**
+  Files may be deleted from the backup storage by accident or attack, missing files may cause Velero behaves erroneously. This design won't aim to solve this file omission problem considering the architecture flexibility, object storage characteristic. If it becomes a concern, a separate design is required to solve it.  
   
 
 ## Architecture
