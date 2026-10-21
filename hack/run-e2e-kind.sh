@@ -227,17 +227,19 @@ EOF
 # localhost:5000/velero:e2e-local would reduce to "localhost".
 velero_image_name="${VELERO_IMAGE%:*}"
 velero_image_tag="${VELERO_IMAGE##*:}"
-# The container target appends -<os>-<arch>, taken from go env when
-# BUILD_OUTPUT_TYPE is docker (Makefile, ALL_ARCH.linux). Hardcoding amd64 here
-# would load a tag that does not exist on an arm64 workstation.
-velero_image_platform="$(go env GOOS 2>/dev/null)-$(go env GOARCH 2>/dev/null)"
-if [ "${velero_image_platform}" = "-" ]; then
-  echo "ERROR: could not read the build platform from 'go env'. The image tag the" >&2
-  echo "       container target produces ends in -<os>-<arch>, so this script needs" >&2
+# The container target appends -linux-<arch>: with BUILD_OUTPUT_TYPE=docker the
+# Makefile fixes ALL_OS to linux and takes only the architecture from go env, so
+# the OS is linux even on a Darwin host, which still needs a Linux image to load
+# into kind. Hardcoding the architecture instead would load a tag that does not
+# exist on an arm64 workstation.
+velero_image_arch="$(go env GOARCH 2>/dev/null)"
+if [ -z "${velero_image_arch}" ]; then
+  echo "ERROR: could not read the build architecture from 'go env'. The image tag the" >&2
+  echo "       container target produces ends in -linux-<arch>, so this script needs" >&2
   echo "       go on PATH to know which tag to load." >&2
   exit 1
 fi
-velero_image_built="${VELERO_IMAGE}-${velero_image_platform}"
+velero_image_built="${VELERO_IMAGE}-linux-${velero_image_arch}"
 
 if [ "${SKIP_BUILD}" != "true" ]; then
   echo "==> Building the Velero CLI and image"
