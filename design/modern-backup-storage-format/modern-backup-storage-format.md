@@ -321,7 +321,13 @@ For Velero built-in backup repository, Velero uses the default encryption method
 
 ### Velero CSE and SSE
 
-Velero Client Side Encryption has no conflict with Sever Side Encryption from the backup storage. Instead, they work together to mitigate the security risks. Therefore, users are recommended to enable the both mechanisms.  
+CSE is required to meet the requirements for end-to-end confidentiality and integrity of backup content, independently of storage access permissions.  
+
+Even when SSE operates correctly, it does not establish that the content was produced by Velero or belongs to the expected backup context. Or in another word, SSE cannot provide end to end backup data integrity.  
+Velero CSE requires a separate key to encrypt content and generate valid authentication tags, and binds protected files to their backup context. That is to say, as long as the data could be decrypted, it guarantees that the data stream is complete and matches the expected backup.    
+
+CSE and SSE are complementary. Velero encrypts and authenticates protected content before persistency; SSE can then encrypt that ciphertext again at the storage layer.  
+
 Below lists the threat models, which layer fixes them and how:  
 
 | Threat Model | Mitigating Layer | SSE | Velero CSE |
@@ -650,7 +656,7 @@ Below diagram takes data mover pods for example to show the sequence of backup r
 │              │                      │ • KEK = PBKDF2(passphrase, salt, iterations)            │                       │              │
 │              │                      │ • BMK = AES-256-GCM-Decrypt(KEK, wrappedMasterKey, AAD) │                       │              │
 │              │                      │ • Assert SHA256(BMK) == BSL.Status.keyFingerprint       │                       │              │
-│              │                      │ • (Fail if no match)                                    │                       │              │    │              │                      │                                                         │                       │              │
+│              │                      │ • (Fail if no match)                                    │                       │              │ 
 │              │                      │ • DEK_repo = HKDF-Expand(HKDF(salt=bslID, BMK), repo)   │                       │              │
 │              │                      │ • memclr(BMK, KEK, passphrase)                          │                       │              │
 │              │                      └─────────────────────────────────────────────────────────┘                       │              │
@@ -795,6 +801,22 @@ Below is the diagram for password rotation workflow:
                           |
                   API error: retry as InProgress
 ```
+
+### Encryption
+
+Resource data and Velero metadata are encrypted/decrypted with `DEK_resource` in below way:
+
+```
+Encryption:
+  AAD = Encode(bslID, backupName, fileName)
+  ciphertext, tag = AES-GCM-Encrypt(DEK, nonce, compressedData, AAD)
+
+Decryption:
+  AAD = Encode(bslID, backupName, fileName)
+  compressedData = AES-GCM-Decrypt(DEK, nonce, ciphertext, tag, AAD)
+```
+
+The encryption/decryption happens per file and binds contexts of BSL, backup and file.  
 
 ### Compression
 
