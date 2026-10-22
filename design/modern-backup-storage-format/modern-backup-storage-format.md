@@ -173,7 +173,7 @@ A Key Encryption Key (KEK) is derived from the user password. The KEK then encry
 - **Resource Data Encryption Key (`DEK_resource`)**: A 256-bit Data Encryption Key derived per BSL via HKDF with domain separation to encrypt Kubernetes resource backup data and Velero metadata files with AES-256-GCM.
 - **Backup Repository Passwords (`DEK_repo`)**: Backup repository passwords derived per backup repository via HKDF with strict domain separation. The password is provided to the backup repository through the existing workflow of Unified Repo. How the password is used is decided by the specific backup repository.  
 
-The Kubernetes Secret is provided by callers, e.g., users, or ESO/Gitops tools. The secret should be in Velero namespace.  
+The Kubernetes Secret is provided by callers, e.g., users, or ESO/Gitops tools. The secret should be in Velero namespace. Multiple BSLs could share the same secret through different keys.  
 BMK is a 256 bits random key generated during BSL initialization, after that, BMK is never changed.
 DEK_resource and DEK_repo are derived from BMK so they are unchanged as well after BSL is initialized.  
 DEK_resource and DEK_repo stays in memory all the time, they are never persisted.   
@@ -239,9 +239,15 @@ In all these cases:
 #### Password Rotation
 It guarantees O(1) complexity for password rotation. That is the complexity is not increase along with the number of backups or backup repositories.   
 
+To fully secure the password rotation process, a Password Rotation Request is introduced.  
+
 Password rotation involves two secrets:
  - `active-password`: the existing/active password the BSL is using, it is referred by the BSL CR
- - `target-password`: the new password to be changed to, it is referred by the password rotation CR
+ - `target-password`: the new password to be changed to, it is referred by the Password Rotation Request CR
+
+Users should carefully follow some rules for password rotation:
+1. Always use the Password Rotation Request for changing `active-password`; they should not change it directly in BSL.  
+2. When multiple clusters share the same BSL, Password Rotation Request should be launched in each of the clusters with **Exactly the same** password. Otherwise, RSD encryption envelop will be overwritten. It is not recommended to launch the rotations among multiple clusters simultaneously, users should launch it one after another.   
 
 Velero does below steps for the password rotation:
 1. Set BSL CR to `unavailable`
@@ -267,7 +273,7 @@ When the password rotation completes, the old `active-password` secret is out of
 ### Root Storage Descriptor Recovery
 The information in Root Storage Descriptor is critical, once it is lost or corrupted, all the data in the backup storage will be inaccessible. There are mechanisms from different levels to protect the system from falling to this catersphic situation.  
 
-#### Detetct Root Storage Descriptor Corruption/Lost/Tampering
+#### Detect Root Storage Descriptor Corruption/Lost/Tampering
 Below mechanisms are used to detect corruption of Root Storage Descriptor:
 1. Calculate a hash of fields in `velero-storage.json` and save it to `velero-storage.json` for cross check
 2. Check BMK in `velero-storage.json` through the same AES-256-GCM
@@ -277,14 +283,14 @@ A periodical sync task is required for each backup storage to do this detection.
 Once BSL is unavailable due to RSD check errors, users need to interfere and recover the RSD manually.     
 
 #### Recover Root Storage Descriptor
-3 teirs of reduncencies for Root Storage Descriptor are recommended:
+3 tiers of reduncencies for Root Storage Descriptor are recommended:
 1. [out of scope of Velero] A side by side protection of Recover Root Storage Descriptor from the backup storage is highly recommended. E.g., enable the object versioning for this `velero-storage.json` object in the object storage
 2. [default and automatic] Clone in BSL. Since the BSL clone is not fully trustful, users need to do manual checks and guarantee it is correct, before restoring it to the backup storage.
 3. [out of current Velero instance] A side by side protection of RSD from Velero Self Protection. Velero Self Protection is a separate feature in backlog for backup/restore Velero's own data which includes the RSD as well. Once this feature is ready, users is expected to do backups before password rotation and when the Recover RSD in the backup storage is detected as corrupted/lost, it could be restored from the Self Protection backup.
 
-To use Teir-1 reduncency, users need to stop all Velero activities of the backup storage location and rollback the `velero-storage.json` from the storage side. Velero is unaware of this process.  
+To use Tier-1 reduncency, users need to stop all Velero activities of the backup storage location and rollback the `velero-storage.json` from the storage side. Velero is unaware of this process.  
 
-To use Teir-2 and Teir-3 redundancy, BSL is either available or restored from Velero self protection backup, then users need to extract the Root Storage Descriptor from the BSL, stop all Velero activities of the backup storage location and upload to the backup storage.  
+To use Tier-2 and Tier-3 redundancy, BSL is either available or restored from Velero self protection backup, then users need to extract the Root Storage Descriptor from the BSL, stop all Velero activities of the backup storage location and upload to the backup storage.  
 The Recover Root Storage Descriptor in the backup storage is always the source of truth, so Velero won't sync it back to the backup storage automatically.  
 
 ### Modernize Compression
@@ -707,23 +713,17 @@ type BSLKeyRotationRequestStatus struct {
 
 #### Admission and State Transition
 
-A `New` request is admitted only for an `Available`, `ReadWrite` BSL with no other active rotation request.  
-An `InProgress` request resumes without requiring the BSL to be `Available`. The BSL must remain writable.  
+The controller access `New` or `InProgress` requests, for `InProgress` requests, the controller resumes/retries the rotation operation.  
 
 Multiple rotation request for the same BSL is not allowed, the controller will:  
 - If an `InProgress` request exists, continue it and reject additional `New` requests as Failed
 - If several `New` requests exist, choose one by creation timestamp, then reject the others as Failed
 
-An annotation `velero.io/key-rotation-in-progress: "true"` is introduced. It prevents BSL sync from processing the BSL and signals that rotation reconciliation should continue. Reconciliation sets it before changing storage.  
+An annotation `velero.io/key-rotation-in-progress: "true"` is introduced. It prevents BSL sync from processing the BSL (since BSL is set to `Unavailable`) and signals that rotation reconciliation should continue. Reconciliation sets it before changing storage.  
 
 There is an admission stage before modifying the RSD or BSL.  
 
-For `New` request, the admission does below things:
-- Verify the BSL is Available and ReadWrite, with no active rotation
-- Read the BSL’s `active-password` and validate the storage RSD using that password, including headerchecksum and BMK fingerprint check
-- Update the request status `Phase` to `InProgress`
-
-For `InProgress` request, the admission does below things:
+The admission does below things:
 - Verify the BSL is ReadWrite
 - Read the BSL’s `active-password` and validate the storage RSD using that password, including headerchecksum and BMK fingerprint check
 - If the verification with `active-password` fails, do the same verification with `target-password`
@@ -732,6 +732,8 @@ For `InProgress` request, the admission does below things:
 On verification failure during the admission, the controller removes the `velero.io/key-rotation-in-progress` annotation from the BSL and then
 set the rotation request as `Failed`.  
 On transient errors during the admission, the controller will retry the rotation request.  
+
+By the end the BSL is updated and restored to the original state before the rotation, specifically, if the BSL is in `Unavailable` state, the state is not changed to `Available`.  
 
 The BSL is updated in an atomic operation, so it never happens that the BSL fields are in inconsistent states.  
 However, BSL may be inconsistent with backup storage when the upload succeeds but BSL update fails, in this case, admission could still pass using the `target-password` and rotation could continue.  
@@ -758,10 +760,9 @@ Below is the diagram for password rotation workflow:
                  |                                |
                  +---- Verified RSD and BMK -------+
                           |
-             BSL already fully finalized?
+             BSL credentials already updated?
              - Active reference = target reference
              - Clone matches verified storage RSD
-             - Available; no rotation annotation
                     /                    \
                   Yes                    No
                    |                      |
@@ -779,15 +780,17 @@ Below is the diagram for password rotation workflow:
                    |                |              |           |
                    |                +--------------+     Retry as InProgress
                    |                      |
-                   |          Update BSL atomically:
-                   |          - Secret reference and RSD clone
-                   |          - Set Available; remove annotation
-                   |                      |
-                   |               Success / API error
-                   |                  |          |
-                   |                  |    Retry as InProgress
-                   +------------------+
+                   +----------------------+
                           |
+                 Update BSL atomically:
+                 - Secret reference and RSD clone
+                 - Restore pre-rotation availability state
+                 - Remove rotation annotation
+                          |
+                   Success / API error
+                      |          |
+                      |    Retry as InProgress
+                      |
                  Mark request Completed
                           |
                   API error: retry as InProgress
