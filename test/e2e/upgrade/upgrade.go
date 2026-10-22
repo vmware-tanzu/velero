@@ -19,7 +19,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,8 +66,8 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 		if (len(veleroCfg.UpgradeFromVeleroVersion)) == 0 {
 			Skip("An original velero version is required to run upgrade test, please run test with upgrade-from-velero-version=<version>")
 		}
-		if useVolumeSnapshots && veleroCfg.CloudProvider == Kind {
-			Skip(fmt.Sprintf("Volume snapshots not supported on %s", Kind))
+		if useVolumeSnapshots && KibishiiVolumesAreHostPath(veleroCfg) {
+			Skip("Kibishii's PVs on kind are hostPath without EnableCSI, so there is nothing to snapshot")
 		}
 		if veleroCfg.VeleroCLI == "" {
 			Skip("VeleroCLI should be provide")
@@ -224,7 +223,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 					fmt.Sprintf("failed to delete namespace %s", upgradeNamespace))
 			})
 
-			if useVolumeSnapshots && veleroCfg.CloudProvider == Azure && strings.EqualFold(veleroCfg.Features, FeatureCSI) {
+			if useVolumeSnapshots && veleroCfg.CloudProvider == Azure && FeatureEnabled(veleroCfg.Features, FeatureCSI) {
 				// Upgrade test is not running daily since no CSI plugin v1.0 released, because builds before
 				//   v1.0 have issues to fail upgrade case.
 				By("Sleep 5 minutes to avoid snapshot recreated by unknown reason ", func() {

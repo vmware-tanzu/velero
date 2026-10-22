@@ -212,6 +212,7 @@ run-e2e: ginkgo
 		-v \
 		--junit-report e2e/report.xml \
 		--label-filter="$(GINKGO_LABELS)" \
+		--fail-on-empty \
 		--timeout=5h \
 		--fail-fast=$(FAIL_FAST) \
 		./e2e \
