@@ -2531,6 +2531,7 @@ func TestDeleteSnapshotByTempVSC(t *testing.T) {
 			assert.NotEqual(t, "fake-vs", created.Spec.VolumeSnapshotRef.Name)
 			assert.Equal(t, "fake-secret", created.Annotations[VSCDeletionSecretNameAnnotation])
 			assert.Equal(t, "fake-ns", created.Annotations[VSCDeletionSecretNamespaceAnnotation])
+			assert.Equal(t, []string{VSCBoundProtectionFinalizer}, created.Finalizers)
 		})
 	}
 }

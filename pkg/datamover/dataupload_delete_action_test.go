@@ -339,6 +339,7 @@ func TestDataUploadDeleteActionRetainedSnapshot(t *testing.T) {
 			assert.NotEmpty(t, vsc.Spec.VolumeSnapshotRef.Namespace)
 			assert.Equal(t, tc.wantAnnotations, vsc.Annotations)
 			assert.Equal(t, "daily-backup", vsc.Labels[velerov1.BackupNameLabel])
+			assert.Equal(t, []string{csiutil.VSCBoundProtectionFinalizer}, vsc.Finalizers)
 		})
 	}
 }

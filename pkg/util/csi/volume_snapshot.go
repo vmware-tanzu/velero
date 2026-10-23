@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -920,6 +921,10 @@ const (
 	VSCDeletionSecretNameAnnotation      = "snapshot.storage.kubernetes.io/deletion-secret-name"
 	VSCDeletionSecretNamespaceAnnotation = "snapshot.storage.kubernetes.io/deletion-secret-namespace"
 
+	// VSCBoundProtectionFinalizer is the CSI snapshot finalizer that keeps a
+	// VolumeSnapshotContent until the CSI snapshotter has handled its deletion.
+	VSCBoundProtectionFinalizer = "snapshot.storage.kubernetes.io/volumesnapshotcontent-bound-protection"
+
 	// TempVSCCreateDeleteGap is the delay between creating and deleting a temporary
 	// VolumeSnapshotContent, to avoid create/delete race conditions in CSI controllers.
 	TempVSCCreateDeleteGap = 2 * time.Second
@@ -959,6 +964,14 @@ func DeleteSnapshotByTempVSC(ctx context.Context, crClient crclient.Client, vsc 
 	// Make the deletion independent of the VolumeSnapshotClass, which may no
 	// longer exist; the CSI driver reads the deletion secret from the annotations.
 	vsc.Spec.VolumeSnapshotClassName = nil
+	// The snapshot controller only adds this finalizer to a VSC bound to a
+	// VolumeSnapshot, which the placeholder never is. Without it, the VSC is
+	// removed as soon as it is deleted and the CSI snapshotter never calls
+	// DeleteSnapshot. With it, the snapshotter sees the unbound VSC being deleted,
+	// deletes the snapshot and then removes the finalizer.
+	if !slices.Contains(vsc.Finalizers, VSCBoundProtectionFinalizer) {
+		vsc.Finalizers = append(vsc.Finalizers, VSCBoundProtectionFinalizer)
+	}
 
 	if err := crClient.Create(ctx, vsc); err != nil {
 		return errors.Wrapf(err, "error creating temp VolumeSnapshotContent %s", vsc.Name)
