@@ -218,6 +218,7 @@ func TestDataUploadDeleteActionRetainedSnapshot(t *testing.T) {
 		name            string
 		retained        *velerov2alpha1.RetainedSnapshot
 		executingBackup string
+		existingCM      bool
 		createErr       error
 		deleteErr       error
 		wantEvents      []string
@@ -242,6 +243,17 @@ func TestDataUploadDeleteActionRetainedSnapshot(t *testing.T) {
 			},
 			executingBackup: "daily-backup",
 			wantEvents:      []string{"create", "sleep", "delete"},
+		},
+		{
+			name:            "snapshot-info configmap left by a failed deletion does not stop the retry",
+			retained:        retainedWithSecret,
+			executingBackup: "daily-backup",
+			existingCM:      true,
+			wantEvents:      []string{"create", "sleep", "delete"},
+			wantAnnotations: map[string]string{
+				csiutil.VSCDeletionSecretNameAnnotation:      "rook-csi-rbd-provisioner",
+				csiutil.VSCDeletionSecretNamespaceAnnotation: "rook-ceph",
+			},
 		},
 		{
 			name:            "no retained snapshot creates no VSC",
@@ -312,6 +324,9 @@ func TestDataUploadDeleteActionRetainedSnapshot(t *testing.T) {
 			du := newCompletedDataUpload("daily-backup-abcde", "daily-backup")
 			du.Status.RetainedSnapshot = tc.retained
 			backup := builder.ForBackup("velero", tc.executingBackup).StorageLocation("default").Result()
+			if tc.existingCM {
+				require.NoError(t, crClient.Create(t.Context(), genConfigmap(backup, *du)))
+			}
 
 			err := action.Execute(&velero.DeleteItemActionExecuteInput{
 				Item:   toUnstructured(t, du),

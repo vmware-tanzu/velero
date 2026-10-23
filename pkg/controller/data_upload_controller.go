@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/cockroachdb/errors"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned/typed/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -549,7 +551,14 @@ func (r *DataUploadReconciler) getRetainedSnapshot(ctx context.Context, du *vele
 	}
 
 	// The backup VSC is named after the DataUpload, see csiSnapshotExposer.createBackupVSC.
-	vsc, err := r.csiSnapshotClient.VolumeSnapshotContents().Get(ctx, du.Name, metav1.GetOptions{})
+	// Retry transient errors, the backup VSC and the chance to record its snapshot
+	// are gone once the cleanup runs.
+	var vsc *snapshotv1api.VolumeSnapshotContent
+	err := retry.OnError(retry.DefaultBackoff, func(err error) bool { return !apierrors.IsNotFound(err) }, func() error {
+		var getErr error
+		vsc, getErr = r.csiSnapshotClient.VolumeSnapshotContents().Get(ctx, du.Name, metav1.GetOptions{})
+		return getErr
+	})
 	if err != nil {
 		log.WithError(err).Errorf("Failed to get backup VSC %s, a retained snapshot will not be deleted with the backup", du.Name)
 		return nil

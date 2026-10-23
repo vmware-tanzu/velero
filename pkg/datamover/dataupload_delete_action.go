@@ -9,6 +9,7 @@ import (
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,9 +78,11 @@ func (d *DataUploadDeleteAction) Execute(input *velero.DeleteItemActionExecuteIn
 		)
 		return nil
 	}
-	// A nil configmap will not fail the backup deletion
+	// A nil configmap will not fail the backup deletion. The configmap may already
+	// exist from a previous deletion attempt that failed, which must not stop the
+	// retry from deleting the retained snapshot.
 	if cm := genConfigmap(input.Backup, *du); cm != nil {
-		if err := d.client.Create(context.Background(), cm); err != nil {
+		if err := d.client.Create(context.Background(), cm); err != nil && !apierrors.IsAlreadyExists(err) {
 			return errors.WithStack(errors.Wrapf(err, "failed to create the configmap for DataUpload %s/%s", du.Namespace, du.Name))
 		}
 	}

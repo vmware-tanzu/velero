@@ -26,6 +26,7 @@ import (
 	"github.com/cockroachdb/errors"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned/fake"
+	snapshotv1fake "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned/typed/volumesnapshot/v1/fake"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	clientgofake "k8s.io/client-go/kubernetes/fake"
+	clientTesting "k8s.io/client-go/testing"
 	"k8s.io/utils/clock"
 	testclocks "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -932,6 +934,7 @@ func TestOnDataUploadCompletedRetainedSnapshot(t *testing.T) {
 	tests := []struct {
 		name      string
 		backupVSC *snapshotv1api.VolumeSnapshotContent
+		getErrs   int
 		expected  *velerov2alpha1api.RetainedSnapshot
 	}{
 		{
@@ -955,6 +958,22 @@ func TestOnDataUploadCompletedRetainedSnapshot(t *testing.T) {
 				Driver:                  "rbd.csi.ceph.com",
 				DeletionSecretName:      "rbd-secret",
 				DeletionSecretNamespace: "rook-ceph",
+			},
+		},
+		{
+			name:    "transient error getting the backup VSC is retried",
+			getErrs: 2,
+			backupVSC: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{Name: dataUploadName},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+					Driver:         "rbd.csi.ceph.com",
+					Source:         snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: &handle},
+				},
+			},
+			expected: &velerov2alpha1api.RetainedSnapshot{
+				SnapshotHandle: handle,
+				Driver:         "rbd.csi.ceph.com",
 			},
 		},
 		{
@@ -984,6 +1003,16 @@ func TestOnDataUploadCompletedRetainedSnapshot(t *testing.T) {
 			if test.backupVSC != nil {
 				_, err = r.csiSnapshotClient.VolumeSnapshotContents().Create(ctx, test.backupVSC, metav1.CreateOptions{})
 				require.NoError(t, err)
+			}
+			if test.getErrs > 0 {
+				failures := test.getErrs
+				r.csiSnapshotClient.(*snapshotv1fake.FakeSnapshotV1).PrependReactor("get", "volumesnapshotcontents", func(clientTesting.Action) (bool, runtime.Object, error) {
+					if failures == 0 {
+						return false, nil, nil
+					}
+					failures--
+					return true, nil, errors.New("fake-transient-error")
+				})
 			}
 			r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
 
