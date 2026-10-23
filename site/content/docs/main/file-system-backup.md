@@ -332,7 +332,11 @@ Instructions to back up using this approach are as follows:
 
 ## To restore
 
-Regardless of how volumes are discovered for backup using FSB, the process of restoring remains the same.  
+Regardless of how volumes are discovered for backup using FSB, the process of restoring remains the same.
+
+To restore data directly into an existing, bound PVC instead of provisioning a new volume, specify `--existing-volume-data-policy=full` or `--existing-volume-data-policy=incremental`.
+
+Before starting an in-place restore with File System Backup, you must delete the workload controllers (such as Deployments or StatefulSets) while retaining the target PVCs and PVs. Do not merely scale controllers to zero replicas: a controller scaled to zero immediately terminates the restored Pod that contains Velero's `restore-wait` init container, which prevents data restoration. Include the workload controllers in the restore so Velero recreates them with the required init container. For more information, see [Volume Data In-place Restore](volume-data-inplace-restore.md).
 
 1. Restore from your Velero backup:
 

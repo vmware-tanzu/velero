@@ -345,6 +345,10 @@ To restore from your Velero backup:
 velero restore create --from-backup BACKUP_NAME OPTIONS...
 ```
 
+To restore data directly into an existing, bound PVC instead of provisioning a new volume, specify `--existing-volume-data-policy=full` or `--existing-volume-data-policy=incremental`.
+
+Before restoring, you must stop consuming workloads (for example, by scaling Deployments and StatefulSets to zero replicas) and ensure all consuming Pods have completely terminated. For more information, including pre-flight checks, volume identity verification, and cross-namespace workflows, see [Volume Data In-place Restore](volume-data-inplace-restore.md).
+
 When the restore starts, you will see one or more `DataDownload` CRs created.  
 You may also see some intermediate objects (i.e., pods, PVCs, PVs) created in Velero namespace or the cluster scope, they are to help data movers to move data. And they will be removed after the restore completes.  
 The phase of a `DataDownload` CR changes several times during the restore process and finally goes to one of the terminal status, `Completed`, `Failed` or `Cancelled`. You can see the phase changes as well as the data download progress by watching the DataDownload CRs:  
