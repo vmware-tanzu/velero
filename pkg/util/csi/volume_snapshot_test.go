@@ -37,6 +37,7 @@ import (
 	clientTesting "k8s.io/client-go/testing"
 	"k8s.io/utils/ptr"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/velero-io/velero/pkg/apis/velero/v2alpha1"
@@ -2427,4 +2428,109 @@ func TestDeleteSnapshotByTempVSCEmptyHandle(t *testing.T) {
 	crClient := velerotest.NewFakeControllerRuntimeClient(t)
 	err := DeleteSnapshotByTempVSC(t.Context(), crClient, &snapshotv1api.VolumeSnapshotContent{}, velerotest.NewLogger())
 	require.ErrorContains(t, err, "snapshot handle is empty")
+}
+
+func TestDeleteSnapshotByTempVSC(t *testing.T) {
+	tests := []struct {
+		name       string
+		createErr  error
+		deleteErr  error
+		wantEvents []string
+		wantErr    string
+	}{
+		{
+			name:       "temp VSC is created with Delete policy and then deleted",
+			wantEvents: []string{"create", "sleep", "delete"},
+		},
+		{
+			name:       "create error",
+			createErr:  errors.New("fake-create-error"),
+			wantEvents: []string{"create"},
+			wantErr:    "fake-create-error",
+		},
+		{
+			name:       "temp VSC already gone",
+			deleteErr:  apierrors.NewNotFound(snapshotv1api.Resource("volumesnapshotcontents"), "fake-vsc"),
+			wantEvents: []string{"create", "sleep", "delete"},
+		},
+		{
+			name:       "delete error",
+			deleteErr:  errors.New("fake-delete-error"),
+			wantEvents: []string{"create", "sleep", "delete"},
+			wantErr:    "fake-delete-error",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			events := []string{}
+			originalSleep := SleepBetweenTempVSCCreateAndDelete
+			t.Cleanup(func() { SleepBetweenTempVSCCreateAndDelete = originalSleep })
+			SleepBetweenTempVSCCreateAndDelete = func(d time.Duration) {
+				assert.Equal(t, TempVSCCreateDeleteGap, d)
+				events = append(events, "sleep")
+			}
+
+			var created *snapshotv1api.VolumeSnapshotContent
+			crClient := interceptor.NewClient(velerotest.NewFakeControllerRuntimeClient(t).(crclient.WithWatch), interceptor.Funcs{
+				Create: func(ctx context.Context, c crclient.WithWatch, obj crclient.Object, opts ...crclient.CreateOption) error {
+					events = append(events, "create")
+					if tc.createErr != nil {
+						return tc.createErr
+					}
+					created = obj.(*snapshotv1api.VolumeSnapshotContent).DeepCopy()
+					return c.Create(ctx, obj, opts...)
+				},
+				Delete: func(ctx context.Context, c crclient.WithWatch, obj crclient.Object, opts ...crclient.DeleteOption) error {
+					events = append(events, "delete")
+					if tc.deleteErr != nil {
+						return tc.deleteErr
+					}
+					return c.Delete(ctx, obj, opts...)
+				},
+			})
+
+			vsc := &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "original-vsc",
+					ResourceVersion: "123",
+					Annotations: map[string]string{
+						VSCDeletionSecretNameAnnotation:      "fake-secret",
+						VSCDeletionSecretNamespaceAnnotation: "fake-ns",
+					},
+				},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy:          snapshotv1api.VolumeSnapshotContentRetain,
+					Driver:                  "fake-driver",
+					VolumeSnapshotClassName: ptr.To("fake-class"),
+					VolumeSnapshotRef:       corev1api.ObjectReference{Name: "fake-vs", Namespace: "fake-vs-ns"},
+					Source: snapshotv1api.VolumeSnapshotContentSource{
+						SnapshotHandle: ptr.To("fake-handle"),
+						VolumeHandle:   ptr.To("fake-volume"),
+					},
+				},
+			}
+
+			err := DeleteSnapshotByTempVSC(t.Context(), crClient, vsc, velerotest.NewLogger())
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.wantEvents, events)
+
+			if created == nil {
+				return
+			}
+			assert.NotEqual(t, "original-vsc", created.Name)
+			assert.Equal(t, snapshotv1api.VolumeSnapshotContentDelete, created.Spec.DeletionPolicy)
+			assert.Equal(t, "fake-handle", *created.Spec.Source.SnapshotHandle)
+			assert.Nil(t, created.Spec.Source.VolumeHandle)
+			assert.Equal(t, "fake-driver", created.Spec.Driver)
+			assert.Nil(t, created.Spec.VolumeSnapshotClassName)
+			assert.NotEqual(t, "fake-vs", created.Spec.VolumeSnapshotRef.Name)
+			assert.Equal(t, "fake-secret", created.Annotations[VSCDeletionSecretNameAnnotation])
+			assert.Equal(t, "fake-ns", created.Annotations[VSCDeletionSecretNamespaceAnnotation])
+		})
+	}
 }
