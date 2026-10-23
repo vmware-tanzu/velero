@@ -27,6 +27,7 @@ import (
 
 	"github.com/cockroachdb/errors"
 	jsonpatch "github.com/evanphx/json-patch/v5"
+	"github.com/google/uuid"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned/typed/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
@@ -39,6 +40,7 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/velero-io/velero/pkg/apis/velero/v2alpha1"
 	"github.com/velero-io/velero/pkg/util/boolptr"
 	"github.com/velero-io/velero/pkg/util/stringptr"
 	"github.com/velero-io/velero/pkg/util/stringslice"
@@ -909,4 +911,91 @@ func GetVSCForVS(
 	}
 
 	return vsc, nil
+}
+
+const (
+	// VSCDeletionSecretNameAnnotation and VSCDeletionSecretNamespaceAnnotation are set by
+	// the CSI snapshot controller on a VolumeSnapshotContent and name the secret the CSI
+	// driver requires to delete the snapshot.
+	VSCDeletionSecretNameAnnotation      = "snapshot.storage.kubernetes.io/deletion-secret-name"
+	VSCDeletionSecretNamespaceAnnotation = "snapshot.storage.kubernetes.io/deletion-secret-namespace"
+
+	// TempVSCCreateDeleteGap is the delay between creating and deleting a temporary
+	// VolumeSnapshotContent, to avoid create/delete race conditions in CSI controllers.
+	TempVSCCreateDeleteGap = 2 * time.Second
+)
+
+// SleepBetweenTempVSCCreateAndDelete is a variable so that tests can skip the wait.
+var SleepBetweenTempVSCCreateAndDelete = time.Sleep
+
+// DeleteSnapshotByTempVSC deletes the storage snapshot referenced by
+// vsc.Spec.Source.SnapshotHandle. It creates vsc as a statically provisioned
+// VolumeSnapshotContent with DeletionPolicy Delete, bound to a placeholder
+// VolumeSnapshot, and then deletes it so the CSI driver removes the snapshot.
+// vsc must carry the snapshot handle, the driver and, if the driver requires
+// them, the deletion secret annotations; everything else is overwritten.
+func DeleteSnapshotByTempVSC(ctx context.Context, crClient crclient.Client, vsc *snapshotv1api.VolumeSnapshotContent, log logrus.FieldLogger) error {
+	if vsc.Spec.Source.SnapshotHandle == nil || *vsc.Spec.Source.SnapshotHandle == "" {
+		return errors.New("snapshot handle is empty")
+	}
+
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return errors.Wrap(err, "error generating UUID for temp VolumeSnapshotContent")
+	}
+
+	vsc.Name = "vsc-" + id.String()
+	vsc.ResourceVersion = ""
+	vsc.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentDelete
+	vsc.Spec.Source = snapshotv1api.VolumeSnapshotContentSource{
+		SnapshotHandle: vsc.Spec.Source.SnapshotHandle,
+	}
+	vsc.Spec.VolumeSnapshotRef = corev1api.ObjectReference{
+		APIVersion: snapshotv1api.SchemeGroupVersion.String(),
+		Kind:       "VolumeSnapshot",
+		Namespace:  "ns-" + id.String(),
+		Name:       "name-" + id.String(),
+	}
+	// Make the deletion independent of the VolumeSnapshotClass, which may no
+	// longer exist; the CSI driver reads the deletion secret from the annotations.
+	vsc.Spec.VolumeSnapshotClassName = nil
+
+	if err := crClient.Create(ctx, vsc); err != nil {
+		return errors.Wrapf(err, "error creating temp VolumeSnapshotContent %s", vsc.Name)
+	}
+	log.Infof("Created temp VolumeSnapshotContent %s with DeletionPolicy=Delete for snapshot %s", vsc.Name, *vsc.Spec.Source.SnapshotHandle)
+
+	SleepBetweenTempVSCCreateAndDelete(TempVSCCreateDeleteGap)
+
+	if err := crClient.Delete(ctx, vsc); err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, "error deleting temp VolumeSnapshotContent %s", vsc.Name)
+	}
+	log.Infof("Deleted temp VolumeSnapshotContent %s to remove snapshot %s from the storage", vsc.Name, *vsc.Spec.Source.SnapshotHandle)
+
+	return nil
+}
+
+// GetRetainedSnapshot returns the snapshot that stays in the storage after vsc is
+// deleted, or nil if the snapshot is deleted together with vsc.
+func GetRetainedSnapshot(vsc *snapshotv1api.VolumeSnapshotContent) *velerov2alpha1api.RetainedSnapshot {
+	if vsc == nil || vsc.Spec.DeletionPolicy != snapshotv1api.VolumeSnapshotContentRetain {
+		return nil
+	}
+
+	handle := ""
+	if vsc.Status != nil && vsc.Status.SnapshotHandle != nil {
+		handle = *vsc.Status.SnapshotHandle
+	} else if vsc.Spec.Source.SnapshotHandle != nil {
+		handle = *vsc.Spec.Source.SnapshotHandle
+	}
+	if handle == "" {
+		return nil
+	}
+
+	return &velerov2alpha1api.RetainedSnapshot{
+		SnapshotHandle:          handle,
+		Driver:                  vsc.Spec.Driver,
+		DeletionSecretName:      vsc.Annotations[VSCDeletionSecretNameAnnotation],
+		DeletionSecretNamespace: vsc.Annotations[VSCDeletionSecretNamespaceAnnotation],
+	}
 }

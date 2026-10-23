@@ -58,6 +58,7 @@ import (
 	velerotypes "github.com/velero-io/velero/pkg/types"
 	"github.com/velero-io/velero/pkg/uploader"
 	"github.com/velero-io/velero/pkg/util/boolptr"
+	"github.com/velero-io/velero/pkg/util/csi"
 	"github.com/velero-io/velero/pkg/util/kube"
 )
 
@@ -924,6 +925,82 @@ func TestOnDataUploadCompleted(t *testing.T) {
 	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
 	assert.Equal(t, "fake-id", updatedDu.Status.SnapshotID)
 	assert.Equal(t, "fake-path", updatedDu.Status.Path)
+}
+
+func TestOnDataUploadCompletedRetainedSnapshot(t *testing.T) {
+	handle := "fake-snapshot-handle"
+	tests := []struct {
+		name      string
+		backupVSC *snapshotv1api.VolumeSnapshotContent
+		expected  *velerov2alpha1api.RetainedSnapshot
+	}{
+		{
+			name: "backup VSC with Retain policy records the retained snapshot",
+			backupVSC: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: dataUploadName,
+					Annotations: map[string]string{
+						csi.VSCDeletionSecretNameAnnotation:      "rbd-secret",
+						csi.VSCDeletionSecretNamespaceAnnotation: "rook-ceph",
+					},
+				},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+					Driver:         "rbd.csi.ceph.com",
+					Source:         snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: &handle},
+				},
+			},
+			expected: &velerov2alpha1api.RetainedSnapshot{
+				SnapshotHandle:          handle,
+				Driver:                  "rbd.csi.ceph.com",
+				DeletionSecretName:      "rbd-secret",
+				DeletionSecretNamespace: "rook-ceph",
+			},
+		},
+		{
+			name: "backup VSC with Delete policy records nothing",
+			backupVSC: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{Name: dataUploadName},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentDelete,
+					Driver:         "rbd.csi.ceph.com",
+					Source:         snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: &handle},
+				},
+			},
+		},
+		{
+			name: "missing backup VSC records nothing",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+			r, err := initDataUploaderReconciler()
+			require.NoError(t, err)
+
+			du := dataUploadBuilder().Result()
+			require.NoError(t, r.client.Create(ctx, du))
+			if test.backupVSC != nil {
+				_, err = r.csiSnapshotClient.VolumeSnapshotContents().Create(ctx, test.backupVSC, metav1.CreateOptions{})
+				require.NoError(t, err)
+			}
+			r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
+
+			r.OnDataUploadCompleted(ctx, du.Namespace, du.Name, datapath.Result{
+				Backup: datapath.BackupResult{SnapshotID: "fake-id"},
+			})
+
+			updatedDu := &velerov2alpha1api.DataUpload{}
+			require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: du.Name, Namespace: du.Namespace}, updatedDu))
+			assert.Equal(t, velerov2alpha1api.DataUploadPhaseCompleted, updatedDu.Status.Phase)
+			assert.Equal(t, test.expected, updatedDu.Status.RetainedSnapshot)
+
+			// The backup VSC is still cleaned up after its snapshot info is recorded.
+			_, err = r.csiSnapshotClient.VolumeSnapshotContents().Get(ctx, dataUploadName, metav1.GetOptions{})
+			assert.True(t, apierrors.IsNotFound(err))
+		})
+	}
 }
 
 func TestFindDataUploadForPod(t *testing.T) {

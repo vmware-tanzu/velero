@@ -52,6 +52,7 @@ import (
 	velerotypes "github.com/velero-io/velero/pkg/types"
 	"github.com/velero-io/velero/pkg/uploader"
 	"github.com/velero-io/velero/pkg/util"
+	"github.com/velero-io/velero/pkg/util/csi"
 	"github.com/velero-io/velero/pkg/util/datamover"
 	"github.com/velero-io/velero/pkg/util/kube"
 )
@@ -493,6 +494,9 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 		return
 	}
 
+	// Must run before the cleanup below, which deletes the backup VSC.
+	retainedSnapshot := r.getRetainedSnapshot(ctx, &du, log)
+
 	// cleans up any objects generated during the snapshot expose
 	ep, ok := r.snapshotExposerList[du.Spec.SnapshotType]
 	if !ok {
@@ -518,6 +522,7 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 		du.Status.IncrementalBytes = result.Backup.IncrementalBytes
 		du.Status.SourceSize = result.Backup.SourceSize
 		du.Status.FallbackFull = result.Backup.FallbackFull
+		du.Status.RetainedSnapshot = retainedSnapshot
 
 		du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if result.Backup.EmptySnapshot {
@@ -533,6 +538,29 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 		log.Info("Data upload completed")
 		r.metrics.RegisterDataUploadSuccess(r.nodeName)
 	}
+}
+
+// getRetainedSnapshot returns the volume snapshot that stays in the storage after the
+// backup VSC is cleaned up, so that backup deletion can delete it later. It returns nil
+// when the snapshot is deleted with the backup VSC, i.e. the deletion policy is Delete.
+func (r *DataUploadReconciler) getRetainedSnapshot(ctx context.Context, du *velerov2alpha1api.DataUpload, log logrus.FieldLogger) *velerov2alpha1api.RetainedSnapshot {
+	if du.Spec.SnapshotType != velerov2alpha1api.SnapshotTypeCSI {
+		return nil
+	}
+
+	// The backup VSC is named after the DataUpload, see csiSnapshotExposer.createBackupVSC.
+	vsc, err := r.csiSnapshotClient.VolumeSnapshotContents().Get(ctx, du.Name, metav1.GetOptions{})
+	if err != nil {
+		log.WithError(err).Errorf("Failed to get backup VSC %s, a retained snapshot will not be deleted with the backup", du.Name)
+		return nil
+	}
+
+	retained := csi.GetRetainedSnapshot(vsc)
+	if retained != nil {
+		log.Infof("Snapshot %s is retained in the storage by deletion policy of backup VSC %s", retained.SnapshotHandle, vsc.Name)
+	}
+
+	return retained
 }
 
 func (r *DataUploadReconciler) OnDataUploadFailed(ctx context.Context, namespace, duName string, err error) {

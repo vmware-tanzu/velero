@@ -39,6 +39,7 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/velero-io/velero/pkg/apis/velero/v2alpha1"
 	"github.com/velero-io/velero/pkg/builder"
 	"github.com/velero-io/velero/pkg/test"
 	velerotest "github.com/velero-io/velero/pkg/test"
@@ -2346,4 +2347,84 @@ func TestCleanupVolumeSnapshot(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetRetainedSnapshot(t *testing.T) {
+	tests := []struct {
+		name     string
+		vsc      *snapshotv1api.VolumeSnapshotContent
+		expected *velerov2alpha1api.RetainedSnapshot
+	}{
+		{
+			name: "nil VSC",
+		},
+		{
+			name: "Delete policy",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentDelete,
+					Driver:         "fake-driver",
+					Source:         snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: ptr.To("fake-handle")},
+				},
+			},
+		},
+		{
+			name: "Retain policy without handle",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+					Driver:         "fake-driver",
+				},
+			},
+		},
+		{
+			name: "Retain policy with handle in spec",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+					Driver:         "fake-driver",
+					Source:         snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: ptr.To("fake-handle")},
+				},
+			},
+			expected: &velerov2alpha1api.RetainedSnapshot{
+				SnapshotHandle: "fake-handle",
+				Driver:         "fake-driver",
+			},
+		},
+		{
+			name: "Retain policy with handle in status and deletion secret",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						VSCDeletionSecretNameAnnotation:      "fake-secret",
+						VSCDeletionSecretNamespaceAnnotation: "fake-ns",
+					},
+				},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+					Driver:         "fake-driver",
+					Source:         snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: ptr.To("fake-spec-handle")},
+				},
+				Status: &snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: ptr.To("fake-handle")},
+			},
+			expected: &velerov2alpha1api.RetainedSnapshot{
+				SnapshotHandle:          "fake-handle",
+				Driver:                  "fake-driver",
+				DeletionSecretName:      "fake-secret",
+				DeletionSecretNamespace: "fake-ns",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expected, GetRetainedSnapshot(test.vsc))
+		})
+	}
+}
+
+func TestDeleteSnapshotByTempVSCEmptyHandle(t *testing.T) {
+	crClient := velerotest.NewFakeControllerRuntimeClient(t)
+	err := DeleteSnapshotByTempVSC(t.Context(), crClient, &snapshotv1api.VolumeSnapshotContent{}, velerotest.NewLogger())
+	require.ErrorContains(t, err, "snapshot handle is empty")
 }

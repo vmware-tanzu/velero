@@ -37,6 +37,7 @@ import (
 	factorymocks "github.com/velero-io/velero/pkg/client/mocks"
 	"github.com/velero-io/velero/pkg/plugin/velero"
 	velerotest "github.com/velero-io/velero/pkg/test"
+	"github.com/velero-io/velero/pkg/util/csi"
 )
 
 // fakeClientWithErrors wraps a real client and injects errors for specific operations.
@@ -422,13 +423,13 @@ func TestVSCExecute_CreateSleepDeleteOrder(t *testing.T) {
 	realClient := velerotest.NewFakeControllerRuntimeClient(t)
 	trackingClient := &fakeClientWithCallTracking{Client: realClient, events: &events}
 
-	originalSleep := sleepBetweenTempVSCCreateAndDelete
+	originalSleep := csi.SleepBetweenTempVSCCreateAndDelete
 	t.Cleanup(func() {
-		sleepBetweenTempVSCCreateAndDelete = originalSleep
+		csi.SleepBetweenTempVSCCreateAndDelete = originalSleep
 	})
 
-	sleepBetweenTempVSCCreateAndDelete = func(d time.Duration) {
-		require.Equal(t, tempVSCCreateDeleteGap, d)
+	csi.SleepBetweenTempVSCCreateAndDelete = func(d time.Duration) {
+		require.Equal(t, csi.TempVSCCreateDeleteGap, d)
 		events = append(events, "sleep")
 	}
 
