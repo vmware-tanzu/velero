@@ -731,9 +731,11 @@ func isTarballNotFoundError(err error) bool {
 	//   - "nosuchkey":                    AWS S3
 	//   - "blobnotfound":                 Azure Blob Storage
 	//   - "objectnotexist":               GCS
+	//   - "doesn't exist":                GCS
 	return strings.Contains(msg, "not found") ||
 		strings.Contains(msg, "does not exist") ||
 		strings.Contains(msg, "nosuchkey") ||
 		strings.Contains(msg, "blobnotfound") ||
-		strings.Contains(msg, "objectnotexist")
+		strings.Contains(msg, "objectnotexist") ||
+		strings.Contains(msg, "doesn't exist")
 }
