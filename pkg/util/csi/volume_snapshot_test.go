@@ -2580,3 +2580,122 @@ func TestWaitTempVSCDeleted(t *testing.T) {
 	require.NoError(t, crClient.Delete(t.Context(), vsc))
 	require.Error(t, waitTempVSCDeleted(t.Context(), crClient, "fake-vsc", 2*time.Second))
 }
+
+func TestWaitTempVSCDeletedResult(t *testing.T) {
+	before := metav1.NewTime(time.Now().Add(-time.Minute))
+	after := metav1.NewTime(time.Now().Add(time.Minute))
+
+	tests := []struct {
+		name      string
+		errorTime *metav1.Time
+		wantErr   error
+		wantMsg   string
+	}{
+		{
+			name:    "slow deletion without error is pending",
+			wantErr: ErrTempVSCDeletionPending,
+		},
+		{
+			name:      "error recorded before the deletion is ignored",
+			errorTime: &before,
+			wantErr:   ErrTempVSCDeletionPending,
+		},
+		{
+			name:      "error recorded by the deletion fails immediately",
+			errorTime: &after,
+			wantMsg:   "CSI driver failed to delete the snapshot: fake-delete-error",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			crClient := velerotest.NewFakeControllerRuntimeClient(t)
+			vsc := &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{Name: "fake-vsc", Finalizers: []string{VSCBoundProtectionFinalizer}},
+			}
+			require.NoError(t, crClient.Create(t.Context(), vsc))
+			require.NoError(t, crClient.Delete(t.Context(), vsc))
+			if tc.errorTime != nil {
+				require.NoError(t, crClient.Get(t.Context(), crclient.ObjectKeyFromObject(vsc), vsc))
+				vsc.Status = &snapshotv1api.VolumeSnapshotContentStatus{
+					Error: &snapshotv1api.VolumeSnapshotError{Time: tc.errorTime, Message: ptr.To("fake-delete-error")},
+				}
+				require.NoError(t, crClient.Update(t.Context(), vsc))
+			}
+
+			err := waitTempVSCDeleted(t.Context(), crClient, "fake-vsc", 2*time.Second)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+			} else {
+				require.EqualError(t, err, tc.wantMsg)
+			}
+		})
+	}
+}
+
+func TestDeleteSnapshotByTempVSCPending(t *testing.T) {
+	originalSleep := SleepBetweenTempVSCCreateAndDelete
+	originalWait := WaitTempVSCDeleted
+	t.Cleanup(func() {
+		SleepBetweenTempVSCCreateAndDelete = originalSleep
+		WaitTempVSCDeleted = originalWait
+	})
+	SleepBetweenTempVSCCreateAndDelete = func(time.Duration) {}
+	WaitTempVSCDeleted = func(context.Context, crclient.Client, string, time.Duration) error {
+		return ErrTempVSCDeletionPending
+	}
+
+	vsc := &snapshotv1api.VolumeSnapshotContent{
+		Spec: snapshotv1api.VolumeSnapshotContentSpec{
+			Driver: "fake-driver",
+			Source: snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: ptr.To("fake-handle")},
+		},
+	}
+	require.NoError(t, DeleteSnapshotByTempVSC(t.Context(), velerotest.NewFakeControllerRuntimeClient(t), vsc, velerotest.NewLogger()))
+}
+
+func TestReleaseRetainedVSC(t *testing.T) {
+	tests := []struct {
+		name     string
+		vsc      *snapshotv1api.VolumeSnapshotContent
+		expected snapshotv1api.DeletionPolicy
+	}{
+		{
+			name: "Retain is changed to Delete",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{Name: "fake-vsc"},
+				Spec:       snapshotv1api.VolumeSnapshotContentSpec{DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain},
+			},
+			expected: snapshotv1api.VolumeSnapshotContentDelete,
+		},
+		{
+			name: "Delete is kept",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{Name: "fake-vsc"},
+				Spec:       snapshotv1api.VolumeSnapshotContentSpec{DeletionPolicy: snapshotv1api.VolumeSnapshotContentDelete},
+			},
+			expected: snapshotv1api.VolumeSnapshotContentDelete,
+		},
+		{
+			name: "missing VSC is not an error",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			objs := []runtime.Object{}
+			if tc.vsc != nil {
+				objs = append(objs, tc.vsc)
+			}
+			client := snapshotFake.NewSimpleClientset(objs...)
+
+			require.NoError(t, ReleaseRetainedVSC(t.Context(), client.SnapshotV1(), "fake-vsc"))
+
+			if tc.vsc != nil {
+				vsc, err := client.SnapshotV1().VolumeSnapshotContents().Get(t.Context(), "fake-vsc", metav1.GetOptions{})
+				require.NoError(t, err)
+				assert.Equal(t, tc.expected, vsc.Spec.DeletionPolicy)
+			}
+		})
+	}
+}

@@ -669,7 +669,23 @@ func (r *DataUploadReconciler) cleanUp(ctx context.Context, du *velerov2alpha1ap
 		if du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI { // Other exposer should have another condition
 			volumeSnapshotName = du.Spec.CSISnapshot.VolumeSnapshot
 		}
+		r.releaseRetainedSnapshot(ctx, du, log)
 		ep.CleanUp(ctx, getOwnerObject(du), volumeSnapshotName, du.Spec.SourceNamespace)
+	}
+}
+
+// releaseRetainedSnapshot makes the cleanup of a DataUpload that did not complete
+// delete the snapshot even if the backup VSC's deletion policy is Retain. Only a
+// completed DataUpload records the retained snapshot for backup deletion, so the
+// snapshot of a failed or canceled one would otherwise be left in the storage.
+func (r *DataUploadReconciler) releaseRetainedSnapshot(ctx context.Context, du *velerov2alpha1api.DataUpload, log logrus.FieldLogger) {
+	if du.Spec.SnapshotType != velerov2alpha1api.SnapshotTypeCSI {
+		return
+	}
+
+	// The backup VSC is named after the DataUpload, see csiSnapshotExposer.createBackupVSC.
+	if err := csi.ReleaseRetainedVSC(ctx, r.csiSnapshotClient, du.Name); err != nil {
+		log.WithError(err).Errorf("Failed to set deletion policy of backup VSC %s to Delete, its snapshot may be left in the storage", du.Name)
 	}
 }
 
@@ -833,6 +849,7 @@ func (r *DataUploadReconciler) errorOut(ctx context.Context, du *velerov2alpha1a
 		if du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI { // Other exposer should have another condition
 			volumeSnapshotName = du.Spec.CSISnapshot.VolumeSnapshot
 		}
+		r.releaseRetainedSnapshot(ctx, du, log)
 		se.CleanUp(ctx, getOwnerObject(du), volumeSnapshotName, du.Spec.SourceNamespace)
 	} else {
 		log.Errorf("failed to clean up exposed snapshot could not find %s snapshot exposer", du.Spec.SnapshotType)
@@ -943,6 +960,7 @@ func (r *DataUploadReconciler) onPrepareTimeout(ctx context.Context, du *velerov
 			log.Warnf("[Diagnose DU expose]%s", diag)
 		}
 
+		r.releaseRetainedSnapshot(ctx, du, log)
 		ep.CleanUp(ctx, getOwnerObject(du), volumeSnapshotName, du.Spec.SourceNamespace)
 
 		log.Info("Dataupload has been cleaned up")

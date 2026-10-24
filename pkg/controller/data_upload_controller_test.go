@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1030,6 +1031,53 @@ func TestOnDataUploadCompletedRetainedSnapshot(t *testing.T) {
 			assert.True(t, apierrors.IsNotFound(err))
 		})
 	}
+}
+
+func TestDataUploadNotCompletedReleasesRetainedSnapshot(t *testing.T) {
+	handle := "fake-snapshot-handle"
+	ctx := t.Context()
+	r, err := initDataUploaderReconciler()
+	require.NoError(t, err)
+
+	du := dataUploadBuilder().Result()
+	require.NoError(t, r.client.Create(ctx, du))
+	_, err = r.csiSnapshotClient.VolumeSnapshotContents().Create(ctx, &snapshotv1api.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{Name: dataUploadName},
+		Spec: snapshotv1api.VolumeSnapshotContentSpec{
+			DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+			Driver:         "rbd.csi.ceph.com",
+			Source:         snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: &handle},
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+	r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
+
+	_, _ = r.errorOut(ctx, du, errors.New("fake-error"), "fake failure", velerotest.NewLogger())
+
+	// The policy must be Delete before the cleanup deletes the backup VSC.
+	var released, deleted int
+	for i, action := range r.csiSnapshotClient.(*snapshotv1fake.FakeSnapshotV1).Actions() {
+		if action.GetResource().Resource != "volumesnapshotcontents" {
+			continue
+		}
+		switch a := action.(type) {
+		case clientTesting.PatchAction:
+			if a.GetName() == dataUploadName && strings.Contains(string(a.GetPatch()), `"deletionPolicy":"Delete"`) {
+				released = i
+			}
+		case clientTesting.DeleteAction:
+			if a.GetName() == dataUploadName {
+				deleted = i
+			}
+		}
+	}
+	require.NotZero(t, released, "backup VSC deletion policy was not changed to Delete")
+	require.NotZero(t, deleted, "backup VSC was not deleted")
+	assert.Less(t, released, deleted)
+
+	updatedDu := &velerov2alpha1api.DataUpload{}
+	require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: du.Name, Namespace: du.Namespace}, updatedDu))
+	assert.Nil(t, updatedDu.Status.RetainedSnapshot)
 }
 
 func TestFindDataUploadForPod(t *testing.T) {
