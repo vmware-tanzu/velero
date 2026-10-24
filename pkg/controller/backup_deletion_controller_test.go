@@ -18,6 +18,8 @@ package controller
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1256,11 +1258,18 @@ func TestBackupDeletionRetainedSnapshotAfterOtherData(t *testing.T) {
 	tests := []struct {
 		name               string
 		batchDeleteSucceed bool
+		existingTempVSC    bool
 		wantSnapshotDelete bool
 	}{
 		{
 			name:               "retained snapshot is deleted after the moved snapshot data",
 			batchDeleteSucceed: true,
+			wantSnapshotDelete: true,
+		},
+		{
+			name:               "retry of an interrupted deletion reuses the temp VSC it left",
+			batchDeleteSucceed: true,
+			existingTempVSC:    true,
 			wantSnapshotDelete: true,
 		},
 		{
@@ -1305,8 +1314,26 @@ func TestBackupDeletionRetainedSnapshotAfterOtherData(t *testing.T) {
 				Driver:         "hostpath.csi.k8s.io",
 			})
 
+			objs := []runtime.Object{backup, location, snapshotInfoCM, retainedCM}
+			if tc.existingTempVSC {
+				sum := sha256.Sum256([]byte("hostpath.csi.k8s.io/snap-handle"))
+				handle := "snap-handle"
+				objs = append(objs, &snapshotv1api.VolumeSnapshotContent{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:       "vsc-" + hex.EncodeToString(sum[:16]),
+						Labels:     map[string]string{velerov1api.BackupNameLabel: "foo"},
+						Finalizers: []string{csi.VSCBoundProtectionFinalizer},
+					},
+					Spec: snapshotv1api.VolumeSnapshotContentSpec{
+						DeletionPolicy: snapshotv1api.VolumeSnapshotContentDelete,
+						Driver:         "hostpath.csi.k8s.io",
+						Source:         snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: &handle},
+					},
+				})
+			}
+
 			dbr := defaultTestDbr()
-			td := setupBackupDeletionControllerTest(t, dbr, backup, location, snapshotInfoCM, retainedCM)
+			td := setupBackupDeletionControllerTest(t, dbr, objs...)
 			td.controller.repoMgr = repomocks.NewManager(t)
 
 			pluginManager := &pluginmocks.Manager{}
@@ -1326,6 +1353,7 @@ func TestBackupDeletionRetainedSnapshotAfterOtherData(t *testing.T) {
 				require.NotNil(t, vscs.Items[0].Spec.Source.SnapshotHandle)
 				assert.Equal(t, "snap-handle", *vscs.Items[0].Spec.Source.SnapshotHandle)
 				assert.Equal(t, "foo", vscs.Items[0].Labels[velerov1api.BackupNameLabel])
+				assert.NotNil(t, vscs.Items[0].DeletionTimestamp, "expected the temp VSC to be deleted")
 				assert.Len(t, *waited, 1)
 				td.backupStore.AssertCalled(t, "DeleteBackup", dbr.Spec.BackupName)
 			} else {
@@ -1338,9 +1366,13 @@ func TestBackupDeletionRetainedSnapshotAfterOtherData(t *testing.T) {
 				assert.Contains(t, strings.Join(res.Status.Errors, "\n"), "error deleting moved snapshot data")
 			}
 
-			// The configmap is created again from the backup tarball when the deletion is retried.
+			// The configmap is the record of the snapshot, so it is kept until the snapshot is deleted.
 			err = td.fakeClient.Get(t.Context(), client.ObjectKeyFromObject(retainedCM), &corev1api.ConfigMap{})
-			assert.True(t, apierrors.IsNotFound(err), "expected the retained snapshot configmap to be removed, got %v", err)
+			if tc.wantSnapshotDelete {
+				assert.True(t, apierrors.IsNotFound(err), "expected the retained snapshot configmap to be removed, got %v", err)
+			} else {
+				require.NoError(t, err, "expected the retained snapshot configmap to be kept")
+			}
 		})
 	}
 }
@@ -1350,10 +1382,10 @@ func TestDeleteRetainedSnapshots(t *testing.T) {
 		name       string
 		retained   *velerov2alpha1api.RetainedSnapshot
 		otherCM    bool
-		skip       bool
 		waitErr    error
 		wantWaited int
 		wantErr    string
+		wantCMKept bool
 	}{
 		{
 			name:       "retained snapshot is deleted",
@@ -1361,19 +1393,16 @@ func TestDeleteRetainedSnapshots(t *testing.T) {
 			wantWaited: 1,
 		},
 		{
-			name:     "retained snapshot is kept when skipped",
-			retained: &velerov2alpha1api.RetainedSnapshot{SnapshotHandle: "snap-handle", Driver: "hostpath.csi.k8s.io"},
-			skip:     true,
+			name:       "retained snapshot of another backup is not touched",
+			retained:   &velerov2alpha1api.RetainedSnapshot{SnapshotHandle: "snap-handle", Driver: "hostpath.csi.k8s.io"},
+			otherCM:    true,
+			wantCMKept: true,
 		},
 		{
-			name:     "retained snapshot of another backup is not touched",
-			retained: &velerov2alpha1api.RetainedSnapshot{SnapshotHandle: "snap-handle", Driver: "hostpath.csi.k8s.io"},
-			otherCM:  true,
-		},
-		{
-			name:     "invalid retained snapshot fails",
-			retained: &velerov2alpha1api.RetainedSnapshot{Driver: "hostpath.csi.k8s.io"},
-			wantErr:  "invalid retained snapshot",
+			name:       "invalid retained snapshot fails",
+			retained:   &velerov2alpha1api.RetainedSnapshot{Driver: "hostpath.csi.k8s.io"},
+			wantErr:    "invalid retained snapshot",
+			wantCMKept: true,
 		},
 		{
 			name:       "failure of the CSI driver fails",
@@ -1381,6 +1410,7 @@ func TestDeleteRetainedSnapshots(t *testing.T) {
 			waitErr:    errors.New("fake-snapshot-delete-error"),
 			wantWaited: 1,
 			wantErr:    "fake-snapshot-delete-error",
+			wantCMKept: true,
 		},
 	}
 
@@ -1397,7 +1427,7 @@ func TestDeleteRetainedSnapshots(t *testing.T) {
 			r := &backupDeletionReconciler{Client: fakeClient, logger: velerotest.NewLogger()}
 			backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").Result()
 
-			errs := r.deleteRetainedSnapshots(t.Context(), backup, tc.skip, velerotest.NewLogger())
+			errs := r.deleteRetainedSnapshots(t.Context(), backup, velerotest.NewLogger())
 			if tc.wantErr != "" {
 				require.Len(t, errs, 1)
 				require.ErrorContains(t, errs[0], tc.wantErr)
@@ -1407,8 +1437,8 @@ func TestDeleteRetainedSnapshots(t *testing.T) {
 			assert.Len(t, *waited, tc.wantWaited)
 
 			err := fakeClient.Get(t.Context(), client.ObjectKeyFromObject(cm), &corev1api.ConfigMap{})
-			if tc.otherCM {
-				require.NoError(t, err)
+			if tc.wantCMKept {
+				require.NoError(t, err, "expected the configmap to be kept")
 			} else {
 				assert.True(t, apierrors.IsNotFound(err), "expected the configmap to be removed, got %v", err)
 			}

@@ -372,14 +372,11 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		// Deleting a retained snapshot can't be undone and it is the base of the next
 		// incremental backup, so it is deleted only after the other data of the backup is
 		// deleted. Otherwise the snapshot is kept, and a retry of the deletion deletes it.
-		skipRetained := len(errs) > 0
-		if skipRetained {
+		if len(errs) > 0 {
 			log.Info("Skipping removal of retained volume snapshots due to previous errors")
 		} else {
 			log.Info("Removing retained volume snapshots")
-		}
-		if deleteErrs := r.deleteRetainedSnapshots(ctx, backup, skipRetained, log); len(deleteErrs) > 0 {
-			for _, err := range deleteErrs {
+			for _, err := range r.deleteRetainedSnapshots(ctx, backup, log) {
 				errs = append(errs, errors.Wrap(err, "error deleting retained volume snapshot").Error())
 			}
 		}
@@ -640,10 +637,11 @@ func (r *backupDeletionReconciler) deleteMovedSnapshots(ctx context.Context, bac
 }
 
 // deleteRetainedSnapshots has the CSI driver delete the volume snapshots that the
-// DataUploads of the backup retained in the storage, unless skip is set. The
-// configmaps that pass the snapshots from the DataUpload DeleteItemAction are
-// removed either way; they are created again when the deletion is retried.
-func (r *backupDeletionReconciler) deleteRetainedSnapshots(ctx context.Context, backup *velerov1api.Backup, skip bool, log logrus.FieldLogger) []error {
+// DataUploads of the backup retained in the storage. The configmaps that pass the
+// snapshots from the DataUpload DeleteItemAction are the only record of the
+// snapshots once the DataUploads are deleted, so a configmap is removed only after
+// its snapshot is deleted.
+func (r *backupDeletionReconciler) deleteRetainedSnapshots(ctx context.Context, backup *velerov1api.Backup, log logrus.FieldLogger) []error {
 	list := &corev1api.ConfigMapList{}
 	if err := r.Client.List(ctx, list, &client.ListOptions{
 		Namespace: backup.Namespace,
@@ -659,10 +657,9 @@ func (r *backupDeletionReconciler) deleteRetainedSnapshots(ctx context.Context, 
 	var errs []error
 	for i := range list.Items {
 		cm := list.Items[i]
-		if !skip {
-			if err := r.deleteRetainedSnapshot(ctx, backup, &cm, log); err != nil {
-				errs = append(errs, err)
-			}
+		if err := r.deleteRetainedSnapshot(ctx, backup, &cm, log); err != nil {
+			errs = append(errs, err)
+			continue
 		}
 		if err := r.Client.Delete(ctx, &cm); err != nil && !apierrors.IsNotFound(err) {
 			log.Warnf("Failed to delete retained snapshot configmap %s/%s: %v", cm.Namespace, cm.Name, err)
