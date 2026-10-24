@@ -17,12 +17,9 @@ limitations under the License.
 package datamover
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
@@ -41,7 +38,6 @@ import (
 	"github.com/velero-io/velero/pkg/builder"
 	"github.com/velero-io/velero/pkg/plugin/velero"
 	velerotest "github.com/velero-io/velero/pkg/test"
-	csiutil "github.com/velero-io/velero/pkg/util/csi"
 )
 
 func toUnstructured(t *testing.T, du *velerov2alpha1.DataUpload) runtime.Unstructured {
@@ -175,37 +171,6 @@ func TestDataUploadDeleteActionExecute(t *testing.T) {
 	}
 }
 
-// vscTrackingClient records the VolumeSnapshotContents created and deleted
-// through it and can inject errors into those calls.
-type vscTrackingClient struct {
-	crclient.Client
-	events    *[]string
-	created   []*snapshotv1api.VolumeSnapshotContent
-	createErr error
-	deleteErr error
-}
-
-func (c *vscTrackingClient) Create(ctx context.Context, obj crclient.Object, opts ...crclient.CreateOption) error {
-	if vsc, ok := obj.(*snapshotv1api.VolumeSnapshotContent); ok {
-		*c.events = append(*c.events, "create")
-		if c.createErr != nil {
-			return c.createErr
-		}
-		c.created = append(c.created, vsc.DeepCopy())
-	}
-	return c.Client.Create(ctx, obj, opts...)
-}
-
-func (c *vscTrackingClient) Delete(ctx context.Context, obj crclient.Object, opts ...crclient.DeleteOption) error {
-	if _, ok := obj.(*snapshotv1api.VolumeSnapshotContent); ok {
-		*c.events = append(*c.events, "delete")
-		if c.deleteErr != nil {
-			return c.deleteErr
-		}
-	}
-	return c.Client.Delete(ctx, obj, opts...)
-}
-
 func TestDataUploadDeleteActionRetainedSnapshot(t *testing.T) {
 	retainedWithSecret := &velerov2alpha1.RetainedSnapshot{
 		SnapshotHandle:          "0001-0009-rook-ceph-0000000000000001-snap",
@@ -218,144 +183,75 @@ func TestDataUploadDeleteActionRetainedSnapshot(t *testing.T) {
 		name            string
 		retained        *velerov2alpha1.RetainedSnapshot
 		executingBackup string
-		existingCM      bool
-		createErr       error
-		deleteErr       error
-		waitErr         error
-		wantEvents      []string
-		wantAnnotations map[string]string
+		existingCMs     bool
+		wantData        map[string]string
 		wantErr         string
 	}{
 		{
-			name:            "retained snapshot is deleted through a temp VSC with Delete policy and the deletion secret",
+			name:            "retained snapshot is passed to the backup deletion controller with the deletion secret",
 			retained:        retainedWithSecret,
 			executingBackup: "daily-backup",
-			wantEvents:      []string{"create", "sleep", "delete", "wait"},
-			wantAnnotations: map[string]string{
-				csiutil.VSCDeletionSecretNameAnnotation:      "rook-csi-rbd-provisioner",
-				csiutil.VSCDeletionSecretNamespaceAnnotation: "rook-ceph",
+			wantData: map[string]string{
+				"snapshotHandle":          "0001-0009-rook-ceph-0000000000000001-snap",
+				"driver":                  "rbd.csi.ceph.com",
+				"deletionSecretName":      "rook-csi-rbd-provisioner",
+				"deletionSecretNamespace": "rook-ceph",
 			},
 		},
 		{
-			name: "retained snapshot without deletion secret is deleted through a temp VSC without secret annotations",
+			name: "retained snapshot without deletion secret is passed without the secret",
 			retained: &velerov2alpha1.RetainedSnapshot{
 				SnapshotHandle: "snap-handle",
 				Driver:         "hostpath.csi.k8s.io",
 			},
 			executingBackup: "daily-backup",
-			wantEvents:      []string{"create", "sleep", "delete", "wait"},
-		},
-		{
-			name:            "snapshot-info configmap left by a failed deletion does not stop the retry",
-			retained:        retainedWithSecret,
-			executingBackup: "daily-backup",
-			existingCM:      true,
-			wantEvents:      []string{"create", "sleep", "delete", "wait"},
-			wantAnnotations: map[string]string{
-				csiutil.VSCDeletionSecretNameAnnotation:      "rook-csi-rbd-provisioner",
-				csiutil.VSCDeletionSecretNamespaceAnnotation: "rook-ceph",
+			wantData: map[string]string{
+				"snapshotHandle": "snap-handle",
+				"driver":         "hostpath.csi.k8s.io",
 			},
 		},
 		{
-			name:            "no retained snapshot creates no VSC",
+			name:            "configmaps left by a failed deletion do not stop the retry",
+			retained:        retainedWithSecret,
 			executingBackup: "daily-backup",
-			wantEvents:      []string{},
+			existingCMs:     true,
+			wantData: map[string]string{
+				"snapshotHandle":          "0001-0009-rook-ceph-0000000000000001-snap",
+				"driver":                  "rbd.csi.ceph.com",
+				"deletionSecretName":      "rook-csi-rbd-provisioner",
+				"deletionSecretNamespace": "rook-ceph",
+			},
 		},
 		{
-			name:            "retained snapshot of a DataUpload owned by another backup is not deleted",
+			name:            "no retained snapshot creates no configmap",
+			executingBackup: "daily-backup",
+		},
+		{
+			name:            "retained snapshot of a DataUpload owned by another backup is not passed",
 			retained:        retainedWithSecret,
 			executingBackup: "hourly-backup",
-			wantEvents:      []string{},
 		},
 		{
 			name:            "retained snapshot without handle fails the deletion",
 			retained:        &velerov2alpha1.RetainedSnapshot{Driver: "rbd.csi.ceph.com"},
 			executingBackup: "daily-backup",
-			wantEvents:      []string{},
 			wantErr:         "invalid retained snapshot",
-		},
-		{
-			name:            "failure to create the temp VSC fails the deletion",
-			retained:        retainedWithSecret,
-			executingBackup: "daily-backup",
-			createErr:       errors.New("fake-create-error"),
-			wantEvents:      []string{"create"},
-			wantErr:         "fake-create-error",
-		},
-		{
-			name:            "temp VSC already gone is not an error",
-			retained:        retainedWithSecret,
-			executingBackup: "daily-backup",
-			deleteErr:       apierrors.NewNotFound(snapshotv1api.Resource("volumesnapshotcontents"), "vsc"),
-			wantEvents:      []string{"create", "sleep", "delete", "wait"},
-			wantAnnotations: map[string]string{
-				csiutil.VSCDeletionSecretNameAnnotation:      "rook-csi-rbd-provisioner",
-				csiutil.VSCDeletionSecretNamespaceAnnotation: "rook-ceph",
-			},
-		},
-		{
-			name:            "slow snapshot deletion by the CSI driver does not fail the deletion",
-			retained:        retainedWithSecret,
-			executingBackup: "daily-backup",
-			waitErr:         csiutil.ErrTempVSCDeletionPending,
-			wantEvents:      []string{"create", "sleep", "delete", "wait"},
-			wantAnnotations: map[string]string{
-				csiutil.VSCDeletionSecretNameAnnotation:      "rook-csi-rbd-provisioner",
-				csiutil.VSCDeletionSecretNamespaceAnnotation: "rook-ceph",
-			},
-		},
-		{
-			name:            "error waiting for the temp VSC fails the deletion",
-			retained:        retainedWithSecret,
-			executingBackup: "daily-backup",
-			waitErr:         errors.New("fake-wait-error"),
-			wantEvents:      []string{"create", "sleep", "delete", "wait"},
-			wantAnnotations: map[string]string{
-				csiutil.VSCDeletionSecretNameAnnotation:      "rook-csi-rbd-provisioner",
-				csiutil.VSCDeletionSecretNamespaceAnnotation: "rook-ceph",
-			},
-			wantErr: "fake-wait-error",
-		},
-		{
-			name:            "failure to delete the temp VSC fails the deletion",
-			retained:        retainedWithSecret,
-			executingBackup: "daily-backup",
-			deleteErr:       errors.New("fake-delete-error"),
-			wantEvents:      []string{"create", "sleep", "delete"},
-			wantAnnotations: map[string]string{
-				csiutil.VSCDeletionSecretNameAnnotation:      "rook-csi-rbd-provisioner",
-				csiutil.VSCDeletionSecretNamespaceAnnotation: "rook-ceph",
-			},
-			wantErr: "fake-delete-error",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			events := []string{}
-			originalSleep := csiutil.SleepBetweenTempVSCCreateAndDelete
-			t.Cleanup(func() { csiutil.SleepBetweenTempVSCCreateAndDelete = originalSleep })
-			csiutil.SleepBetweenTempVSCCreateAndDelete = func(time.Duration) { events = append(events, "sleep") }
-			originalWait := csiutil.WaitTempVSCDeleted
-			t.Cleanup(func() { csiutil.WaitTempVSCDeleted = originalWait })
-			csiutil.WaitTempVSCDeleted = func(context.Context, crclient.Client, string, time.Duration, logrus.FieldLogger) error {
-				events = append(events, "wait")
-				return tc.waitErr
-			}
-
-			crClient := &vscTrackingClient{
-				Client:    velerotest.NewFakeControllerRuntimeClient(t),
-				events:    &events,
-				createErr: tc.createErr,
-				deleteErr: tc.deleteErr,
-			}
+			crClient := velerotest.NewFakeControllerRuntimeClient(t)
 			action := NewDataUploadDeleteAction(velerotest.NewLogger(), crClient)
 
 			du := newCompletedDataUpload("daily-backup-abcde", "daily-backup")
 			du.Status.RetainedSnapshot = tc.retained
 			backup := builder.ForBackup("velero", tc.executingBackup).StorageLocation("default").Result()
-			if tc.existingCM {
+			if tc.existingCMs {
 				require.NoError(t, crClient.Create(t.Context(), genConfigmap(backup, *du)))
+				cm, err := genRetainedSnapshotConfigmap(backup, *du)
+				require.NoError(t, err)
+				require.NoError(t, crClient.Create(t.Context(), cm))
 			}
 
 			err := action.Execute(&velero.DeleteItemActionExecuteInput{
@@ -367,24 +263,23 @@ func TestDataUploadDeleteActionRetainedSnapshot(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-			assert.Equal(t, tc.wantEvents, events)
 
-			if len(tc.wantEvents) < 3 {
+			cms := &corev1api.ConfigMapList{}
+			require.NoError(t, crClient.List(t.Context(), cms, crclient.MatchingLabels{velerov1.DataUploadRetainedSnapshotLabel: "true"}))
+			if tc.wantData == nil {
+				assert.Empty(t, cms.Items)
 				return
 			}
-			require.Len(t, crClient.created, 1)
-			vsc := crClient.created[0]
-			assert.Equal(t, snapshotv1api.VolumeSnapshotContentDelete, vsc.Spec.DeletionPolicy)
-			require.NotNil(t, vsc.Spec.Source.SnapshotHandle)
-			assert.Equal(t, tc.retained.SnapshotHandle, *vsc.Spec.Source.SnapshotHandle)
-			assert.Nil(t, vsc.Spec.Source.VolumeHandle)
-			assert.Equal(t, tc.retained.Driver, vsc.Spec.Driver)
-			assert.Nil(t, vsc.Spec.VolumeSnapshotClassName)
-			assert.NotEmpty(t, vsc.Spec.VolumeSnapshotRef.Name)
-			assert.NotEmpty(t, vsc.Spec.VolumeSnapshotRef.Namespace)
-			assert.Equal(t, tc.wantAnnotations, vsc.Annotations)
-			assert.Equal(t, "daily-backup", vsc.Labels[velerov1.BackupNameLabel])
-			assert.Equal(t, []string{csiutil.VSCBoundProtectionFinalizer}, vsc.Finalizers)
+			require.Len(t, cms.Items, 1)
+			cm := cms.Items[0]
+			assert.Equal(t, "velero", cm.Namespace)
+			assert.Equal(t, "daily-backup-abcde-retained-snapshot", cm.Name)
+			assert.Equal(t, "daily-backup", cm.Labels[velerov1.BackupNameLabel])
+			assert.Equal(t, tc.wantData, cm.Data)
+
+			vscs := &snapshotv1api.VolumeSnapshotContentList{}
+			require.NoError(t, crClient.List(t.Context(), vscs))
+			assert.Empty(t, vscs.Items, "the retained snapshot must not be deleted by the DeleteItemAction")
 		})
 	}
 }

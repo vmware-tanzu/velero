@@ -27,6 +27,7 @@ import (
 
 	"context"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -46,6 +47,7 @@ import (
 
 	"github.com/velero-io/velero/internal/volume"
 	velerov1api "github.com/velero-io/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/velero-io/velero/pkg/apis/velero/v2alpha1"
 	pkgbackup "github.com/velero-io/velero/pkg/backup"
 	"github.com/velero-io/velero/pkg/builder"
 	"github.com/velero-io/velero/pkg/metrics"
@@ -59,6 +61,7 @@ import (
 	repomocks "github.com/velero-io/velero/pkg/repository/mocks"
 	repotypes "github.com/velero-io/velero/pkg/repository/types"
 	velerotest "github.com/velero-io/velero/pkg/test"
+	"github.com/velero-io/velero/pkg/util/csi"
 )
 
 type backupDeletionControllerTestData struct {
@@ -1210,6 +1213,204 @@ func TestDeleteMovedSnapshots(t *testing.T) {
 				for i := range test.expected {
 					assert.EqualError(t, errs[i], test.expected[i])
 				}
+			}
+		})
+	}
+}
+
+func retainedSnapshotConfigMap(t *testing.T, backupName string, name string, retained *velerov2alpha1api.RetainedSnapshot) *corev1api.ConfigMap {
+	t.Helper()
+	b, err := json.Marshal(retained)
+	require.NoError(t, err)
+	data := make(map[string]string)
+	require.NoError(t, json.Unmarshal(b, &data))
+	return &corev1api.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1api.DefaultNamespace,
+			Name:      name,
+			Labels: map[string]string{
+				velerov1api.BackupNameLabel:                 backupName,
+				velerov1api.DataUploadRetainedSnapshotLabel: "true",
+			},
+		},
+		Data: data,
+	}
+}
+
+func stubTempVSCDeletion(t *testing.T, waitErr error) *[]string {
+	t.Helper()
+	waited := []string{}
+	originalSleep := csi.SleepBetweenTempVSCCreateAndDelete
+	t.Cleanup(func() { csi.SleepBetweenTempVSCCreateAndDelete = originalSleep })
+	csi.SleepBetweenTempVSCCreateAndDelete = func(time.Duration) {}
+	originalWait := csi.WaitTempVSCDeleted
+	t.Cleanup(func() { csi.WaitTempVSCDeleted = originalWait })
+	csi.WaitTempVSCDeleted = func(_ context.Context, _ client.Client, name string, _ time.Duration, _ logrus.FieldLogger) error {
+		waited = append(waited, name)
+		return waitErr
+	}
+	return &waited
+}
+
+func TestBackupDeletionRetainedSnapshotAfterOtherData(t *testing.T) {
+	tests := []struct {
+		name               string
+		batchDeleteSucceed bool
+		wantSnapshotDelete bool
+	}{
+		{
+			name:               "retained snapshot is deleted after the moved snapshot data",
+			batchDeleteSucceed: true,
+			wantSnapshotDelete: true,
+		},
+		{
+			name: "retained snapshot is kept when deleting the moved snapshot data fails",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			waited := stubTempVSCDeletion(t, nil)
+			originalBatchDelete := batchDeleteSnapshotFunc
+			t.Cleanup(func() { batchDeleteSnapshotFunc = originalBatchDelete })
+			if tc.batchDeleteSucceed {
+				batchDeleteSnapshotFunc = batchDeleteSucceed
+			} else {
+				batchDeleteSnapshotFunc = batchDeleteFail
+			}
+
+			backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").StorageLocation("primary").SnapshotMoveData(true).Result()
+			backup.UID = "uid"
+			location := builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "primary").Provider("objStoreProvider").Bucket("bucket").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
+
+			snapshotData, err := generateSnapshotData(&repotypes.SnapshotIdentifier{
+				SnapshotID:      "kopia-snapshot-1",
+				RepositoryType:  "kopia",
+				VolumeNamespace: "app",
+			})
+			require.NoError(t, err)
+			snapshotInfoCM := &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "foo-du-info",
+					Labels: map[string]string{
+						velerov1api.BackupNameLabel:             "foo",
+						velerov1api.DataUploadSnapshotInfoLabel: "true",
+					},
+				},
+				Data: snapshotData,
+			}
+			retainedCM := retainedSnapshotConfigMap(t, "foo", "foo-du-retained-snapshot", &velerov2alpha1api.RetainedSnapshot{
+				SnapshotHandle: "snap-handle",
+				Driver:         "hostpath.csi.k8s.io",
+			})
+
+			dbr := defaultTestDbr()
+			td := setupBackupDeletionControllerTest(t, dbr, backup, location, snapshotInfoCM, retainedCM)
+			td.controller.repoMgr = repomocks.NewManager(t)
+
+			pluginManager := &pluginmocks.Manager{}
+			pluginManager.On("GetDeleteItemActions").Return([]velero.DeleteItemAction{}, nil)
+			pluginManager.On("CleanupClients")
+			td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
+			td.backupStore.On("GetBackupVolumeSnapshots", dbr.Spec.BackupName).Return(nil, nil)
+			td.backupStore.On("DeleteBackup", dbr.Spec.BackupName).Return(nil)
+
+			_, err = td.controller.Reconcile(t.Context(), td.req)
+			require.NoError(t, err)
+
+			vscs := &snapshotv1api.VolumeSnapshotContentList{}
+			require.NoError(t, td.fakeClient.List(t.Context(), vscs))
+			if tc.wantSnapshotDelete {
+				require.Len(t, vscs.Items, 1)
+				require.NotNil(t, vscs.Items[0].Spec.Source.SnapshotHandle)
+				assert.Equal(t, "snap-handle", *vscs.Items[0].Spec.Source.SnapshotHandle)
+				assert.Equal(t, "foo", vscs.Items[0].Labels[velerov1api.BackupNameLabel])
+				assert.Len(t, *waited, 1)
+				td.backupStore.AssertCalled(t, "DeleteBackup", dbr.Spec.BackupName)
+			} else {
+				assert.Empty(t, vscs.Items)
+				assert.Empty(t, *waited)
+				td.backupStore.AssertNotCalled(t, "DeleteBackup", mock.Anything)
+
+				res := &velerov1api.DeleteBackupRequest{}
+				require.NoError(t, td.fakeClient.Get(t.Context(), td.req.NamespacedName, res))
+				assert.Contains(t, strings.Join(res.Status.Errors, "\n"), "error deleting moved snapshot data")
+			}
+
+			// The configmap is created again from the backup tarball when the deletion is retried.
+			err = td.fakeClient.Get(t.Context(), client.ObjectKeyFromObject(retainedCM), &corev1api.ConfigMap{})
+			assert.True(t, apierrors.IsNotFound(err), "expected the retained snapshot configmap to be removed, got %v", err)
+		})
+	}
+}
+
+func TestDeleteRetainedSnapshots(t *testing.T) {
+	tests := []struct {
+		name       string
+		retained   *velerov2alpha1api.RetainedSnapshot
+		otherCM    bool
+		skip       bool
+		waitErr    error
+		wantWaited int
+		wantErr    string
+	}{
+		{
+			name:       "retained snapshot is deleted",
+			retained:   &velerov2alpha1api.RetainedSnapshot{SnapshotHandle: "snap-handle", Driver: "hostpath.csi.k8s.io"},
+			wantWaited: 1,
+		},
+		{
+			name:     "retained snapshot is kept when skipped",
+			retained: &velerov2alpha1api.RetainedSnapshot{SnapshotHandle: "snap-handle", Driver: "hostpath.csi.k8s.io"},
+			skip:     true,
+		},
+		{
+			name:     "retained snapshot of another backup is not touched",
+			retained: &velerov2alpha1api.RetainedSnapshot{SnapshotHandle: "snap-handle", Driver: "hostpath.csi.k8s.io"},
+			otherCM:  true,
+		},
+		{
+			name:     "invalid retained snapshot fails",
+			retained: &velerov2alpha1api.RetainedSnapshot{Driver: "hostpath.csi.k8s.io"},
+			wantErr:  "invalid retained snapshot",
+		},
+		{
+			name:       "failure of the CSI driver fails",
+			retained:   &velerov2alpha1api.RetainedSnapshot{SnapshotHandle: "snap-handle", Driver: "hostpath.csi.k8s.io"},
+			waitErr:    errors.New("fake-snapshot-delete-error"),
+			wantWaited: 1,
+			wantErr:    "fake-snapshot-delete-error",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			waited := stubTempVSCDeletion(t, tc.waitErr)
+
+			owner := "foo"
+			if tc.otherCM {
+				owner = "bar"
+			}
+			cm := retainedSnapshotConfigMap(t, owner, "du-retained-snapshot", tc.retained)
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, cm)
+			r := &backupDeletionReconciler{Client: fakeClient, logger: velerotest.NewLogger()}
+			backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").Result()
+
+			errs := r.deleteRetainedSnapshots(t.Context(), backup, tc.skip, velerotest.NewLogger())
+			if tc.wantErr != "" {
+				require.Len(t, errs, 1)
+				require.ErrorContains(t, errs[0], tc.wantErr)
+			} else {
+				assert.Empty(t, errs)
+			}
+			assert.Len(t, *waited, tc.wantWaited)
+
+			err := fakeClient.Get(t.Context(), client.ObjectKeyFromObject(cm), &corev1api.ConfigMap{})
+			if tc.otherCM {
+				require.NoError(t, err)
+			} else {
+				assert.True(t, apierrors.IsNotFound(err), "expected the configmap to be removed, got %v", err)
 			}
 		})
 	}

@@ -1098,6 +1098,39 @@ func GetRetainedSnapshot(vsc *snapshotv1api.VolumeSnapshotContent) *velerov2alph
 	}
 }
 
+// DeleteRetainedSnapshot has the CSI driver delete a retained snapshot. A
+// VolumeSnapshotContent labeled with the backup name label value
+// backupNameLabel is rebuilt for the retained snapshot handle with
+// DeletionPolicy Delete and then deleted.
+func DeleteRetainedSnapshot(ctx context.Context, crClient crclient.Client, retained *velerov2alpha1api.RetainedSnapshot, backupNameLabel string, log logrus.FieldLogger) error {
+	if retained.SnapshotHandle == "" || retained.Driver == "" {
+		return errors.Errorf("invalid retained snapshot, handle %q, driver %q", retained.SnapshotHandle, retained.Driver)
+	}
+
+	handle := retained.SnapshotHandle
+	vsc := &snapshotv1api.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				velerov1api.BackupNameLabel: backupNameLabel,
+			},
+		},
+		Spec: snapshotv1api.VolumeSnapshotContentSpec{
+			Driver: retained.Driver,
+			Source: snapshotv1api.VolumeSnapshotContentSource{
+				SnapshotHandle: &handle,
+			},
+		},
+	}
+	if retained.DeletionSecretName != "" {
+		vsc.Annotations = map[string]string{
+			VSCDeletionSecretNameAnnotation:      retained.DeletionSecretName,
+			VSCDeletionSecretNamespaceAnnotation: retained.DeletionSecretNamespace,
+		}
+	}
+
+	return DeleteSnapshotByTempVSC(ctx, crClient, vsc, log)
+}
+
 // ReleaseRetainedVSC sets the deletion policy of the named VolumeSnapshotContent
 // to Delete if it is Retain, so that deleting it or its VolumeSnapshot also
 // makes the CSI driver delete the snapshot. A missing VSC is not an error.
