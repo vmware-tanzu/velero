@@ -90,7 +90,7 @@ func skipTempVSCDeletionWait(t *testing.T) {
 	t.Helper()
 	original := csi.WaitTempVSCDeleted
 	t.Cleanup(func() { csi.WaitTempVSCDeleted = original })
-	csi.WaitTempVSCDeleted = func(context.Context, crclient.Client, string, time.Duration) error { return nil }
+	csi.WaitTempVSCDeleted = func(context.Context, crclient.Client, string, time.Duration, logrus.FieldLogger) error { return nil }
 }
 
 func TestVSCExecute(t *testing.T) {
@@ -444,7 +444,7 @@ func TestVSCExecute_CreateSleepDeleteOrder(t *testing.T) {
 	}
 	originalWait := csi.WaitTempVSCDeleted
 	t.Cleanup(func() { csi.WaitTempVSCDeleted = originalWait })
-	csi.WaitTempVSCDeleted = func(context.Context, crclient.Client, string, time.Duration) error {
+	csi.WaitTempVSCDeleted = func(context.Context, crclient.Client, string, time.Duration, logrus.FieldLogger) error {
 		events = append(events, "wait")
 		return nil
 	}

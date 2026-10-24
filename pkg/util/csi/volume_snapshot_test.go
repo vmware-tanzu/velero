@@ -2571,14 +2571,14 @@ func TestDeleteSnapshotByTempVSC(t *testing.T) {
 
 func TestWaitTempVSCDeleted(t *testing.T) {
 	crClient := velerotest.NewFakeControllerRuntimeClient(t)
-	require.NoError(t, waitTempVSCDeleted(t.Context(), crClient, "fake-vsc", time.Second))
+	require.NoError(t, waitTempVSCDeleted(t.Context(), crClient, "fake-vsc", time.Second, velerotest.NewLogger()))
 
 	vsc := &snapshotv1api.VolumeSnapshotContent{
 		ObjectMeta: metav1.ObjectMeta{Name: "fake-vsc", Finalizers: []string{VSCBoundProtectionFinalizer}},
 	}
 	require.NoError(t, crClient.Create(t.Context(), vsc))
 	require.NoError(t, crClient.Delete(t.Context(), vsc))
-	require.ErrorIs(t, waitTempVSCDeleted(t.Context(), crClient, "fake-vsc", 2*time.Second), ErrTempVSCDeletionPending)
+	require.ErrorIs(t, waitTempVSCDeleted(t.Context(), crClient, "fake-vsc", 2*time.Second, velerotest.NewLogger()), ErrTempVSCDeletionPending)
 }
 
 func TestDeleteSnapshotByTempVSCPending(t *testing.T) {
@@ -2589,7 +2589,7 @@ func TestDeleteSnapshotByTempVSCPending(t *testing.T) {
 		WaitTempVSCDeleted = originalWait
 	})
 	SleepBetweenTempVSCCreateAndDelete = func(time.Duration) {}
-	WaitTempVSCDeleted = func(context.Context, crclient.Client, string, time.Duration) error {
+	WaitTempVSCDeleted = func(context.Context, crclient.Client, string, time.Duration, logrus.FieldLogger) error {
 		return ErrTempVSCDeletionPending
 	}
 
@@ -2643,6 +2643,67 @@ func TestReleaseRetainedVSC(t *testing.T) {
 				vsc, err := client.SnapshotV1().VolumeSnapshotContents().Get(t.Context(), "fake-vsc", metav1.GetOptions{})
 				require.NoError(t, err)
 				assert.Equal(t, tc.expected, vsc.Spec.DeletionPolicy)
+			}
+		})
+	}
+}
+
+func TestWaitTempVSCDeletedDeleteError(t *testing.T) {
+	recent := metav1.NewTime(time.Now())
+	old := metav1.NewTime(time.Now().Add(-time.Hour))
+	event := func(name, vscName, reason string, at metav1.Time) *corev1api.Event {
+		return &corev1api.Event{
+			ObjectMeta:     metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: name},
+			InvolvedObject: corev1api.ObjectReference{Kind: "VolumeSnapshotContent", Name: vscName},
+			Reason:         reason,
+			Message:        "Failed to get snapshot credentials",
+			LastTimestamp:  at,
+		}
+	}
+
+	tests := []struct {
+		name    string
+		events  []*corev1api.Event
+		wantMsg string
+	}{
+		{
+			name: "no event means the deletion is pending",
+		},
+		{
+			name:    "delete error recorded during the wait fails",
+			events:  []*corev1api.Event{event("e1", "fake-vsc", "SnapshotDeleteError", recent)},
+			wantMsg: "CSI snapshotter failed to delete the snapshot: Failed to get snapshot credentials",
+		},
+		{
+			name:   "delete error recorded before the wait is ignored",
+			events: []*corev1api.Event{event("e1", "fake-vsc", "SnapshotDeleteError", old)},
+		},
+		{
+			name: "events of other VSCs or reasons are ignored",
+			events: []*corev1api.Event{
+				event("e1", "other-vsc", "SnapshotDeleteError", recent),
+				event("e2", "fake-vsc", "SnapshotContentCheckandUpdateFailed", recent),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			crClient := velerotest.NewFakeControllerRuntimeClient(t)
+			vsc := &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{Name: "fake-vsc", Finalizers: []string{VSCBoundProtectionFinalizer}},
+			}
+			require.NoError(t, crClient.Create(t.Context(), vsc))
+			require.NoError(t, crClient.Delete(t.Context(), vsc))
+			for _, e := range tc.events {
+				require.NoError(t, crClient.Create(t.Context(), e))
+			}
+
+			err := waitTempVSCDeleted(t.Context(), crClient, "fake-vsc", time.Second, velerotest.NewLogger())
+			if tc.wantMsg == "" {
+				require.ErrorIs(t, err, ErrTempVSCDeletionPending)
+			} else {
+				require.ErrorContains(t, err, tc.wantMsg)
 			}
 		})
 	}

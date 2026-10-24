@@ -338,7 +338,7 @@ func TestDataUploadDeleteActionRetainedSnapshot(t *testing.T) {
 			csiutil.SleepBetweenTempVSCCreateAndDelete = func(time.Duration) { events = append(events, "sleep") }
 			originalWait := csiutil.WaitTempVSCDeleted
 			t.Cleanup(func() { csiutil.WaitTempVSCDeleted = originalWait })
-			csiutil.WaitTempVSCDeleted = func(context.Context, crclient.Client, string, time.Duration) error {
+			csiutil.WaitTempVSCDeleted = func(context.Context, crclient.Client, string, time.Duration, logrus.FieldLogger) error {
 				events = append(events, "wait")
 				return tc.waitErr
 			}

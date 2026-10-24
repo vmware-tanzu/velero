@@ -946,10 +946,12 @@ var WaitTempVSCDeleted = waitTempVSCDeleted
 var ErrTempVSCDeletionPending = errors.New("temp VolumeSnapshotContent deletion is still pending")
 
 // waitTempVSCDeleted waits until the temp VolumeSnapshotContent is gone. Its
-// finalizer is only removed once the CSI driver has deleted the snapshot, so
-// ErrTempVSCDeletionPending means the deletion is either slow or failing; the
-// CSI snapshotter reports failures only as events on the VSC and keeps retrying.
-func waitTempVSCDeleted(ctx context.Context, crClient crclient.Client, name string, timeout time.Duration) error {
+// finalizer is only removed once the CSI driver has deleted the snapshot. The CSI
+// snapshotter reports a failed deletion only as an event on the VSC and keeps
+// retrying, so at the timeout it returns the failure recorded during the wait,
+// or ErrTempVSCDeletionPending if there is none and the deletion is just slow.
+func waitTempVSCDeleted(ctx context.Context, crClient crclient.Client, name string, timeout time.Duration, log logrus.FieldLogger) error {
+	start := time.Now()
 	err := wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		err := crClient.Get(ctx, crclient.ObjectKey{Name: name}, &snapshotv1api.VolumeSnapshotContent{})
 		if apierrors.IsNotFound(err) {
@@ -958,9 +960,45 @@ func waitTempVSCDeleted(ctx context.Context, crClient crclient.Client, name stri
 		return false, err
 	})
 	if wait.Interrupted(err) {
+		if deleteErr := snapshotDeleteErrorSince(ctx, crClient, name, start, log); deleteErr != nil {
+			return deleteErr
+		}
 		return ErrTempVSCDeletionPending
 	}
 	return err
+}
+
+// snapshotDeleteErrorSince returns the failure of the latest SnapshotDeleteError
+// event the CSI snapshotter recorded for the named VolumeSnapshotContent since
+// the given time, or nil if there is none or the events cannot be listed. Events
+// of a cluster scoped object are recorded in the default namespace.
+func snapshotDeleteErrorSince(ctx context.Context, crClient crclient.Client, vscName string, since time.Time, log logrus.FieldLogger) error {
+	events := &corev1api.EventList{}
+	if err := crClient.List(ctx, events, crclient.InNamespace(metav1.NamespaceDefault)); err != nil {
+		// The events only add detail to a pending deletion, don't fail on them.
+		log.WithError(err).Warnf("Failed to list the events of VolumeSnapshotContent %s", vscName)
+		return nil
+	}
+
+	// Allow for clock skew between Velero and the CSI snapshotter.
+	since = since.Add(-5 * time.Second)
+	var latest *corev1api.Event
+	for i := range events.Items {
+		event := &events.Items[i]
+		if event.InvolvedObject.Kind != "VolumeSnapshotContent" || event.InvolvedObject.Name != vscName ||
+			event.Reason != "SnapshotDeleteError" || event.LastTimestamp.Time.Before(since) {
+			continue
+		}
+		if latest == nil || latest.LastTimestamp.Before(&event.LastTimestamp) {
+			latest = event
+		}
+	}
+	if latest == nil {
+		return nil
+	}
+
+	return errors.Errorf("CSI snapshotter failed to delete the snapshot: %s, see the events of VolumeSnapshotContent %s and the CSI snapshotter logs",
+		latest.Message, vscName)
 }
 
 // DeleteSnapshotByTempVSC deletes the storage snapshot referenced by
@@ -1018,11 +1056,11 @@ func DeleteSnapshotByTempVSC(ctx context.Context, crClient crclient.Client, vsc 
 		return errors.Wrapf(err, "error deleting temp VolumeSnapshotContent %s", vsc.Name)
 	}
 
-	if err := WaitTempVSCDeleted(ctx, crClient, vsc.Name, TempVSCDeleteTimeout); err != nil {
+	if err := WaitTempVSCDeleted(ctx, crClient, vsc.Name, TempVSCDeleteTimeout, log); err != nil {
 		if errors.Is(err, ErrTempVSCDeletionPending) {
 			// The CSI snapshotter keeps the temp VSC and retries until the snapshot
 			// is deleted, so a slow deletion still completes after this returns, and
-			// a retry of the backup deletion reuses the VSC.
+			// a later deletion of the same snapshot reuses the VSC.
 			log.Warnf("Snapshot %s is not deleted after %v, the CSI snapshotter keeps retrying and removes temp VolumeSnapshotContent %s when it succeeds; "+
 				"if it stays, check the events of the VolumeSnapshotContent and the CSI snapshotter logs",
 				*vsc.Spec.Source.SnapshotHandle, TempVSCDeleteTimeout, vsc.Name)
