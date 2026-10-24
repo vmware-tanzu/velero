@@ -1,1 +1,1 @@
-Delete retained volume snapshots on backup deletion for data movement
+Delete retained volume snapshots on backup deletion for data movement, and delete the CBT baseline snapshot of in-place incremental restores under a Retain VolumeSnapshotClass
