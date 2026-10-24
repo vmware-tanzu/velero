@@ -294,16 +294,27 @@ func TestDataUploadDeleteActionRetainedSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name:            "snapshot not deleted by the CSI driver fails the deletion",
+			name:            "slow snapshot deletion by the CSI driver does not fail the deletion",
 			retained:        retainedWithSecret,
 			executingBackup: "daily-backup",
-			waitErr:         errors.New("fake-wait-timeout"),
+			waitErr:         csiutil.ErrTempVSCDeletionPending,
 			wantEvents:      []string{"create", "sleep", "delete", "wait"},
 			wantAnnotations: map[string]string{
 				csiutil.VSCDeletionSecretNameAnnotation:      "rook-csi-rbd-provisioner",
 				csiutil.VSCDeletionSecretNamespaceAnnotation: "rook-ceph",
 			},
-			wantErr: "fake-wait-timeout",
+		},
+		{
+			name:            "error waiting for the temp VSC fails the deletion",
+			retained:        retainedWithSecret,
+			executingBackup: "daily-backup",
+			waitErr:         errors.New("fake-wait-error"),
+			wantEvents:      []string{"create", "sleep", "delete", "wait"},
+			wantAnnotations: map[string]string{
+				csiutil.VSCDeletionSecretNameAnnotation:      "rook-csi-rbd-provisioner",
+				csiutil.VSCDeletionSecretNamespaceAnnotation: "rook-ceph",
+			},
+			wantErr: "fake-wait-error",
 		},
 		{
 			name:            "failure to delete the temp VSC fails the deletion",

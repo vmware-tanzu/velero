@@ -2578,59 +2578,7 @@ func TestWaitTempVSCDeleted(t *testing.T) {
 	}
 	require.NoError(t, crClient.Create(t.Context(), vsc))
 	require.NoError(t, crClient.Delete(t.Context(), vsc))
-	require.Error(t, waitTempVSCDeleted(t.Context(), crClient, "fake-vsc", 2*time.Second))
-}
-
-func TestWaitTempVSCDeletedResult(t *testing.T) {
-	before := metav1.NewTime(time.Now().Add(-time.Minute))
-	after := metav1.NewTime(time.Now().Add(time.Minute))
-
-	tests := []struct {
-		name      string
-		errorTime *metav1.Time
-		wantErr   error
-		wantMsg   string
-	}{
-		{
-			name:    "slow deletion without error is pending",
-			wantErr: ErrTempVSCDeletionPending,
-		},
-		{
-			name:      "error recorded before the deletion is ignored",
-			errorTime: &before,
-			wantErr:   ErrTempVSCDeletionPending,
-		},
-		{
-			name:      "error recorded by the deletion fails immediately",
-			errorTime: &after,
-			wantMsg:   "CSI driver failed to delete the snapshot: fake-delete-error",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			crClient := velerotest.NewFakeControllerRuntimeClient(t)
-			vsc := &snapshotv1api.VolumeSnapshotContent{
-				ObjectMeta: metav1.ObjectMeta{Name: "fake-vsc", Finalizers: []string{VSCBoundProtectionFinalizer}},
-			}
-			require.NoError(t, crClient.Create(t.Context(), vsc))
-			require.NoError(t, crClient.Delete(t.Context(), vsc))
-			if tc.errorTime != nil {
-				require.NoError(t, crClient.Get(t.Context(), crclient.ObjectKeyFromObject(vsc), vsc))
-				vsc.Status = &snapshotv1api.VolumeSnapshotContentStatus{
-					Error: &snapshotv1api.VolumeSnapshotError{Time: tc.errorTime, Message: ptr.To("fake-delete-error")},
-				}
-				require.NoError(t, crClient.Update(t.Context(), vsc))
-			}
-
-			err := waitTempVSCDeleted(t.Context(), crClient, "fake-vsc", 2*time.Second)
-			if tc.wantErr != nil {
-				require.ErrorIs(t, err, tc.wantErr)
-			} else {
-				require.EqualError(t, err, tc.wantMsg)
-			}
-		})
-	}
+	require.ErrorIs(t, waitTempVSCDeleted(t.Context(), crClient, "fake-vsc", 2*time.Second), ErrTempVSCDeletionPending)
 }
 
 func TestDeleteSnapshotByTempVSCPending(t *testing.T) {
