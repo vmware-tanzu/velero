@@ -1068,7 +1068,7 @@ func DeleteSnapshotByTempVSC(ctx context.Context, crClient crclient.Client, vsc 
 		}
 		return errors.Wrapf(err, "error deleting snapshot %s with temp VolumeSnapshotContent %s", *vsc.Spec.Source.SnapshotHandle, vsc.Name)
 	}
-	log.Infof("Deleted temp VolumeSnapshotContent %s and snapshot %s from the storage", vsc.Name, *vsc.Spec.Source.SnapshotHandle)
+	log.Infof("Deleted temp VolumeSnapshotContent %s, the CSI driver deleted snapshot %s", vsc.Name, *vsc.Spec.Source.SnapshotHandle)
 
 	return nil
 }
@@ -1100,7 +1100,7 @@ func GetRetainedSnapshot(vsc *snapshotv1api.VolumeSnapshotContent) *velerov2alph
 
 // ReleaseRetainedVSC sets the deletion policy of the named VolumeSnapshotContent
 // to Delete if it is Retain, so that deleting it or its VolumeSnapshot also
-// deletes the snapshot from the storage. A missing VSC is not an error.
+// makes the CSI driver delete the snapshot. A missing VSC is not an error.
 func ReleaseRetainedVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface, vscName string) error {
 	vsc, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vscName, metav1.GetOptions{})
 	if err != nil {
