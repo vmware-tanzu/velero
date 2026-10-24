@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -166,6 +167,119 @@ func TestDataUploadDeleteActionExecute(t *testing.T) {
 			assert.Equal(t, tc.wantWarnContains != "", sawWarn,
 				"unexpected warn log presence (wantContains=%q, got=%v); entries=%v",
 				tc.wantWarnContains, sawWarn, hook.AllEntries())
+		})
+	}
+}
+
+func TestDataUploadDeleteActionRetainedSnapshot(t *testing.T) {
+	retainedWithSecret := &velerov2alpha1.RetainedSnapshot{
+		SnapshotHandle:          "0001-0009-rook-ceph-0000000000000001-snap",
+		Driver:                  "rbd.csi.ceph.com",
+		DeletionSecretName:      "rook-csi-rbd-provisioner",
+		DeletionSecretNamespace: "rook-ceph",
+	}
+
+	tests := []struct {
+		name            string
+		retained        *velerov2alpha1.RetainedSnapshot
+		executingBackup string
+		existingCMs     bool
+		wantData        map[string]string
+		wantErr         string
+	}{
+		{
+			name:            "retained snapshot is passed to the backup deletion controller with the deletion secret",
+			retained:        retainedWithSecret,
+			executingBackup: "daily-backup",
+			wantData: map[string]string{
+				"snapshotHandle":          "0001-0009-rook-ceph-0000000000000001-snap",
+				"driver":                  "rbd.csi.ceph.com",
+				"deletionSecretName":      "rook-csi-rbd-provisioner",
+				"deletionSecretNamespace": "rook-ceph",
+			},
+		},
+		{
+			name: "retained snapshot without deletion secret is passed without the secret",
+			retained: &velerov2alpha1.RetainedSnapshot{
+				SnapshotHandle: "snap-handle",
+				Driver:         "hostpath.csi.k8s.io",
+			},
+			executingBackup: "daily-backup",
+			wantData: map[string]string{
+				"snapshotHandle": "snap-handle",
+				"driver":         "hostpath.csi.k8s.io",
+			},
+		},
+		{
+			name:            "configmaps left by a failed deletion do not stop the retry",
+			retained:        retainedWithSecret,
+			executingBackup: "daily-backup",
+			existingCMs:     true,
+			wantData: map[string]string{
+				"snapshotHandle":          "0001-0009-rook-ceph-0000000000000001-snap",
+				"driver":                  "rbd.csi.ceph.com",
+				"deletionSecretName":      "rook-csi-rbd-provisioner",
+				"deletionSecretNamespace": "rook-ceph",
+			},
+		},
+		{
+			name:            "no retained snapshot creates no configmap",
+			executingBackup: "daily-backup",
+		},
+		{
+			name:            "retained snapshot of a DataUpload owned by another backup is not passed",
+			retained:        retainedWithSecret,
+			executingBackup: "hourly-backup",
+		},
+		{
+			name:            "retained snapshot without handle fails the deletion",
+			retained:        &velerov2alpha1.RetainedSnapshot{Driver: "rbd.csi.ceph.com"},
+			executingBackup: "daily-backup",
+			wantErr:         "invalid retained snapshot",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			crClient := velerotest.NewFakeControllerRuntimeClient(t)
+			action := NewDataUploadDeleteAction(velerotest.NewLogger(), crClient)
+
+			du := newCompletedDataUpload("daily-backup-abcde", "daily-backup")
+			du.Status.RetainedSnapshot = tc.retained
+			backup := builder.ForBackup("velero", tc.executingBackup).StorageLocation("default").Result()
+			if tc.existingCMs {
+				require.NoError(t, crClient.Create(t.Context(), genConfigmap(backup, *du)))
+				cm, err := genRetainedSnapshotConfigmap(backup, *du)
+				require.NoError(t, err)
+				require.NoError(t, crClient.Create(t.Context(), cm))
+			}
+
+			err := action.Execute(&velero.DeleteItemActionExecuteInput{
+				Item:   toUnstructured(t, du),
+				Backup: backup,
+			})
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			cms := &corev1api.ConfigMapList{}
+			require.NoError(t, crClient.List(t.Context(), cms, crclient.MatchingLabels{velerov1.DataUploadRetainedSnapshotLabel: "true"}))
+			if tc.wantData == nil {
+				assert.Empty(t, cms.Items)
+				return
+			}
+			require.Len(t, cms.Items, 1)
+			cm := cms.Items[0]
+			assert.Equal(t, "velero", cm.Namespace)
+			assert.Equal(t, "daily-backup-abcde-retained-snapshot", cm.Name)
+			assert.Equal(t, "daily-backup", cm.Labels[velerov1.BackupNameLabel])
+			assert.Equal(t, tc.wantData, cm.Data)
+
+			vscs := &snapshotv1api.VolumeSnapshotContentList{}
+			require.NoError(t, crClient.List(t.Context(), vscs))
+			assert.Empty(t, vscs.Items, "the retained snapshot must not be deleted by the DeleteItemAction")
 		})
 	}
 }
