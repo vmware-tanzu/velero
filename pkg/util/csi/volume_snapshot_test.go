@@ -18,6 +18,8 @@ package csi
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"testing"
 	"time"
@@ -2433,6 +2435,7 @@ func TestDeleteSnapshotByTempVSCEmptyHandle(t *testing.T) {
 func TestDeleteSnapshotByTempVSC(t *testing.T) {
 	tests := []struct {
 		name       string
+		existing   bool
 		createErr  error
 		deleteErr  error
 		wantEvents []string
@@ -2440,6 +2443,11 @@ func TestDeleteSnapshotByTempVSC(t *testing.T) {
 	}{
 		{
 			name:       "temp VSC is created with Delete policy and then deleted",
+			wantEvents: []string{"create", "sleep", "delete"},
+		},
+		{
+			name:       "temp VSC left by a previous attempt is reused",
+			existing:   true,
 			wantEvents: []string{"create", "sleep", "delete"},
 		},
 		{
@@ -2471,15 +2479,28 @@ func TestDeleteSnapshotByTempVSC(t *testing.T) {
 				events = append(events, "sleep")
 			}
 
+			sum := sha256.Sum256([]byte("fake-driver/fake-handle"))
+			tempVSCName := "vsc-" + hex.EncodeToString(sum[:16])
+
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t)
+			if tc.existing {
+				require.NoError(t, fakeClient.Create(t.Context(), &snapshotv1api.VolumeSnapshotContent{
+					ObjectMeta: metav1.ObjectMeta{Name: tempVSCName, Finalizers: []string{VSCBoundProtectionFinalizer}},
+				}))
+			}
+
 			var created *snapshotv1api.VolumeSnapshotContent
-			crClient := interceptor.NewClient(velerotest.NewFakeControllerRuntimeClient(t).(crclient.WithWatch), interceptor.Funcs{
+			crClient := interceptor.NewClient(fakeClient.(crclient.WithWatch), interceptor.Funcs{
 				Create: func(ctx context.Context, c crclient.WithWatch, obj crclient.Object, opts ...crclient.CreateOption) error {
 					events = append(events, "create")
 					if tc.createErr != nil {
 						return tc.createErr
 					}
+					if err := c.Create(ctx, obj, opts...); err != nil {
+						return err
+					}
 					created = obj.(*snapshotv1api.VolumeSnapshotContent).DeepCopy()
-					return c.Create(ctx, obj, opts...)
+					return nil
 				},
 				Delete: func(ctx context.Context, c crclient.WithWatch, obj crclient.Object, opts ...crclient.DeleteOption) error {
 					events = append(events, "delete")
@@ -2534,7 +2555,7 @@ func TestDeleteSnapshotByTempVSC(t *testing.T) {
 			if created == nil {
 				return
 			}
-			assert.NotEqual(t, "original-vsc", created.Name)
+			assert.Equal(t, tempVSCName, created.Name)
 			assert.Equal(t, snapshotv1api.VolumeSnapshotContentDelete, created.Spec.DeletionPolicy)
 			assert.Equal(t, "fake-handle", *created.Spec.Source.SnapshotHandle)
 			assert.Nil(t, created.Spec.Source.VolumeHandle)

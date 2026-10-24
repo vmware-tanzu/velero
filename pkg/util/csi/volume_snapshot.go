@@ -18,6 +18,8 @@ package csi
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -28,7 +30,6 @@ import (
 
 	"github.com/cockroachdb/errors"
 	jsonpatch "github.com/evanphx/json-patch/v5"
-	"github.com/google/uuid"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned/typed/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
@@ -965,12 +966,12 @@ func DeleteSnapshotByTempVSC(ctx context.Context, crClient crclient.Client, vsc 
 		return errors.New("snapshot handle is empty")
 	}
 
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return errors.Wrap(err, "error generating UUID for temp VolumeSnapshotContent")
-	}
+	// Name the temp VSC after the snapshot, so that a retry after a failed or
+	// timed out deletion reuses the VSC left behind instead of adding another one.
+	sum := sha256.Sum256([]byte(vsc.Spec.Driver + "/" + *vsc.Spec.Source.SnapshotHandle))
+	id := hex.EncodeToString(sum[:16])
 
-	vsc.Name = "vsc-" + id.String()
+	vsc.Name = "vsc-" + id
 	vsc.ResourceVersion = ""
 	vsc.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentDelete
 	vsc.Spec.Source = snapshotv1api.VolumeSnapshotContentSource{
@@ -979,8 +980,8 @@ func DeleteSnapshotByTempVSC(ctx context.Context, crClient crclient.Client, vsc 
 	vsc.Spec.VolumeSnapshotRef = corev1api.ObjectReference{
 		APIVersion: snapshotv1api.SchemeGroupVersion.String(),
 		Kind:       "VolumeSnapshot",
-		Namespace:  "ns-" + id.String(),
-		Name:       "name-" + id.String(),
+		Namespace:  "ns-" + id,
+		Name:       "name-" + id,
 	}
 	// Make the deletion independent of the VolumeSnapshotClass, which may no
 	// longer exist; the CSI driver reads the deletion secret from the annotations.
@@ -995,9 +996,13 @@ func DeleteSnapshotByTempVSC(ctx context.Context, crClient crclient.Client, vsc 
 	}
 
 	if err := crClient.Create(ctx, vsc); err != nil {
-		return errors.Wrapf(err, "error creating temp VolumeSnapshotContent %s", vsc.Name)
+		if !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "error creating temp VolumeSnapshotContent %s", vsc.Name)
+		}
+		log.Infof("Temp VolumeSnapshotContent %s for snapshot %s already exists, reusing it", vsc.Name, *vsc.Spec.Source.SnapshotHandle)
+	} else {
+		log.Infof("Created temp VolumeSnapshotContent %s with DeletionPolicy=Delete for snapshot %s", vsc.Name, *vsc.Spec.Source.SnapshotHandle)
 	}
-	log.Infof("Created temp VolumeSnapshotContent %s with DeletionPolicy=Delete for snapshot %s", vsc.Name, *vsc.Spec.Source.SnapshotHandle)
 
 	SleepBetweenTempVSCCreateAndDelete(TempVSCCreateDeleteGap)
 
