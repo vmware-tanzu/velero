@@ -554,7 +554,8 @@ func (r *DataUploadReconciler) getRetainedSnapshot(ctx context.Context, du *vele
 	// Retry transient errors, the backup VSC and the chance to record its snapshot
 	// are gone once the cleanup runs.
 	var vsc *snapshotv1api.VolumeSnapshotContent
-	err := retry.OnError(retry.DefaultBackoff, func(err error) bool { return !apierrors.IsNotFound(err) }, func() error {
+	backoff := wait.Backoff{Steps: 5, Duration: time.Second, Factor: 2.0, Jitter: 0.1}
+	err := retry.OnError(backoff, func(err error) bool { return !apierrors.IsNotFound(err) }, func() error {
 		var getErr error
 		vsc, getErr = r.csiSnapshotClient.VolumeSnapshotContents().Get(ctx, du.Name, metav1.GetOptions{})
 		return getErr

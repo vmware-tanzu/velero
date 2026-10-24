@@ -928,10 +928,31 @@ const (
 	// TempVSCCreateDeleteGap is the delay between creating and deleting a temporary
 	// VolumeSnapshotContent, to avoid create/delete race conditions in CSI controllers.
 	TempVSCCreateDeleteGap = 2 * time.Second
+
+	// TempVSCDeleteTimeout is how long to wait for the CSI snapshotter to delete
+	// the snapshot and remove the temp VolumeSnapshotContent.
+	TempVSCDeleteTimeout = time.Minute
 )
 
 // SleepBetweenTempVSCCreateAndDelete is a variable so that tests can skip the wait.
 var SleepBetweenTempVSCCreateAndDelete = time.Sleep
+
+// WaitTempVSCDeleted is a variable so that tests can skip the wait.
+var WaitTempVSCDeleted = waitTempVSCDeleted
+
+// waitTempVSCDeleted waits until the temp VolumeSnapshotContent is gone. Its
+// finalizer is only removed once the CSI driver has deleted the snapshot, so a
+// VSC that stays means the snapshot is not deleted, e.g. because the driver
+// lacks the deletion secret or the storage is unreachable.
+func waitTempVSCDeleted(ctx context.Context, crClient crclient.Client, name string, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, func(ctx context.Context) (bool, error) {
+		err := crClient.Get(ctx, crclient.ObjectKey{Name: name}, &snapshotv1api.VolumeSnapshotContent{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+}
 
 // DeleteSnapshotByTempVSC deletes the storage snapshot referenced by
 // vsc.Spec.Source.SnapshotHandle. It creates vsc as a statically provisioned
@@ -983,7 +1004,12 @@ func DeleteSnapshotByTempVSC(ctx context.Context, crClient crclient.Client, vsc 
 	if err := crClient.Delete(ctx, vsc); err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrapf(err, "error deleting temp VolumeSnapshotContent %s", vsc.Name)
 	}
-	log.Infof("Deleted temp VolumeSnapshotContent %s to remove snapshot %s from the storage", vsc.Name, *vsc.Spec.Source.SnapshotHandle)
+
+	if err := WaitTempVSCDeleted(ctx, crClient, vsc.Name, TempVSCDeleteTimeout); err != nil {
+		return errors.Wrapf(err, "snapshot %s is not deleted, temp VolumeSnapshotContent %s still exists, check the CSI snapshotter logs",
+			*vsc.Spec.Source.SnapshotHandle, vsc.Name)
+	}
+	log.Infof("Deleted temp VolumeSnapshotContent %s and snapshot %s from the storage", vsc.Name, *vsc.Spec.Source.SnapshotHandle)
 
 	return nil
 }

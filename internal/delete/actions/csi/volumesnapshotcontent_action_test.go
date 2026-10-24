@@ -84,7 +84,17 @@ func (c *fakeClientWithErrors) Delete(ctx context.Context, obj crclient.Object, 
 	return c.Client.Delete(ctx, obj, opts...)
 }
 
+// skipTempVSCDeletionWait skips waiting for the CSI snapshotter, which the fake
+// client doesn't run, to remove the temp VSC.
+func skipTempVSCDeletionWait(t *testing.T) {
+	t.Helper()
+	original := csi.WaitTempVSCDeleted
+	t.Cleanup(func() { csi.WaitTempVSCDeleted = original })
+	csi.WaitTempVSCDeleted = func(context.Context, crclient.Client, string, time.Duration) error { return nil }
+}
+
 func TestVSCExecute(t *testing.T) {
+	skipTempVSCDeletionWait(t)
 	snapshotHandleStr := "test"
 	tests := []struct {
 		name           string
@@ -432,6 +442,12 @@ func TestVSCExecute_CreateSleepDeleteOrder(t *testing.T) {
 		require.Equal(t, csi.TempVSCCreateDeleteGap, d)
 		events = append(events, "sleep")
 	}
+	originalWait := csi.WaitTempVSCDeleted
+	t.Cleanup(func() { csi.WaitTempVSCDeleted = originalWait })
+	csi.WaitTempVSCDeleted = func(context.Context, crclient.Client, string, time.Duration) error {
+		events = append(events, "wait")
+		return nil
+	}
 
 	p := volumeSnapshotContentDeleteItemAction{log: logrus.StandardLogger(), crClient: trackingClient}
 	err = p.Execute(&velero.DeleteItemActionExecuteInput{
@@ -439,7 +455,7 @@ func TestVSCExecute_CreateSleepDeleteOrder(t *testing.T) {
 		Backup: builder.ForBackup("velero", "backup").Result(),
 	})
 	require.NoError(t, err)
-	require.Equal(t, []string{"create", "sleep", "delete"}, events)
+	require.Equal(t, []string{"create", "sleep", "delete", "wait"}, events)
 }
 
 func boolPtr(b bool) *bool {

@@ -2483,10 +2483,22 @@ func TestDeleteSnapshotByTempVSC(t *testing.T) {
 				},
 				Delete: func(ctx context.Context, c crclient.WithWatch, obj crclient.Object, opts ...crclient.DeleteOption) error {
 					events = append(events, "delete")
-					if tc.deleteErr != nil {
+					if tc.deleteErr != nil && !apierrors.IsNotFound(tc.deleteErr) {
 						return tc.deleteErr
 					}
-					return c.Delete(ctx, obj, opts...)
+					if err := c.Delete(ctx, obj, opts...); err != nil {
+						return err
+					}
+					// Act as the CSI snapshotter: delete the snapshot, then remove the finalizer.
+					deleting := &snapshotv1api.VolumeSnapshotContent{}
+					if err := c.Get(ctx, crclient.ObjectKeyFromObject(obj), deleting); err != nil {
+						return err
+					}
+					deleting.Finalizers = nil
+					if err := c.Update(ctx, deleting); err != nil {
+						return err
+					}
+					return tc.deleteErr
 				},
 			})
 
@@ -2534,4 +2546,16 @@ func TestDeleteSnapshotByTempVSC(t *testing.T) {
 			assert.Equal(t, []string{VSCBoundProtectionFinalizer}, created.Finalizers)
 		})
 	}
+}
+
+func TestWaitTempVSCDeleted(t *testing.T) {
+	crClient := velerotest.NewFakeControllerRuntimeClient(t)
+	require.NoError(t, waitTempVSCDeleted(t.Context(), crClient, "fake-vsc", time.Second))
+
+	vsc := &snapshotv1api.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{Name: "fake-vsc", Finalizers: []string{VSCBoundProtectionFinalizer}},
+	}
+	require.NoError(t, crClient.Create(t.Context(), vsc))
+	require.NoError(t, crClient.Delete(t.Context(), vsc))
+	require.Error(t, waitTempVSCDeleted(t.Context(), crClient, "fake-vsc", 2*time.Second))
 }
